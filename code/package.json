@@ -1,0 +1,20 @@
+{
+  "name": "slides",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "astro dev --host 127.0.0.1",
+    "check": "astro check",
+    "build": "astro build && bun build ./src/host.ts --target=bun --outfile ./build/host.js",
+    "start": "bun ./build/host.js",
+    "test": "bun test"
+  },
+  "dependencies": {
+    "astro": "7.3.3"
+  },
+  "devDependencies": {
+    "@astrojs/check": "0.9.10",
+    "@types/bun": "1.4.2",
+    "typescript": "5.9.3"
+  }
+}
