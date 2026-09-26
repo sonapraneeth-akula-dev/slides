@@ -1,0 +1,23 @@
+---
+import '../styles.css';
+---
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light dark" />
+    <title>Slides — Audience</title>
+  </head>
+  <body>
+    <main class="audience-page">
+      <p id="audience-status" role="status" aria-live="polite">Connecting to presentation…</p>
+      <div id="audience-frame" class="stage-frame" aria-label="Audience slide">
+        <div id="audience-stage" class="stage"></div>
+        <svg id="audience-ink" class="ink" viewBox="0 0 1000 562.5" preserveAspectRatio="none" aria-hidden="true"></svg>
+        <div id="audience-mode" class="stage-mode" hidden></div>
+      </div>
+    </main>
+    <script>import '../audience.ts';</script>
+  </body>
+</html>

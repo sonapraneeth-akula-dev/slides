@@ -6,15 +6,28 @@
       "name": "slides",
       "dependencies": {
         "astro": "7.3.3",
+        "dompurify": "^3.4.15",
+        "echarts": "^6.1.0",
+        "highlight.js": "^11.12.0",
+        "katex": "^0.18.7",
+        "markdown-it": "^15.0.2",
+        "mermaid": "^12.0.0",
+        "yaml": "2.9.1",
       },
       "devDependencies": {
         "@astrojs/check": "0.9.10",
         "@types/bun": "1.4.2",
+        "@types/dompurify": "^3.2.0",
+        "@types/highlight.js": "^10.1.0",
+        "@types/katex": "^0.16.8",
+        "@types/markdown-it": "^14.2.0",
         "typescript": "5.9.3",
       },
     },
   },
   "packages": {
+    "@antfu/install-pkg": ["@antfu/install-pkg@2.1.0", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/@antfu/install-pkg/-/install-pkg-2.1.0.tgz", { "dependencies": { "package-manager-detector": "^1.8.0", "tinyexec": "^1.3.1" } }, "sha512-sdg9NxU3zR4Mnawfbc/x6GB5Wf17WYud5qOuEuxXjaKpYpMkISSJEjItGebXJ2bQ4DIcly4NYH23mtkGJjvKUw=="],
+
     "@astrojs/astro2tsx": ["@astrojs/astro2tsx@0.1.0", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/@astrojs/astro2tsx/-/astro2tsx-0.1.0.tgz", { "dependencies": { "@emnapi/core": "1.11.3", "@napi-rs/wasm-runtime": "1.2.4" } }, "sha512-tgprkax8mcF+BiHJQBdoQ+REqtvvnLlYzV0yCeLMdcv3pJIutdlinWNHUzN1jMOT5VRlYTtMmDdaoPrtd3cBAQ=="],
 
     "@astrojs/check": ["@astrojs/check@0.9.10", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/@astrojs/check/-/check-0.9.10.tgz", { "dependencies": { "@astrojs/language-server": "^2.16.7", "chokidar": "^4.0.3", "kleur": "^4.1.5", "yargs": "^18.0.0" }, "peerDependencies": { "typescript": "^5.0.0 || ^6.0.0" }, "bin": { "astro-check": "./bin/astro-check.js" } }, "sha1-dllc256pkOFVv1vmlaZeyz7OM00="],
@@ -63,6 +76,8 @@
 
     "@babel/types": ["@babel/types@7.29.8", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/@babel/types/-/types-7.29.8.tgz", { "dependencies": { "@babel/helper-string-parser": "^7.29.7", "@babel/helper-validator-identifier": "^7.29.7" } }, "sha1-Einu8x2FFW1w+j9M2Fk3bQ6vaGM="],
 
+    "@braintree/sanitize-url": ["@braintree/sanitize-url@7.1.2", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/@braintree/sanitize-url/-/sanitize-url-7.1.2.tgz", {}, "sha1-yiA1sP7+lWqGdv8Maa9z5gX82B8="],
+
     "@bruits/satteri-darwin-arm64": ["@bruits/satteri-darwin-arm64@0.10.5", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/@bruits/satteri-darwin-arm64/-/satteri-darwin-arm64-0.10.5.tgz", { "os": "darwin", "cpu": "arm64" }, "sha1-BAlHHVGBA/qMJCF1i8n6n3i6KFY="],
 
     "@bruits/satteri-darwin-x64": ["@bruits/satteri-darwin-x64@0.10.5", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/@bruits/satteri-darwin-x64/-/satteri-darwin-x64-0.10.5.tgz", { "os": "darwin", "cpu": "x64" }, "sha1-in1J3qfgW2dW3c0+dIr8fHb28Vg="],
@@ -82,6 +97,16 @@
     "@bruits/satteri-win32-x64-msvc": ["@bruits/satteri-win32-x64-msvc@0.10.5", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/@bruits/satteri-win32-x64-msvc/-/satteri-win32-x64-msvc-0.10.5.tgz", { "os": "win32", "cpu": "x64" }, "sha1-Im5ZHoxj0y51qA2GNDvnBk55wag="],
 
     "@capsizecss/unpack": ["@capsizecss/unpack@4.0.1", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/@capsizecss/unpack/-/unpack-4.0.1.tgz", { "dependencies": { "fontkitten": "^1.0.3" } }, "sha1-X8Xzo3GpOmnXZOgaCbrfAUM4Fzk="],
+
+    "@chevrotain/cst-dts-gen": ["@chevrotain/cst-dts-gen@11.1.2", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/@chevrotain/cst-dts-gen/-/cst-dts-gen-11.1.2.tgz", { "dependencies": { "@chevrotain/gast": "11.1.2", "@chevrotain/types": "11.1.2", "lodash-es": "4.17.23" } }, "sha1-UB6mF3+iHMVyZMeS71zD0LuUEP0="],
+
+    "@chevrotain/gast": ["@chevrotain/gast@11.1.2", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/@chevrotain/gast/-/gast-11.1.2.tgz", { "dependencies": { "@chevrotain/types": "11.1.2", "lodash-es": "4.17.23" } }, "sha1-ITOT8rWELovxM2m9wELH/RggGvI="],
+
+    "@chevrotain/regexp-to-ast": ["@chevrotain/regexp-to-ast@11.1.2", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/@chevrotain/regexp-to-ast/-/regexp-to-ast-11.1.2.tgz", {}, "sha1-ausLP9Xj8iCwY7PYVvu67VguTPo="],
+
+    "@chevrotain/types": ["@chevrotain/types@11.1.2", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/@chevrotain/types/-/types-11.1.2.tgz", {}, "sha1-6DoaJwTwxeSedZKyFAMaD0o01+U="],
+
+    "@chevrotain/utils": ["@chevrotain/utils@11.1.2", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/@chevrotain/utils/-/utils-11.1.2.tgz", {}, "sha1-oLE2N6zAopM9ii7eukvx2nicVl0="],
 
     "@clack/core": ["@clack/core@1.5.1", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/@clack/core/-/core-1.5.1.tgz", { "dependencies": { "fast-wrap-ansi": "^0.2.0", "sisteransi": "^1.0.5" } }, "sha512-iHTrHA8MtVuLl2TfZySmcKv1qO2PoyC9Z7pfSDozEuV5vtY3/wcOPKJXlqJ5Oq2Cx5DDGQGAMVx6HZfRRoVEbQ=="],
 
@@ -159,6 +184,10 @@
 
     "@esbuild/win32-x64": ["@esbuild/win32-x64@0.28.2", "https://ms-feed-17.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/@esbuild/win32-x64/-/win32-x64-0.28.2.tgz", { "os": "win32", "cpu": "x64" }, "sha1-shr/uATMFnwTPZX0WzodwTI7moc="],
 
+    "@iconify/types": ["@iconify/types@2.0.0", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/@iconify/types/-/types-2.0.0.tgz", {}, "sha1-qw6epoHWyKEhTzDNdB/jogzFf1c="],
+
+    "@iconify/utils": ["@iconify/utils@3.1.7", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/@iconify/utils/-/utils-3.1.7.tgz", { "dependencies": { "@antfu/install-pkg": "^2.0.1", "@iconify/types": "^2.0.0", "import-meta-resolve": "^4.2.0" } }, "sha1-//EcUoSQsRmiUKzjzzWgp44YIxc="],
+
     "@img/colour": ["@img/colour@1.1.0", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/@img/colour/-/colour-1.1.0.tgz", {}, "sha1-sMLC+mYa33Xv/WtJZEl82AAQu50="],
 
     "@img/sharp-darwin-arm64": ["@img/sharp-darwin-arm64@0.35.4", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/@img/sharp-darwin-arm64/-/sharp-darwin-arm64-0.35.4.tgz", { "optionalDependencies": { "@img/sharp-libvips-darwin-arm64": "1.3.3" }, "os": "darwin", "cpu": "arm64" }, "sha1-vBCyYt4vyACIAT9fmYKY0ciQn78="],
@@ -214,6 +243,8 @@
     "@img/sharp-win32-x64": ["@img/sharp-win32-x64@0.35.4", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/@img/sharp-win32-x64/-/sharp-win32-x64-0.35.4.tgz", { "os": "win32", "cpu": "x64" }, "sha1-C2e9Cx8BEjqYKvzGug3AC4d7igo="],
 
     "@jridgewell/sourcemap-codec": ["@jridgewell/sourcemap-codec@1.6.0", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/@jridgewell/sourcemap-codec/-/sourcemap-codec-1.6.0.tgz", {}, "sha1-9MZj6GLwbcmMpNRThixGkCeJoY0="],
+
+    "@mermaid-js/parser": ["@mermaid-js/parser@2.0.0", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/@mermaid-js/parser/-/parser-2.0.0.tgz", { "dependencies": { "@chevrotain/types": "~11.1.2" } }, "sha512-K8BeapFUfrfxbRAUQAG5oBOCwo1+bNWzaVnPxTCutkfrTBn6T/j91FIhqxWJ32SUeQ9T3iy1zcmPZ5ROZEvDrg=="],
 
     "@napi-rs/wasm-runtime": ["@napi-rs/wasm-runtime@1.2.4", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/@napi-rs/wasm-runtime/-/wasm-runtime-1.2.4.tgz", { "dependencies": { "@tybys/wasm-util": "^0.10.3" }, "peerDependencies": { "@emnapi/core": "^1.7.1 || ^2.0.0-alpha.4", "@emnapi/runtime": "^1.7.1 || ^2.0.0-alpha.4" } }, "sha512-AJxoUD2/15ESHbvpcyjU274nsAPLuOtPHCk0vKJM5pj//Fg/B1FXNWjPnXTT9PymCYYiHo4zPj0ZomXBKhoy7g=="],
 
@@ -273,21 +304,101 @@
 
     "@types/bun": ["@types/bun@1.4.2", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/@types/bun/-/bun-1.4.2.tgz", { "dependencies": { "bun-types": "1.4.2" } }, "sha1-LmspxtSEaAufF35yJt8o+sStbZE="],
 
+    "@types/d3": ["@types/d3@7.4.3", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/@types/d3/-/d3-7.4.3.tgz", { "dependencies": { "@types/d3-array": "*", "@types/d3-axis": "*", "@types/d3-brush": "*", "@types/d3-chord": "*", "@types/d3-color": "*", "@types/d3-contour": "*", "@types/d3-delaunay": "*", "@types/d3-dispatch": "*", "@types/d3-drag": "*", "@types/d3-dsv": "*", "@types/d3-ease": "*", "@types/d3-fetch": "*", "@types/d3-force": "*", "@types/d3-format": "*", "@types/d3-geo": "*", "@types/d3-hierarchy": "*", "@types/d3-interpolate": "*", "@types/d3-path": "*", "@types/d3-polygon": "*", "@types/d3-quadtree": "*", "@types/d3-random": "*", "@types/d3-scale": "*", "@types/d3-scale-chromatic": "*", "@types/d3-selection": "*", "@types/d3-shape": "*", "@types/d3-time": "*", "@types/d3-time-format": "*", "@types/d3-timer": "*", "@types/d3-transition": "*", "@types/d3-zoom": "*" } }, "sha1-1FUKhdCPSXj68KTDa4SMYeqsB+I="],
+
+    "@types/d3-array": ["@types/d3-array@3.2.2", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/@types/d3-array/-/d3-array-3.2.2.tgz", {}, "sha1-4CFRRk0C1KG0RkbQ/NuT+viP3ow="],
+
+    "@types/d3-axis": ["@types/d3-axis@3.0.6", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/@types/d3-axis/-/d3-axis-3.0.6.tgz", { "dependencies": { "@types/d3-selection": "*" } }, "sha1-52DldluBiLHe+jK8i7YGL4Hkx5U="],
+
+    "@types/d3-brush": ["@types/d3-brush@3.0.6", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/@types/d3-brush/-/d3-brush-3.0.6.tgz", { "dependencies": { "@types/d3-selection": "*" } }, "sha1-wvQ2KwRdRy4bGGzb7DKbpSva7mw="],
+
+    "@types/d3-chord": ["@types/d3-chord@3.0.6", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/@types/d3-chord/-/d3-chord-3.0.6.tgz", {}, "sha1-FwbKQM9+pZoK3Y9EVu//j4d1eT0="],
+
+    "@types/d3-color": ["@types/d3-color@3.1.3", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/@types/d3-color/-/d3-color-3.1.3.tgz", {}, "sha1-NoyWGhjech2oIA6AvzlD+1MTavI="],
+
+    "@types/d3-contour": ["@types/d3-contour@3.0.6", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/@types/d3-contour/-/d3-contour-3.0.6.tgz", { "dependencies": { "@types/d3-array": "*", "@types/geojson": "*" } }, "sha1-mto/qcTQDjpQk/7QNWx6uSlgQjE="],
+
+    "@types/d3-delaunay": ["@types/d3-delaunay@6.0.4", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/@types/d3-delaunay/-/d3-delaunay-6.0.4.tgz", {}, "sha1-GFwagMyAf92io/6WD3wRxKJ5UuE="],
+
+    "@types/d3-dispatch": ["@types/d3-dispatch@3.0.7", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/@types/d3-dispatch/-/d3-dispatch-3.0.7.tgz", {}, "sha1-7wBNihKARs/OQ00XGC+DTkTvlbI="],
+
+    "@types/d3-drag": ["@types/d3-drag@3.0.7", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/@types/d3-drag/-/d3-drag-3.0.7.tgz", { "dependencies": { "@types/d3-selection": "*" } }, "sha1-sTq6iyRCtAaMmp5tHYL4vOp3/AI="],
+
+    "@types/d3-dsv": ["@types/d3-dsv@3.0.7", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/@types/d3-dsv/-/d3-dsv-3.0.7.tgz", {}, "sha1-CjUfmW3Jmzf0+li0ksLRwE49rBc="],
+
+    "@types/d3-ease": ["@types/d3-ease@3.0.2", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/@types/d3-ease/-/d3-ease-3.0.2.tgz", {}, "sha1-4o2xv7+mFwdvd3DdHZpI6qO2xRs="],
+
+    "@types/d3-fetch": ["@types/d3-fetch@3.0.7", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/@types/d3-fetch/-/d3-fetch-3.0.7.tgz", { "dependencies": { "@types/d3-dsv": "*" } }, "sha1-wEorTyMYGqN28wrwKD28eztWmYA="],
+
+    "@types/d3-force": ["@types/d3-force@3.0.10", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/@types/d3-force/-/d3-force-3.0.10.tgz", {}, "sha1-bcj8bh81cE87BXCQvu63rGdL/xo="],
+
+    "@types/d3-format": ["@types/d3-format@3.0.4", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/@types/d3-format/-/d3-format-3.0.4.tgz", {}, "sha1-seRGVkTds/3zomP+uyQKbNYW3pA="],
+
+    "@types/d3-geo": ["@types/d3-geo@3.1.1", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/@types/d3-geo/-/d3-geo-3.1.1.tgz", { "dependencies": { "@types/geojson": "*" } }, "sha1-nig68XlgHFSVgWALP+wllBkRMp0="],
+
+    "@types/d3-hierarchy": ["@types/d3-hierarchy@3.1.7", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/@types/d3-hierarchy/-/d3-hierarchy-3.1.7.tgz", {}, "sha1-YCP7Oy1GMiny1oD5rEtHRm9x8Xs="],
+
+    "@types/d3-interpolate": ["@types/d3-interpolate@3.0.4", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/@types/d3-interpolate/-/d3-interpolate-3.0.4.tgz", { "dependencies": { "@types/d3-color": "*" } }, "sha1-QSuQ6EhwKF8v+KhGxutgNE8SpBw="],
+
+    "@types/d3-path": ["@types/d3-path@3.1.1", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/@types/d3-path/-/d3-path-3.1.1.tgz", {}, "sha1-9jKzgMOsoduo40qgSbzWpK8j34o="],
+
+    "@types/d3-polygon": ["@types/d3-polygon@3.0.2", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/@types/d3-polygon/-/d3-polygon-3.0.2.tgz", {}, "sha1-365UptNdGedqyVZbyzKo5UaTGJw="],
+
+    "@types/d3-quadtree": ["@types/d3-quadtree@3.0.6", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/@types/d3-quadtree/-/d3-quadtree-3.0.6.tgz", {}, "sha1-1HQLD+NbHFi2bhSI9OftApUvVw8="],
+
+    "@types/d3-random": ["@types/d3-random@3.0.4", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/@types/d3-random/-/d3-random-3.0.4.tgz", {}, "sha1-a9NoO4My/A8B5wWbdja8XH7eczc="],
+
+    "@types/d3-scale": ["@types/d3-scale@4.0.9", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/@types/d3-scale/-/d3-scale-4.0.9.tgz", { "dependencies": { "@types/d3-time": "*" } }, "sha1-V6L3ByQub+Hega17/Myq9gYXmvs="],
+
+    "@types/d3-scale-chromatic": ["@types/d3-scale-chromatic@3.1.0", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/@types/d3-scale-chromatic/-/d3-scale-chromatic-3.1.0.tgz", {}, "sha1-3G1Pmpg3bxjqULrWw5U38bVGPDk="],
+
+    "@types/d3-selection": ["@types/d3-selection@3.0.12", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/@types/d3-selection/-/d3-selection-3.0.12.tgz", {}, "sha512-Qe/KWYhEiIIxGs7HrAAjMfShxKldx19SJtr5zu53f3afPsdZNz7HHtdTLXo/kqeiWNXVycI24kSnfzBYkTzpgw=="],
+
+    "@types/d3-shape": ["@types/d3-shape@3.2.0", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/@types/d3-shape/-/d3-shape-3.2.0.tgz", { "dependencies": { "@types/d3-path": "*" } }, "sha1-Zv80IBHcJDxsIOa4mVI9FIrKQS0="],
+
+    "@types/d3-time": ["@types/d3-time@3.0.4", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/@types/d3-time/-/d3-time-3.0.4.tgz", {}, "sha1-hHL+7NY5aRRQ3YAA6zPt1EThMj8="],
+
+    "@types/d3-time-format": ["@types/d3-time-format@4.0.3", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/@types/d3-time-format/-/d3-time-format-4.0.3.tgz", {}, "sha1-1rwea2p9tpzM+73Uw0twYy2enbI="],
+
+    "@types/d3-timer": ["@types/d3-timer@3.0.2", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/@types/d3-timer/-/d3-timer-3.0.2.tgz", {}, "sha1-cLvad9wjqnJ0E+IuIUr6Pw6FL3A="],
+
+    "@types/d3-transition": ["@types/d3-transition@3.0.9", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/@types/d3-transition/-/d3-transition-3.0.9.tgz", { "dependencies": { "@types/d3-selection": "*" } }, "sha1-ETa8V+nds8OQ3MybX/O30rjZRwY="],
+
+    "@types/d3-zoom": ["@types/d3-zoom@3.0.8", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/@types/d3-zoom/-/d3-zoom-3.0.8.tgz", { "dependencies": { "@types/d3-interpolate": "*", "@types/d3-selection": "*" } }, "sha1-3Msy0cVrHhxuDxGA2ZSJbwOLxAs="],
+
+    "@types/dompurify": ["@types/dompurify@3.2.0", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/@types/dompurify/-/dompurify-3.2.0.tgz", { "dependencies": { "dompurify": "*" } }, "sha1-VmEL8+QlDfV3RNYfvZVCLgffuEA="],
+
     "@types/estree": ["@types/estree@1.0.9", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/@types/estree/-/estree-1.0.9.tgz", {}, "sha1-zz8Oh2177hWpOrkluCv1cKOQSiQ="],
 
     "@types/estree-jsx": ["@types/estree-jsx@1.0.5", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/@types/estree-jsx/-/estree-jsx-1.0.5.tgz", { "dependencies": { "@types/estree": "*" } }, "sha1-hYqI6iDzT+ZREfAFpon6Hr9w3Bg="],
 
+    "@types/geojson": ["@types/geojson@7946.0.16", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/@types/geojson/-/geojson-7946.0.16.tgz", {}, "sha1-jr5T1p762nBERU4zBcGQF9l87So="],
+
     "@types/hast": ["@types/hast@3.0.5", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/@types/hast/-/hast-3.0.5.tgz", { "dependencies": { "@types/unist": "*" } }, "sha1-SAIN5MDmNJL0yp20IGjBCPaLf48="],
 
+    "@types/highlight.js": ["@types/highlight.js@10.1.0", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/@types/highlight.js/-/highlight.js-10.1.0.tgz", { "dependencies": { "highlight.js": "*" } }, "sha1-ibsMICmX16kKB70uwffQDFa7kLQ="],
+
+    "@types/katex": ["@types/katex@0.16.8", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/@types/katex/-/katex-0.16.8.tgz", {}, "sha1-gL8+CBTQmoRkEqCw8UCUa3nDbD4="],
+
+    "@types/linkify-it": ["@types/linkify-it@5.0.0", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/@types/linkify-it/-/linkify-it-5.0.0.tgz", {}, "sha1-IUEwAZcxBs2hw6m5Hu3UzNVGnXY="],
+
+    "@types/markdown-it": ["@types/markdown-it@14.2.0", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/@types/markdown-it/-/markdown-it-14.2.0.tgz", { "dependencies": { "@types/linkify-it": "^5", "@types/mdurl": "^2" } }, "sha1-QHSHP5j7x5ETHjHXRGsS36OjHfk="],
+
     "@types/mdast": ["@types/mdast@4.0.4", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/@types/mdast/-/mdast-4.0.4.tgz", { "dependencies": { "@types/unist": "*" } }, "sha1-fM9y7dLxqn3TQ34YDGQ3NYWATdY="],
+
+    "@types/mdurl": ["@types/mdurl@2.0.0", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/@types/mdurl/-/mdurl-2.0.0.tgz", {}, "sha1-1Dh4tbICImghY65viXsgRHIzvf0="],
 
     "@types/nlcst": ["@types/nlcst@2.0.3", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/@types/nlcst/-/nlcst-2.0.3.tgz", { "dependencies": { "@types/unist": "*" } }, "sha1-McrTRuqrSKmopYRl09BeJTDdp2I="],
 
     "@types/node": ["@types/node@26.6.2", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/@types/node/-/node-26.6.2.tgz", { "dependencies": { "undici-types": "~8.9.0" } }, "sha512-X1P21scMv4zGKLYqjdGjaKa7COa0RKVYYZZN/NfvLQ1JegxFhdhpZG/Lyn8AXx6CDUavKAd11v6BvfpkDByK8g=="],
 
+    "@types/trusted-types": ["@types/trusted-types@2.0.7", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/@types/trusted-types/-/trusted-types-2.0.7.tgz", {}, "sha1-usywepcLkXB986PoumiWxX6tLRE="],
+
     "@types/unist": ["@types/unist@3.0.3", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/@types/unist/-/unist-3.0.3.tgz", {}, "sha1-rKqw+RnOaczmKcLU7S60rcG2wgw="],
 
     "@ungap/structured-clone": ["@ungap/structured-clone@1.4.0", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/@ungap/structured-clone/-/structured-clone-1.4.0.tgz", {}, "sha1-Xi4TdMCjC1pC6LCDUjoiXGlF+Io="],
+
+    "@upsetjs/venn.js": ["@upsetjs/venn.js@2.0.0", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/@upsetjs/venn.js/-/venn.js-2.0.0.tgz", { "optionalDependencies": { "d3-selection": "^3.0.0", "d3-transition": "^3.0.1" } }, "sha1-O+GSA4zdqSeqT4siq1Gvgqv0fzQ="],
 
     "@volar/kit": ["@volar/kit@2.4.28", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/@volar/kit/-/kit-2.4.28.tgz", { "dependencies": { "@volar/language-service": "2.4.28", "@volar/typescript": "2.4.28", "typesafe-path": "^0.2.2", "vscode-languageserver-textdocument": "^1.0.11", "vscode-uri": "^3.0.8" }, "peerDependencies": { "typescript": "*" } }, "sha1-O7yVf6SZTHVXL+i28o0SkHq2KHc="],
 
@@ -319,7 +430,7 @@
 
     "anymatch": ["anymatch@3.1.3", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/anymatch/-/anymatch-3.1.3.tgz", { "dependencies": { "normalize-path": "^3.0.0", "picomatch": "^2.0.4" } }, "sha1-eQxYsZuhcgqEIFtXxhjVrYUklz4="],
 
-    "argparse": ["argparse@2.0.1", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/argparse/-/argparse-2.0.1.tgz", {}, "sha1-JG9Q88p4oyQPbJl+ipvR6sSeSzg="],
+    "argparse": ["argparse@3.0.2", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/argparse/-/argparse-3.0.2.tgz", {}, "sha512-mFdDM6WqWKraGLsVb+C9CahPnzTXOefAOLq3jYcca2YZ8bEWpr++Tzj+zSaKW9+X9L5uSxcm1AZ3Y6aZJ09OhQ=="],
 
     "aria-query": ["aria-query@5.3.2", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/aria-query/-/aria-query-5.3.2.tgz", {}, "sha1-k/gaQ0gOM6M48ZFjo9EKUMAdzVk="],
 
@@ -339,6 +450,8 @@
 
     "character-entities-legacy": ["character-entities-legacy@3.0.0", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/character-entities-legacy/-/character-entities-legacy-3.0.0.tgz", {}, "sha1-dryDqQc4kB17wiOp6TdZ/dVgEls="],
 
+    "chevrotain": ["chevrotain@11.1.2", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/chevrotain/-/chevrotain-11.1.2.tgz", { "dependencies": { "@chevrotain/cst-dts-gen": "11.1.2", "@chevrotain/gast": "11.1.2", "@chevrotain/regexp-to-ast": "11.1.2", "@chevrotain/types": "11.1.2", "@chevrotain/utils": "11.1.2", "lodash-es": "4.17.23" } }, "sha1-HbRGvetj/kLTZlCKNCgMLjwMT2I="],
+
     "chokidar": ["chokidar@4.0.3", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/chokidar/-/chokidar-4.0.3.tgz", { "dependencies": { "readdirp": "^4.0.1" } }, "sha1-e+N6TAPJruHs/oYqSiOyxwwgXTA="],
 
     "ci-info": ["ci-info@4.4.0", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/ci-info/-/ci-info-4.4.0.tgz", {}, "sha1-fVTv+fVLRbYkAcJgMmlutZyL0Yw="],
@@ -349,13 +462,15 @@
 
     "comma-separated-tokens": ["comma-separated-tokens@2.0.3", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/comma-separated-tokens/-/comma-separated-tokens-2.0.3.tgz", {}, "sha1-TonJRYrLYbyP7xn0UplzsjkoOe4="],
 
-    "commander": ["commander@11.1.0", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/commander/-/commander-11.1.0.tgz", {}, "sha1-Yv3OdgBqaOXBqzMU3JLoAOuD2QY="],
+    "commander": ["commander@15.0.0", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/commander/-/commander-15.0.0.tgz", {}, "sha1-lvOWHxKtrBeZ7z+9i8YdQFctGxE="],
 
     "common-ancestor-path": ["common-ancestor-path@2.0.0", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/common-ancestor-path/-/common-ancestor-path-2.0.0.tgz", {}, "sha1-8dNhrqkjaq1bkqD/W53xQi3TYP8="],
 
     "cookie": ["cookie@2.0.1", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/cookie/-/cookie-2.0.1.tgz", {}, "sha1-H8fpvd84+pVnzU11CCAIfNtdbpg="],
 
     "cookie-es": ["cookie-es@1.2.3", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/cookie-es/-/cookie-es-1.2.3.tgz", {}, "sha1-Bso8X181MWhKIFlmajYRc/dKicg="],
+
+    "cose-base": ["cose-base@1.0.3", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/cose-base/-/cose-base-1.0.3.tgz", { "dependencies": { "layout-base": "^1.0.0" } }, "sha1-ZQM0tBuGlXilQzWLgM2n4Kvgpgo="],
 
     "crossws": ["crossws@0.3.5", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/crossws/-/crossws-0.3.5.tgz", { "dependencies": { "uncrypto": "^0.1.3" } }, "sha1-2q0zHUQUjqZQAJi8hYhp86WrgaY="],
 
@@ -367,7 +482,83 @@
 
     "csso": ["csso@5.0.5", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/csso/-/csso-5.0.5.tgz", { "dependencies": { "css-tree": "~2.2.0" } }, "sha1-+bf+bMasC32QeBuxbV6YdDA+LKY="],
 
+    "cytoscape": ["cytoscape@3.34.3", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/cytoscape/-/cytoscape-3.34.3.tgz", {}, "sha1-FQOZa6C1m5AdhjEKH2EuktxGT1E="],
+
+    "cytoscape-cose-bilkent": ["cytoscape-cose-bilkent@4.1.0", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/cytoscape-cose-bilkent/-/cytoscape-cose-bilkent-4.1.0.tgz", { "dependencies": { "cose-base": "^1.0.0" }, "peerDependencies": { "cytoscape": "^3.2.0" } }, "sha1-di+hId+ZMP/rUaSV2HkXxXCsIJs="],
+
+    "cytoscape-fcose": ["cytoscape-fcose@2.2.0", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/cytoscape-fcose/-/cytoscape-fcose-2.2.0.tgz", { "dependencies": { "cose-base": "^2.2.0" }, "peerDependencies": { "cytoscape": "^3.2.0" } }, "sha1-5Nb2SQ30+rWK6c6p5cOrjXRy9HE="],
+
+    "d3": ["d3@7.9.0", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/d3/-/d3-7.9.0.tgz", { "dependencies": { "d3-array": "3", "d3-axis": "3", "d3-brush": "3", "d3-chord": "3", "d3-color": "3", "d3-contour": "4", "d3-delaunay": "6", "d3-dispatch": "3", "d3-drag": "3", "d3-dsv": "3", "d3-ease": "3", "d3-fetch": "3", "d3-force": "3", "d3-format": "3", "d3-geo": "3", "d3-hierarchy": "3", "d3-interpolate": "3", "d3-path": "3", "d3-polygon": "3", "d3-quadtree": "3", "d3-random": "3", "d3-scale": "4", "d3-scale-chromatic": "3", "d3-selection": "3", "d3-shape": "3", "d3-time": "3", "d3-time-format": "4", "d3-timer": "3", "d3-transition": "3", "d3-zoom": "3" } }, "sha1-V556yz10nK+IYL0XQa6NNxBwzV0="],
+
+    "d3-array": ["d3-array@3.2.4", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/d3-array/-/d3-array-3.2.4.tgz", { "dependencies": { "internmap": "1 - 2" } }, "sha1-Ff7DOyN/l6xdfJhtx32ic6jtC7U="],
+
+    "d3-axis": ["d3-axis@3.0.0", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/d3-axis/-/d3-axis-3.0.0.tgz", {}, "sha1-xCpKE+gTHWN7dF/Clzgkz+r5MyI="],
+
+    "d3-brush": ["d3-brush@3.0.0", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/d3-brush/-/d3-brush-3.0.0.tgz", { "dependencies": { "d3-dispatch": "1 - 3", "d3-drag": "2 - 3", "d3-interpolate": "1 - 3", "d3-selection": "3", "d3-transition": "3" } }, "sha1-b3Z8Ttjct53n7ePhwPieY+9k0xw="],
+
+    "d3-chord": ["d3-chord@3.0.1", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/d3-chord/-/d3-chord-3.0.1.tgz", { "dependencies": { "d3-path": "1 - 3" } }, "sha1-0VbWH0hfzoMn5qvzOctB2Mu6aWY="],
+
+    "d3-color": ["d3-color@3.1.0", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/d3-color/-/d3-color-3.1.0.tgz", {}, "sha1-OVsoM9+scVB/EqwvevI7+BneJOI="],
+
+    "d3-contour": ["d3-contour@4.0.2", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/d3-contour/-/d3-contour-4.0.2.tgz", { "dependencies": { "d3-array": "^3.2.0" } }, "sha1-u5IGO8jFZjrLJCL5nHPLtsauO8w="],
+
+    "d3-delaunay": ["d3-delaunay@6.0.4", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/d3-delaunay/-/d3-delaunay-6.0.4.tgz", { "dependencies": { "delaunator": "5" } }, "sha1-mBaQOHM6ClurvtpVBU95W7nkpYs="],
+
+    "d3-dispatch": ["d3-dispatch@3.0.1", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/d3-dispatch/-/d3-dispatch-3.0.1.tgz", {}, "sha1-X8dShOnCN1w2yDlBGgz1UMv8TV4="],
+
+    "d3-drag": ["d3-drag@3.0.0", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/d3-drag/-/d3-drag-3.0.0.tgz", { "dependencies": { "d3-dispatch": "1 - 3", "d3-selection": "3" } }, "sha1-mUqunNI8cZ9TteEOOgphCMaWB7o="],
+
+    "d3-dsv": ["d3-dsv@3.0.1", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/d3-dsv/-/d3-dsv-3.0.1.tgz", { "dependencies": { "commander": "7", "iconv-lite": "0.6", "rw": "1" }, "bin": { "csv2json": "bin/dsv2json.js", "csv2tsv": "bin/dsv2dsv.js", "dsv2dsv": "bin/dsv2dsv.js", "dsv2json": "bin/dsv2json.js", "json2csv": "bin/json2dsv.js", "json2dsv": "bin/json2dsv.js", "json2tsv": "bin/json2dsv.js", "tsv2csv": "bin/dsv2dsv.js", "tsv2json": "bin/dsv2json.js" } }, "sha1-xjr5ePTWoNCEpSpnOSK+IWB4m3M="],
+
+    "d3-ease": ["d3-ease@3.0.1", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/d3-ease/-/d3-ease-3.0.1.tgz", {}, "sha1-llisOKIUDVnTRhYPH2ww/aC9EvQ="],
+
+    "d3-fetch": ["d3-fetch@3.0.1", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/d3-fetch/-/d3-fetch-3.0.1.tgz", { "dependencies": { "d3-dsv": "1 - 3" } }, "sha1-gxQb/5hWoO21443onNz+Y9CmCiI="],
+
+    "d3-force": ["d3-force@3.0.0", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/d3-force/-/d3-force-3.0.0.tgz", { "dependencies": { "d3-dispatch": "1 - 3", "d3-quadtree": "1 - 3", "d3-timer": "1 - 3" } }, "sha1-Piuhph5wiI/j2RlOMNbRTuzhVcQ="],
+
+    "d3-format": ["d3-format@3.1.2", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/d3-format/-/d3-format-3.1.2.tgz", {}, "sha1-Af20a1i+sfVbELQq1wtuNE1esq4="],
+
+    "d3-geo": ["d3-geo@3.1.1", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/d3-geo/-/d3-geo-3.1.1.tgz", { "dependencies": { "d3-array": "2.5.0 - 3" } }, "sha1-YCfPUSRvmy69ZPmeAdx8M2QDOk0="],
+
+    "d3-hierarchy": ["d3-hierarchy@3.1.2", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/d3-hierarchy/-/d3-hierarchy-3.1.2.tgz", {}, "sha1-sBzULB7tPUbbd6WWbPcm+MCRYMY="],
+
+    "d3-interpolate": ["d3-interpolate@3.0.1", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/d3-interpolate/-/d3-interpolate-3.0.1.tgz", { "dependencies": { "d3-color": "1 - 3" } }, "sha1-PEeqWzLFs9+1bvP9Q0IHimMrQA0="],
+
+    "d3-path": ["d3-path@3.1.0", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/d3-path/-/d3-path-3.1.0.tgz", {}, "sha1-It+TkDL7WnGuixgA1h3beFHEJSY="],
+
+    "d3-polygon": ["d3-polygon@3.0.1", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/d3-polygon/-/d3-polygon-3.0.1.tgz", {}, "sha1-C0XT3RxIopyOBX5hNWk+yAvxY5g="],
+
+    "d3-quadtree": ["d3-quadtree@3.0.1", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/d3-quadtree/-/d3-quadtree-3.0.1.tgz", {}, "sha1-bco+i+Kzk8mp1RTau9gKkt7vGk8="],
+
+    "d3-random": ["d3-random@3.0.1", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/d3-random/-/d3-random-3.0.1.tgz", {}, "sha1-1JJjeNMz2cC/0eb6AZTTCuuqIPQ="],
+
+    "d3-sankey": ["d3-sankey@0.12.3", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/d3-sankey/-/d3-sankey-0.12.3.tgz", { "dependencies": { "d3-array": "1 - 2", "d3-shape": "^1.2.0" } }, "sha1-s8JoYnvXLl2AM26N5qy/7J0V0B0="],
+
+    "d3-scale": ["d3-scale@4.0.2", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/d3-scale/-/d3-scale-4.0.2.tgz", { "dependencies": { "d3-array": "2.10.0 - 3", "d3-format": "1 - 3", "d3-interpolate": "1.2.0 - 3", "d3-time": "2.1.1 - 3", "d3-time-format": "2 - 4" } }, "sha1-grOOjo/3CAdk+Nzsd71L45Nok5Y="],
+
+    "d3-scale-chromatic": ["d3-scale-chromatic@3.1.0", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/d3-scale-chromatic/-/d3-scale-chromatic-3.1.0.tgz", { "dependencies": { "d3-color": "1 - 3", "d3-interpolate": "1 - 3" } }, "sha1-NMOdopiyPCDgLxpLI5vQ8i5/ExQ="],
+
+    "d3-selection": ["d3-selection@3.0.0", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/d3-selection/-/d3-selection-3.0.0.tgz", {}, "sha1-wlM4IH76csxbm9FFihpBkB8eGzE="],
+
+    "d3-shape": ["d3-shape@3.2.0", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/d3-shape/-/d3-shape-3.2.0.tgz", { "dependencies": { "d3-path": "^3.1.0" } }, "sha1-oag5y9m6RfKGdMadf4Vbz5HfxqU="],
+
+    "d3-time": ["d3-time@3.1.0", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/d3-time/-/d3-time-3.1.0.tgz", { "dependencies": { "d3-array": "2 - 3" } }, "sha1-kxDbVumS48AXXh7zheVF5Iqbtcc="],
+
+    "d3-time-format": ["d3-time-format@4.1.0", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/d3-time-format/-/d3-time-format-4.1.0.tgz", { "dependencies": { "d3-time": "1 - 3" } }, "sha1-erUlelBB0R7LT+cKXH0WoZW7QIo="],
+
+    "d3-timer": ["d3-timer@3.0.1", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/d3-timer/-/d3-timer-3.0.1.tgz", {}, "sha1-YoTSonCChbGrt+IB7aQ4CvNeY7A="],
+
+    "d3-transition": ["d3-transition@3.0.1", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/d3-transition/-/d3-transition-3.0.1.tgz", { "dependencies": { "d3-color": "1 - 3", "d3-dispatch": "1 - 3", "d3-ease": "1 - 3", "d3-interpolate": "1 - 3", "d3-timer": "1 - 3" }, "peerDependencies": { "d3-selection": "2 - 3" } }, "sha1-aGn93hRIhoB3/dWYkgDLYbKhZF8="],
+
+    "d3-zoom": ["d3-zoom@3.0.0", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/d3-zoom/-/d3-zoom-3.0.0.tgz", { "dependencies": { "d3-dispatch": "1 - 3", "d3-drag": "2 - 3", "d3-interpolate": "1 - 3", "d3-selection": "2 - 3", "d3-transition": "2 - 3" } }, "sha1-0T9BZccyF//qpUKVzWlps+eu6PM="],
+
+    "dagre-d3-es": ["dagre-d3-es@7.0.14", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/dagre-d3-es/-/dagre-d3-es-7.0.14.tgz", { "dependencies": { "d3": "^7.9.0", "lodash-es": "^4.17.21" } }, "sha1-EnInbiZFfPO5faxWn48FMewzw3c="],
+
+    "dayjs": ["dayjs@1.11.23", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/dayjs/-/dayjs-1.11.23.tgz", {}, "sha1-sKNjUG3eXzbPUHXkLr6BFRZajHk="],
+
     "defu": ["defu@6.1.7", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/defu/-/defu-6.1.7.tgz", {}, "sha1-clQ1Z8jp+X/xPOQCttvgmsWuTSM="],
+
+    "delaunator": ["delaunator@5.1.0", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/delaunator/-/delaunator-5.1.0.tgz", { "dependencies": { "robust-predicates": "^3.0.2" } }, "sha1-0TJx+/Ov9nU/nqbiNVV/IJAQRuo="],
 
     "dequal": ["dequal@2.0.3", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/dequal/-/dequal-2.0.3.tgz", {}, "sha1-JkQhTxmX057Q7g7OcjNUkKesZ74="],
 
@@ -387,17 +578,25 @@
 
     "domhandler": ["domhandler@5.0.3", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/domhandler/-/domhandler-5.0.3.tgz", { "dependencies": { "domelementtype": "^2.3.0" } }, "sha1-zDhff3UfHR/GUMITdIBCVFOMfTE="],
 
+    "dompurify": ["dompurify@3.4.15", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/dompurify/-/dompurify-3.4.15.tgz", { "optionalDependencies": { "@types/trusted-types": "^2.0.7" } }, "sha1-MDUbNFE4lPQowTvdsov/CgJ66AQ="],
+
     "domutils": ["domutils@3.2.2", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/domutils/-/domutils-3.2.2.tgz", { "dependencies": { "dom-serializer": "^2.0.0", "domelementtype": "^2.3.0", "domhandler": "^5.0.3" } }, "sha1-7b/itmiwwdl8JLrw8QYrEyIhvHg="],
 
     "dset": ["dset@3.1.4", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/dset/-/dset-3.1.4.tgz", {}, "sha1-+Or18CPwaKA20IzQfcn/t9AGUkg="],
+
+    "echarts": ["echarts@6.1.0", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/echarts/-/echarts-6.1.0.tgz", { "dependencies": { "tslib": "2.3.0", "zrender": "6.1.0" } }, "sha1-rg9oWQ9eu9co2QCQfCes3nxUVtE="],
+
+    "elkjs": ["elkjs@0.9.3", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/elkjs/-/elkjs-0.9.3.tgz", {}, "sha1-FnEfjOsJ8bErmelxsTioOEpSkWE="],
 
     "emmet": ["emmet@2.4.11", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/emmet/-/emmet-2.4.11.tgz", { "dependencies": { "@emmetio/abbreviation": "^2.3.3", "@emmetio/css-abbreviation": "^2.1.8" } }, "sha1-szH1ct83olI2Dr7n3ERiyNLjL1w="],
 
     "emoji-regex": ["emoji-regex@10.6.0", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/emoji-regex/-/emoji-regex-10.6.0.tgz", {}, "sha1-vz1uj3+P0ipl2XA0dbwBRzV6aw0="],
 
-    "entities": ["entities@4.5.0", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/entities/-/entities-4.5.0.tgz", {}, "sha1-XSaOpecRPsdMTQM7eepaNaSI+0g="],
+    "entities": ["entities@8.1.0", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/entities/-/entities-8.1.0.tgz", {}, "sha1-ljLWlhnr2+DPDvIvUwiP5aIWPYY="],
 
     "es-module-lexer": ["es-module-lexer@2.3.2", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/es-module-lexer/-/es-module-lexer-2.3.2.tgz", {}, "sha1-MR+k9AFowZdcUFR3xRsjI01BrVU="],
+
+    "es-toolkit": ["es-toolkit@1.52.0", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/es-toolkit/-/es-toolkit-1.52.0.tgz", {}, "sha1-cerxqLGINO93Y37Mu4hbpMA81t0="],
 
     "esbuild": ["esbuild@0.28.2", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/esbuild/-/esbuild-0.28.2.tgz", { "optionalDependencies": { "@esbuild/aix-ppc64": "0.28.2", "@esbuild/android-arm": "0.28.2", "@esbuild/android-arm64": "0.28.2", "@esbuild/android-x64": "0.28.2", "@esbuild/darwin-arm64": "0.28.2", "@esbuild/darwin-x64": "0.28.2", "@esbuild/freebsd-arm64": "0.28.2", "@esbuild/freebsd-x64": "0.28.2", "@esbuild/linux-arm": "0.28.2", "@esbuild/linux-arm64": "0.28.2", "@esbuild/linux-ia32": "0.28.2", "@esbuild/linux-loong64": "0.28.2", "@esbuild/linux-mips64el": "0.28.2", "@esbuild/linux-ppc64": "0.28.2", "@esbuild/linux-riscv64": "0.28.2", "@esbuild/linux-s390x": "0.28.2", "@esbuild/linux-x64": "0.28.2", "@esbuild/netbsd-arm64": "0.28.2", "@esbuild/netbsd-x64": "0.28.2", "@esbuild/openbsd-arm64": "0.28.2", "@esbuild/openbsd-x64": "0.28.2", "@esbuild/openharmony-arm64": "0.28.2", "@esbuild/sunos-x64": "0.28.2", "@esbuild/win32-arm64": "0.28.2", "@esbuild/win32-ia32": "0.28.2", "@esbuild/win32-x64": "0.28.2" }, "bin": { "esbuild": "bin/esbuild" } }, "sha1-D0O9G62VW3LSTiJh46vllXzPCBY="],
 
@@ -439,15 +638,25 @@
 
     "h3": ["h3@1.15.11", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/h3/-/h3-1.15.11.tgz", { "dependencies": { "cookie-es": "^1.2.3", "crossws": "^0.3.5", "defu": "^6.1.6", "destr": "^2.0.5", "iron-webcrypto": "^1.2.1", "node-mock-http": "^1.0.4", "radix3": "^1.1.2", "ufo": "^1.6.3", "uncrypto": "^0.1.3" } }, "sha1-gxF5/GtLwG3orRB356XH1jt5ZXc="],
 
+    "hachure-fill": ["hachure-fill@0.5.2", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/hachure-fill/-/hachure-fill-0.5.2.tgz", {}, "sha1-0ZvEzIdQpZYrR/sTAFV6hfz5NMw="],
+
     "hast-util-to-html": ["hast-util-to-html@9.0.5", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/hast-util-to-html/-/hast-util-to-html-9.0.5.tgz", { "dependencies": { "@types/hast": "^3.0.0", "@types/unist": "^3.0.0", "ccount": "^2.0.0", "comma-separated-tokens": "^2.0.0", "hast-util-whitespace": "^3.0.0", "html-void-elements": "^3.0.0", "mdast-util-to-hast": "^13.0.0", "property-information": "^7.0.0", "space-separated-tokens": "^2.0.0", "stringify-entities": "^4.0.0", "zwitch": "^2.0.4" } }, "sha1-zMZzpVu46Fd1sIrCg4D3LUcWcAU="],
 
     "hast-util-whitespace": ["hast-util-whitespace@3.0.0", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/hast-util-whitespace/-/hast-util-whitespace-3.0.0.tgz", { "dependencies": { "@types/hast": "^3.0.0" } }, "sha1-d3jtnTyS3Z6MXI9kiknCH8UctiE="],
+
+    "highlight.js": ["highlight.js@11.12.0", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/highlight.js/-/highlight.js-11.12.0.tgz", {}, "sha1-Rw2Rj9VWp23rxA/l5LVAtrnLmJA="],
 
     "html-escaper": ["html-escaper@3.0.3", "https://ms-feed-12.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/html-escaper/-/html-escaper-3.0.3.tgz", {}, "sha1-TTNmdGUr6x3Lwp72trp/a+b9/tY="],
 
     "html-void-elements": ["html-void-elements@3.0.0", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/html-void-elements/-/html-void-elements-3.0.0.tgz", {}, "sha1-/J29hK+edHJJA01NYmAt72UX8dc="],
 
     "http-cache-semantics": ["http-cache-semantics@4.2.0", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/http-cache-semantics/-/http-cache-semantics-4.2.0.tgz", {}, "sha1-IF9Ntk+FYrdqT/kjWqUnmDmgndU="],
+
+    "iconv-lite": ["iconv-lite@0.6.3", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/iconv-lite/-/iconv-lite-0.6.3.tgz", { "dependencies": { "safer-buffer": ">= 2.1.2 < 3.0.0" } }, "sha1-pS+AvzjaGVLrXGgXkHGYcaGnJQE="],
+
+    "import-meta-resolve": ["import-meta-resolve@4.2.0", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/import-meta-resolve/-/import-meta-resolve-4.2.0.tgz", {}, "sha1-CMuFtb037MjrHg9nDcJ2cALUNzQ="],
+
+    "internmap": ["internmap@2.0.3", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/internmap/-/internmap-2.0.3.tgz", {}, "sha1-ZoXyN1XkPFJOJR0py8lySOMGEAk="],
 
     "iron-webcrypto": ["iron-webcrypto@1.2.1", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/iron-webcrypto/-/iron-webcrypto-1.2.1.tgz", {}, "sha1-qmD/KqEFUGMPTAsR/SRCvs2zWm8="],
 
@@ -461,7 +670,13 @@
 
     "jsonc-parser": ["jsonc-parser@3.3.1", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/jsonc-parser/-/jsonc-parser-3.3.1.tgz", {}, "sha1-8qUktPf9EePXkeVZl3rWC5i3mLQ="],
 
+    "katex": ["katex@0.18.7", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/katex/-/katex-0.18.7.tgz", { "dependencies": { "commander": "^15.0.0" }, "bin": { "katex": "cli.js" } }, "sha1-lyMnoMD4O+VEI8jMUNC8NpNSP6c="],
+
+    "khroma": ["khroma@2.1.0", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/khroma/-/khroma-2.1.0.tgz", {}, "sha1-RfLOlM4jGkN89bY8LohubrQru7E="],
+
     "kleur": ["kleur@4.1.5", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/kleur/-/kleur-4.1.5.tgz", {}, "sha1-lRBhAXlfcFDGxlDzUMaD/r3bF4A="],
+
+    "layout-base": ["layout-base@1.0.2", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/layout-base/-/layout-base-1.0.2.tgz", {}, "sha1-EpHilog8Miqd1MXdggY3IbU+JuI="],
 
     "lightningcss": ["lightningcss@1.33.0", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/lightningcss/-/lightningcss-1.33.0.tgz", { "dependencies": { "detect-libc": "^2.0.3" }, "optionalDependencies": { "lightningcss-android-arm64": "1.33.0", "lightningcss-darwin-arm64": "1.33.0", "lightningcss-darwin-x64": "1.33.0", "lightningcss-freebsd-x64": "1.33.0", "lightningcss-linux-arm-gnueabihf": "1.33.0", "lightningcss-linux-arm64-gnu": "1.33.0", "lightningcss-linux-arm64-musl": "1.33.0", "lightningcss-linux-x64-gnu": "1.33.0", "lightningcss-linux-x64-musl": "1.33.0", "lightningcss-win32-arm64-msvc": "1.33.0", "lightningcss-win32-x64-msvc": "1.33.0" } }, "sha1-wIhn1xp5OFxuGQIU/XL+8+X5Xws="],
 
@@ -487,15 +702,27 @@
 
     "lightningcss-win32-x64-msvc": ["lightningcss-win32-x64-msvc@1.33.0", "https://ms-feed-12.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/lightningcss-win32-x64-msvc/-/lightningcss-win32-x64-msvc-1.33.0.tgz", { "os": "win32", "cpu": "x64" }, "sha1-40OuFS7tNgncbhGUnRo785oclG8="],
 
+    "linkify-it": ["linkify-it@6.1.0", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/linkify-it/-/linkify-it-6.1.0.tgz", { "dependencies": { "uc.micro": "^3.0.0" } }, "sha1-zXUNcP6SletxaeYy7mek/0Pn9i0="],
+
+    "lodash-es": ["lodash-es@4.17.23", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/lodash-es/-/lodash-es-4.17.23.tgz", {}, "sha1-WMQ2D9G10zr8bAu9PRFJNJsROOA="],
+
     "lru-cache": ["lru-cache@11.5.3", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/lru-cache/-/lru-cache-11.5.3.tgz", {}, "sha512-U4N8FgzmWxc8k1VH8Kr6lQg18U7Fjvby6wXHVRX/ZZ7IwWbRMgrRbP0Wrb5q5NVinryp4SQampHKdvtecItxUg=="],
 
     "magic-string": ["magic-string@1.4.1", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/magic-string/-/magic-string-1.4.1.tgz", { "dependencies": { "@jridgewell/sourcemap-codec": "^1.6.0" } }, "sha512-8lyCu36ErXR0J9uaGKlKQoiLZKmtI63YGLE8G2o9jyRPdr4X47LusSOwgOJOzcVtp81fTAAjxR7BwKz682Jhow=="],
 
     "magicast": ["magicast@0.5.5", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/magicast/-/magicast-0.5.5.tgz", { "dependencies": { "@babel/parser": "^7.29.7", "@babel/types": "^7.29.7", "source-map-js": "^1.2.1" } }, "sha512-UicdXN8zQ3JHlxVq+28afMXPr1z7WNY6+7EJnzTdQWkTAlMLF5fNCCKxJHBQwGaNGR11581EiQmQzx73+MvszA=="],
 
+    "markdown-it": ["markdown-it@15.0.2", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/markdown-it/-/markdown-it-15.0.2.tgz", { "dependencies": { "argparse": "^3.0.0", "entities": "^8.0.0", "linkify-it": "^6.0.0", "mdurl": "^2.1.0", "punycode.js": "^2.3.1", "uc.micro": "^3.0.0" }, "bin": { "markdown-it": "bin/markdown-it.mjs" } }, "sha512-q4IGxMv56jCqT4OCRCADBoDP3LO4MhmTXjFbphHPXs4g3j9Xg5RDnxqN8IF/3vIWEU+VCnUq+7JUg/cfy2E6Qw=="],
+
+    "marked": ["marked@16.4.2", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/marked/-/marked-16.4.2.tgz", { "bin": { "marked": "bin/marked.js" } }, "sha1-SVmmS+bEhvDbdGfq184ojeVCkKM="],
+
     "mdast-util-to-hast": ["mdast-util-to-hast@13.2.1", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/mdast-util-to-hast/-/mdast-util-to-hast-13.2.1.tgz", { "dependencies": { "@types/hast": "^3.0.0", "@types/mdast": "^4.0.0", "@ungap/structured-clone": "^1.0.0", "devlop": "^1.0.0", "micromark-util-sanitize-uri": "^2.0.0", "trim-lines": "^3.0.0", "unist-util-position": "^5.0.0", "unist-util-visit": "^5.0.0", "vfile": "^6.0.0" } }, "sha1-1/+EykmaV+LAYK5nVIrZUOaJoFM="],
 
     "mdn-data": ["mdn-data@2.27.1", "https://ms-feed-2.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/mdn-data/-/mdn-data-2.27.1.tgz", {}, "sha1-43ucUIgLdTZsTUCsY9m7ys22Hw4="],
+
+    "mdurl": ["mdurl@2.1.0", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/mdurl/-/mdurl-2.1.0.tgz", {}, "sha1-1xHT97zn8ixIfJG+eFRfNW+pZXM="],
+
+    "mermaid": ["mermaid@12.0.0", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/mermaid/-/mermaid-12.0.0.tgz", { "dependencies": { "@braintree/sanitize-url": "^7.1.2", "@iconify/utils": "^3.0.2", "@mermaid-js/parser": "^2.0.0", "@types/d3": "^7.4.3", "@upsetjs/venn.js": "^2.0.0", "chevrotain": "~11.1.2", "cytoscape": "^3.34.0", "cytoscape-cose-bilkent": "^4.1.0", "cytoscape-fcose": "^2.2.0", "d3": "^7.9.0", "d3-sankey": "^0.12.3", "dagre-d3-es": "7.0.14", "dayjs": "^1.11.21", "dompurify": "^3.4.12", "elkjs": "^0.9.3", "es-toolkit": "^1.45.1", "katex": "^0.16.47", "khroma": "^2.1.0", "marked": "^16.3.0", "roughjs": "^4.6.6", "stylis": "^4.3.6", "ts-dedent": "^2.2.0", "uuid": "^11.1.0 || ^12 || ^13 || ^14.0.0" } }, "sha512-/wQXC9iBxoGV8p3erbvaXs9h77VyLDBH6GdayVjj3hEcSQhFU4N1WUhUppotCEqlIxI2pRMwjwBSwTB1MfZBgQ=="],
 
     "micromark-util-character": ["micromark-util-character@2.1.1", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/micromark-util-character/-/micromark-util-character-2.1.1.tgz", { "dependencies": { "micromark-util-symbol": "^2.0.0", "micromark-util-types": "^2.0.0" } }, "sha1-L5h4MaQNTFEKwmHomFLE6XA8zaY="],
 
@@ -545,11 +772,17 @@
 
     "path-browserify": ["path-browserify@1.0.1", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/path-browserify/-/path-browserify-1.0.1.tgz", {}, "sha1-2YRUqcN1PVeQhg8W9ohnueRr4f0="],
 
+    "path-data-parser": ["path-data-parser@0.1.0", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/path-data-parser/-/path-data-parser-0.1.0.tgz", {}, "sha1-j1ulzHD8e+yz3O+uoI4mWaumC4w="],
+
     "piccolore": ["piccolore@0.1.3", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/piccolore/-/piccolore-0.1.3.tgz", {}, "sha1-7zP2GA5qN7Nf4SpFdlqQAXHPrtw="],
 
     "picocolors": ["picocolors@1.1.1", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/picocolors/-/picocolors-1.1.1.tgz", {}, "sha1-PTIa8+q5ObCDyPkpodEs2oHCa2s="],
 
     "picomatch": ["picomatch@4.0.7", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/picomatch/-/picomatch-4.0.7.tgz", {}, "sha1-YxM2ADTMs2s9xh7L3/eBIfkP4h8="],
+
+    "points-on-curve": ["points-on-curve@0.2.0", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/points-on-curve/-/points-on-curve-0.2.0.tgz", {}, "sha1-fbuYxDeRhZQ0KEdhMw+ok8uBtNE="],
+
+    "points-on-path": ["points-on-path@0.2.1", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/points-on-path/-/points-on-path-0.2.1.tgz", { "dependencies": { "path-data-parser": "0.1.0", "points-on-curve": "0.2.0" } }, "sha1-VTICtUJMU77TcTWzGIWOrP+F3VI="],
 
     "postcss": ["postcss@8.5.28", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/postcss/-/postcss-8.5.28.tgz", { "dependencies": { "nanoid": "^3.3.18", "picocolors": "^1.1.1", "source-map-js": "^1.2.1" } }, "sha1-2kVjqZoG5i1sHNGsrjYyJLyu1uk="],
 
@@ -560,6 +793,8 @@
     "process-ancestry": ["process-ancestry@0.1.0", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/process-ancestry/-/process-ancestry-0.1.0.tgz", {}, "sha1-BqGLsGxBPYJ1AhkEWPx2BO5rPe0="],
 
     "property-information": ["property-information@7.2.0", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/property-information/-/property-information-7.2.0.tgz", {}, "sha1-CAmzQmTplcC/zTInAooeNSEK+Ao="],
+
+    "punycode.js": ["punycode.js@2.3.1", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/punycode.js/-/punycode.js-2.3.1.tgz", {}, "sha1-a1PlatdViCNOefSv+pCXLH3Yzbc="],
 
     "radix3": ["radix3@1.1.2", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/radix3/-/radix3-1.1.2.tgz", {}, "sha1-/SfSrziWxr9Lzfq2Qnxpwq/GnsA="],
 
@@ -579,7 +814,15 @@
 
     "retext-smartypants": ["retext-smartypants@6.2.0", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/retext-smartypants/-/retext-smartypants-6.2.0.tgz", { "dependencies": { "@types/nlcst": "^2.0.0", "nlcst-to-string": "^4.0.0", "unist-util-visit": "^5.0.0" } }, "sha1-ToUsKXTPLPolPu7EJ8l+/EO10Vg="],
 
+    "robust-predicates": ["robust-predicates@3.0.3", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/robust-predicates/-/robust-predicates-3.0.3.tgz", {}, "sha1-EJkGGzNJ4sWr7GwqsKzUQNJNQGI="],
+
     "rolldown": ["rolldown@1.2.9", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/rolldown/-/rolldown-1.2.9.tgz", { "dependencies": { "@oxc-project/types": "=0.150.0", "@rolldown/pluginutils": "^1.0.0" }, "optionalDependencies": { "@rolldown/binding-android-arm-eabi": "1.2.9", "@rolldown/binding-android-arm64": "1.2.9", "@rolldown/binding-darwin-arm64": "1.2.9", "@rolldown/binding-darwin-x64": "1.2.9", "@rolldown/binding-freebsd-x64": "1.2.9", "@rolldown/binding-linux-arm-gnueabihf": "1.2.9", "@rolldown/binding-linux-arm64-gnu": "1.2.9", "@rolldown/binding-linux-arm64-musl": "1.2.9", "@rolldown/binding-linux-ppc64-gnu": "1.2.9", "@rolldown/binding-linux-s390x-gnu": "1.2.9", "@rolldown/binding-linux-x64-gnu": "1.2.9", "@rolldown/binding-linux-x64-musl": "1.2.9", "@rolldown/binding-openharmony-arm64": "1.2.9", "@rolldown/binding-win32-arm64-msvc": "1.2.9", "@rolldown/binding-win32-x64-msvc": "1.2.9" }, "bin": { "rolldown": "./bin/cli.mjs" } }, "sha512-hx/Pv0N1haXRb11qkfnK5MXB/iqr7i0yjWQqmO9uHqZpBgQSqzc8UsSnEpalsh+j1I8qQ2CkXAkJC8Br3dKSlg=="],
+
+    "roughjs": ["roughjs@4.6.6", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/roughjs/-/roughjs-4.6.6.tgz", { "dependencies": { "hachure-fill": "^0.5.2", "path-data-parser": "^0.1.0", "points-on-curve": "^0.2.0", "points-on-path": "^0.2.1" } }, "sha1-EFn0ml4MgN7lQaAFsgzDIrIiFYs="],
+
+    "rw": ["rw@1.3.3", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/rw/-/rw-1.3.3.tgz", {}, "sha1-P4Yt+pGrdmsUiF700BEkv9oHT7Q="],
+
+    "safer-buffer": ["safer-buffer@2.1.2", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/safer-buffer/-/safer-buffer-2.1.2.tgz", {}, "sha1-RPoWGwGHuVSd2Eu5GAL5vYOFzWo="],
 
     "satteri": ["satteri@0.10.5", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/satteri/-/satteri-0.10.5.tgz", { "dependencies": { "@types/estree-jsx": "^1.0.5", "@types/hast": "^3.0.5", "@types/mdast": "^4.0.4", "@types/unist": "^3.0.3" }, "optionalDependencies": { "@bruits/satteri-darwin-arm64": "0.10.5", "@bruits/satteri-darwin-x64": "0.10.5", "@bruits/satteri-linux-arm64-gnu": "0.10.5", "@bruits/satteri-linux-arm64-musl": "0.10.5", "@bruits/satteri-linux-x64-gnu": "0.10.5", "@bruits/satteri-linux-x64-musl": "0.10.5", "@bruits/satteri-wasm32-wasi": "0.10.5", "@bruits/satteri-win32-arm64-msvc": "0.10.5", "@bruits/satteri-win32-x64-msvc": "0.10.5" } }, "sha1-S0Sk8OIuZDlkjgZd38E0hj/SjDE="],
 
@@ -605,6 +848,8 @@
 
     "strip-ansi": ["strip-ansi@7.2.0", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/strip-ansi/-/strip-ansi-7.2.0.tgz", { "dependencies": { "ansi-regex": "^6.2.2" } }, "sha1-0iomlSKDamJ6+NBLXD/Sx/o+MuM="],
 
+    "stylis": ["stylis@4.4.0", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/stylis/-/stylis-4.4.0.tgz", {}, "sha1-xYRsk0X0v8Ub0MvXyjWgdE9IWl0="],
+
     "svgo": ["svgo@4.1.0", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/svgo/-/svgo-4.1.0.tgz", { "dependencies": { "commander": "^11.1.0", "css-select": "^6.0.0", "css-tree": "^3.0.1", "css-what": "^7.0.0", "csso": "^5.0.5", "picocolors": "^1.1.1", "sax": "1.6.1" }, "bin": { "svgo": "./bin/svgo.js" } }, "sha1-yXfraWQO8jKl6CNqWjJ+2MnVKFM="],
 
     "tiny-inflate": ["tiny-inflate@1.0.3", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/tiny-inflate/-/tiny-inflate-1.0.3.tgz", {}, "sha1-EicVSUkToYBRZqr3yTRnkz7qJsQ="],
@@ -619,13 +864,17 @@
 
     "trough": ["trough@2.2.0", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/trough/-/trough-2.2.0.tgz", {}, "sha1-lKYL1r03XBUsHfkRpLEdWwJW9Q8="],
 
-    "tslib": ["tslib@2.8.1", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/tslib/-/tslib-2.8.1.tgz", {}, "sha1-YS7+TtI11Wfoq6Xypfq3AoCt6D8="],
+    "ts-dedent": ["ts-dedent@2.3.0", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/ts-dedent/-/ts-dedent-2.3.0.tgz", {}, "sha1-j6w2x5ArVBwVSsE6J6xGeZevEfg="],
+
+    "tslib": ["tslib@2.3.0", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/tslib/-/tslib-2.3.0.tgz", {}, "sha1-gDuM2rPhK6WBpMpByIObuw2ssJ4="],
 
     "typesafe-path": ["typesafe-path@0.2.2", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/typesafe-path/-/typesafe-path-0.2.2.tgz", {}, "sha1-kaQ2aBsvUUutsRQGG2peXCuJQ7E="],
 
     "typescript": ["typescript@5.9.3", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/typescript/-/typescript-5.9.3.tgz", { "bin": { "tsc": "./bin/tsc", "tsserver": "./bin/tsserver" } }, "sha1-W09Z4VMQqxeiFvXWz1PuR27eZw8="],
 
     "typescript-auto-import-cache": ["typescript-auto-import-cache@0.3.6", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/typescript-auto-import-cache/-/typescript-auto-import-cache-0.3.6.tgz", { "dependencies": { "semver": "^7.3.8" } }, "sha1-efA3XW+hbTETPPNdNgJbWCN8ScE="],
+
+    "uc.micro": ["uc.micro@3.0.0", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/uc.micro/-/uc.micro-3.0.0.tgz", {}, "sha1-ZNbLC/4qVYzg7HyMDciKAtiY9QY="],
 
     "ufo": ["ufo@1.6.4", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/ufo/-/ufo-1.6.4.tgz", {}, "sha1-eo+4dfzGOC0sfQs2knOLBQCpJGc="],
 
@@ -652,6 +901,8 @@
     "unist-util-visit-parents": ["unist-util-visit-parents@6.0.2", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/unist-util-visit-parents/-/unist-util-visit-parents-6.0.2.tgz", { "dependencies": { "@types/unist": "^3.0.0", "unist-util-is": "^6.0.0" } }, "sha1-d333+5hlLOFrS3zZmdChpA76OgI="],
 
     "unstorage": ["unstorage@1.17.5", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/unstorage/-/unstorage-1.17.5.tgz", { "dependencies": { "anymatch": "^3.1.3", "chokidar": "^5.0.0", "destr": "^2.0.5", "h3": "^1.15.10", "lru-cache": "^11.2.7", "node-fetch-native": "^1.6.7", "ofetch": "^1.5.1", "ufo": "^1.6.3" }, "peerDependencies": { "@azure/app-configuration": "^1.8.0", "@azure/cosmos": "^4.2.0", "@azure/data-tables": "^13.3.0", "@azure/identity": "^4.6.0", "@azure/keyvault-secrets": "^4.9.0", "@azure/storage-blob": "^12.26.0", "@capacitor/preferences": "^6 || ^7 || ^8", "@deno/kv": ">=0.9.0", "@netlify/blobs": "^6.5.0 || ^7.0.0 || ^8.1.0 || ^9.0.0 || ^10.0.0", "@planetscale/database": "^1.19.0", "@upstash/redis": "^1.34.3", "@vercel/blob": ">=0.27.1", "@vercel/functions": "^2.2.12 || ^3.0.0", "@vercel/kv": "^1 || ^2 || ^3", "aws4fetch": "^1.0.20", "db0": ">=0.2.1", "idb-keyval": "^6.2.1", "ioredis": "^5.4.2", "uploadthing": "^7.4.4" }, "optionalPeers": ["@azure/app-configuration", "@azure/cosmos", "@azure/data-tables", "@azure/identity", "@azure/keyvault-secrets", "@azure/storage-blob", "@capacitor/preferences", "@deno/kv", "@netlify/blobs", "@planetscale/database", "@upstash/redis", "@vercel/blob", "@vercel/functions", "@vercel/kv", "aws4fetch", "db0", "idb-keyval", "ioredis", "uploadthing"] }, "sha1-52yC/cHSwEyw4sCh3giqCLIlP1E="],
+
+    "uuid": ["uuid@14.0.2", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/uuid/-/uuid-14.0.2.tgz", { "bin": { "uuid": "./dist-node/bin/uuid" } }, "sha1-1a4D5NsIgchycfiwub1zEtAseZo="],
 
     "verkit": ["verkit@0.4.1", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/verkit/-/verkit-0.4.1.tgz", {}, "sha512-mMVzj0TXExtVdlDEq+Mzp0eyOuyznNpFobNM3uAqe3HVm/Ps2c+u17BligMkZjZCA6EiXpoon8iRTer3iu40SQ=="],
 
@@ -715,11 +966,21 @@
 
     "zod": ["zod@4.6.5", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/zod/-/zod-4.6.5.tgz", {}, "sha512-v5l/aFXZQeai4awLbOpSoHecE9UiMrnfx75tEXLjNonXVARxQ5mOeipTjROUchszUNCqnE+hqAMujRsRHsut2Q=="],
 
+    "zrender": ["zrender@6.1.0", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/zrender/-/zrender-6.1.0.tgz", { "dependencies": { "tslib": "2.3.0" } }, "sha1-w+8G5kJtXCiGW3GDA1aA1oXgATY="],
+
     "zwitch": ["zwitch@2.0.4", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/zwitch/-/zwitch-2.0.4.tgz", {}, "sha1-yCfUsKy3b8PmhaTG7CkC1RBw6dc="],
 
     "@bruits/satteri-wasm32-wasi/@emnapi/core": ["@emnapi/core@1.11.1", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/@emnapi/core/-/core-1.11.1.tgz", { "dependencies": { "@emnapi/wasi-threads": "1.2.2", "tslib": "^2.4.0" } }, "sha1-ueEGTzprFjHiQeY460jXNr/TcqY="],
 
     "@bruits/satteri-wasm32-wasi/@emnapi/runtime": ["@emnapi/runtime@1.11.1", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/@emnapi/runtime/-/runtime-1.11.1.tgz", { "dependencies": { "tslib": "^2.4.0" } }, "sha1-WPHz1dgamxL3k6tojJY3GQECfCQ="],
+
+    "@emnapi/core/tslib": ["tslib@2.8.1", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/tslib/-/tslib-2.8.1.tgz", {}, "sha1-YS7+TtI11Wfoq6Xypfq3AoCt6D8="],
+
+    "@emnapi/runtime/tslib": ["tslib@2.8.1", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/tslib/-/tslib-2.8.1.tgz", {}, "sha1-YS7+TtI11Wfoq6Xypfq3AoCt6D8="],
+
+    "@emnapi/wasi-threads/tslib": ["tslib@2.8.1", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/tslib/-/tslib-2.8.1.tgz", {}, "sha1-YS7+TtI11Wfoq6Xypfq3AoCt6D8="],
+
+    "@tybys/wasm-util/tslib": ["tslib@2.8.1", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/tslib/-/tslib-2.8.1.tgz", {}, "sha1-YS7+TtI11Wfoq6Xypfq3AoCt6D8="],
 
     "@vscode/emmet-helper/jsonc-parser": ["jsonc-parser@2.3.1", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/jsonc-parser/-/jsonc-parser-2.3.1.tgz", {}, "sha1-WVSRULEz8u+sykj+nOHsBlmvI0I="],
 
@@ -728,6 +989,24 @@
     "cliui/string-width": ["string-width@7.2.0", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/string-width/-/string-width-7.2.0.tgz", { "dependencies": { "emoji-regex": "^10.3.0", "get-east-asian-width": "^1.0.0", "strip-ansi": "^7.1.0" } }, "sha1-tbuOIWXOJ11NQ0dt0nAK2Qkdttw="],
 
     "csso/css-tree": ["css-tree@2.2.1", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/css-tree/-/css-tree-2.2.1.tgz", { "dependencies": { "mdn-data": "2.0.28", "source-map-js": "^1.0.1" } }, "sha1-NhFdOC1gr9Jx43f5xfZ9Ar1IwDI="],
+
+    "cytoscape-fcose/cose-base": ["cose-base@2.2.0", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/cose-base/-/cose-base-2.2.0.tgz", { "dependencies": { "layout-base": "^2.0.0" } }, "sha1-HDlcNbbhC7g/l2nKi4F9YUrdXAE="],
+
+    "d3-dsv/commander": ["commander@7.2.0", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/commander/-/commander-7.2.0.tgz", {}, "sha1-o2y1fQtQHOEI5NIFWaFQo5HZerc="],
+
+    "d3-sankey/d3-array": ["d3-array@2.12.1", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/d3-array/-/d3-array-2.12.1.tgz", { "dependencies": { "internmap": "^1.0.0" } }, "sha1-4gtBqvzf/fXVCSgATs7PgVpGXoE="],
+
+    "d3-sankey/d3-shape": ["d3-shape@1.3.7", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/d3-shape/-/d3-shape-1.3.7.tgz", { "dependencies": { "d3-path": "1" } }, "sha1-32OAG+B7yYa8VPY3ibT+UCmStdc="],
+
+    "dagre-d3-es/lodash-es": ["lodash-es@4.18.1", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/lodash-es/-/lodash-es-4.18.1.tgz", {}, "sha1-uWLuuA2dmDqQC/NClh+3QYyhCx0="],
+
+    "dom-serializer/entities": ["entities@4.5.0", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/entities/-/entities-4.5.0.tgz", {}, "sha1-XSaOpecRPsdMTQM7eepaNaSI+0g="],
+
+    "js-yaml/argparse": ["argparse@2.0.1", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/argparse/-/argparse-2.0.1.tgz", {}, "sha1-JG9Q88p4oyQPbJl+ipvR6sSeSzg="],
+
+    "mermaid/katex": ["katex@0.16.47", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/katex/-/katex-0.16.47.tgz", { "dependencies": { "commander": "^8.3.0" }, "bin": { "katex": "cli.js" } }, "sha1-ChOkLC3rT3TmHxYtRAuRZaVIAw8="],
+
+    "svgo/commander": ["commander@11.1.0", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/commander/-/commander-11.1.0.tgz", {}, "sha1-Yv3OdgBqaOXBqzMU3JLoAOuD2QY="],
 
     "unstorage/chokidar": ["chokidar@5.0.0", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/chokidar/-/chokidar-5.0.0.tgz", { "dependencies": { "readdirp": "^5.0.0" } }, "sha1-lJwSapI4qAeSvpoCZZNPCYrzaaU="],
 
@@ -743,7 +1022,19 @@
 
     "@bruits/satteri-wasm32-wasi/@emnapi/core/@emnapi/wasi-threads": ["@emnapi/wasi-threads@1.2.2", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/@emnapi/wasi-threads/-/wasi-threads-1.2.2.tgz", { "dependencies": { "tslib": "^2.4.0" } }, "sha1-TJO+z1v6OxPRu9zAau44MhrYE5o="],
 
+    "@bruits/satteri-wasm32-wasi/@emnapi/core/tslib": ["tslib@2.8.1", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/tslib/-/tslib-2.8.1.tgz", {}, "sha1-YS7+TtI11Wfoq6Xypfq3AoCt6D8="],
+
+    "@bruits/satteri-wasm32-wasi/@emnapi/runtime/tslib": ["tslib@2.8.1", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/tslib/-/tslib-2.8.1.tgz", {}, "sha1-YS7+TtI11Wfoq6Xypfq3AoCt6D8="],
+
     "csso/css-tree/mdn-data": ["mdn-data@2.0.28", "https://ms-feed-2.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/mdn-data/-/mdn-data-2.0.28.tgz", {}, "sha1-XsSOe+8SBlRTkGnhrk3cgcpJDro="],
+
+    "cytoscape-fcose/cose-base/layout-base": ["layout-base@2.0.1", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/layout-base/-/layout-base-2.0.1.tgz", {}, "sha1-0DN5E1hskPnCwHUpIGn1wtpd0oU="],
+
+    "d3-sankey/d3-array/internmap": ["internmap@1.0.1", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/internmap/-/internmap-1.0.1.tgz", {}, "sha1-ABfMijuZYF8DAvKxmNJy4BXl35U="],
+
+    "d3-sankey/d3-shape/d3-path": ["d3-path@1.0.9", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/d3-path/-/d3-path-1.0.9.tgz", {}, "sha1-SMBQux/owmJJOoyvVSTj6VkXAc8="],
+
+    "mermaid/katex/commander": ["commander@8.3.0", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/commander/-/commander-8.3.0.tgz", {}, "sha1-SDfqGy2me5xhamevuw+v7lZ7ymY="],
 
     "unstorage/chokidar/readdirp": ["readdirp@5.1.1", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/readdirp/-/readdirp-5.1.1.tgz", {}, "sha1-UgvKBvnRrhuWzAgA2+hLmD0ZQiw="],
 

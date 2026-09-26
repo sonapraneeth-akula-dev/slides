@@ -1,17 +1,182 @@
 ---
-const title = 'Slides';
+import '../styles.css';
 ---
 <!doctype html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>{title}</title>
+    <meta name="color-scheme" content="light dark" />
+    <title>Slides</title>
   </head>
   <body>
-    <main>
-      <h1>{title}</h1>
-      <p>The local editor is not implemented yet.</p>
-    </main>
+    <div id="app" aria-busy="true">
+      <header class="topbar">
+        <a class="brand" href="/" id="home">Slides<span class="brand-dot">.</span></a>
+        <span id="page-title" class="page-title">Local presentations</span>
+        <span id="save-status" class="pill" role="status" aria-live="polite" hidden></span>
+        <span class="spacer"></span>
+        <div id="editor-actions" class="actions" hidden>
+          <label>Theme <select id="theme" aria-label="Deck theme"></select></label>
+          <div class="segmented" role="group" aria-label="Editor view">
+            <button type="button" data-view="source">Source</button>
+            <button type="button" data-view="split">Split</button>
+            <button type="button" data-view="preview">Preview</button>
+          </div>
+          <button type="button" id="save">Save</button>
+          <button type="button" id="present" class="primary">Present</button>
+        </div>
+        <div id="presenter-actions" class="actions" hidden>
+          <span class="pill live">Live</span>
+          <button type="button" id="local-audience">Audience window</button>
+          <button type="button" id="share">Share on LAN…</button>
+          <button type="button" id="end">End</button>
+        </div>
+      </header>
+
+      <main id="library-page" class="library-page" hidden>
+        <div class="library-intro">
+          <p class="eyebrow">YOUR LIBRARY</p>
+          <h1>Make room for the story.</h1>
+          <p>Write in Markdown. Present locally. Share with your audience only when you choose.</p>
+          <div class="library-create">
+            <label for="deck-name">New presentation</label>
+            <div class="actions"><input id="deck-name" placeholder="Presentation name" maxlength="120" />
+              <button type="button" id="create" class="primary">Create deck</button></div>
+          </div>
+          <div class="library-open">
+            <label for="deck-path">Open an existing .md or .mdx file</label>
+            <div class="actions"><input id="deck-path" placeholder="Absolute path to a deck" />
+              <button type="button" id="open">Open file</button></div>
+          </div>
+        </div>
+        <section class="library-list" aria-labelledby="library-heading">
+          <div class="section-heading"><h2 id="library-heading">Your decks</h2><span id="library-count"></span></div>
+          <div id="deck-list" class="deck-grid"></div>
+        </section>
+      </main>
+
+      <main id="editor-page" class="editor-page" hidden>
+        <aside id="outline" class="outline" aria-label="Slide outline"></aside>
+        <section id="editor-workspace" class="editor-workspace" aria-label="Deck editor">
+          <div class="editor-panes" id="editor-panes" data-view="split">
+            <section class="source-pane" aria-label="Markdown source">
+              <div class="pane-heading"><strong>Source</strong><span id="source-file"></span></div>
+              <label class="sr-only" for="source">Deck Markdown source</label>
+              <textarea id="source" spellcheck="false" autocomplete="off" autocapitalize="off"></textarea>
+            </section>
+            <section class="preview-pane" aria-label="Slide preview">
+              <div class="pane-heading"><strong>Preview</strong><span id="preview-label">Plain text can be edited here</span></div>
+              <div id="preview" class="preview-list"></div>
+            </section>
+          </div>
+          <section id="master-pane" class="master-pane" aria-label="Presentation settings" hidden>
+            <div class="settings">
+              <h2>Presentation master</h2>
+              <p>Changes update the deck source. Running presentations keep their captured settings.</p>
+              <div id="settings-fields"></div>
+              <button type="button" id="reset-master">Reset all overrides</button>
+            </div>
+            <div id="master-preview" class="master-preview"></div>
+          </section>
+        </section>
+        <footer id="diagnostics" class="diagnostics" aria-live="polite"></footer>
+      </main>
+
+      <main id="presentation-page" class="presentation-page" hidden>
+        <section class="presentation-main">
+          <div id="stage-frame" class="stage-frame" aria-label="Current slide">
+            <div id="stage" class="stage"></div>
+            <svg id="ink" class="ink" viewBox="0 0 1000 562.5" preserveAspectRatio="none" aria-hidden="true"></svg>
+            <div id="stage-mode" class="stage-mode" hidden></div>
+            <div id="laser" class="laser" hidden></div>
+          </div>
+          <div id="presentation-tools" class="toolbar" role="toolbar" aria-label="Presentation tools">
+            <button type="button" data-tool="pen" aria-pressed="false">Pen</button>
+            <button type="button" data-tool="highlighter" aria-pressed="false">Highlighter</button>
+            <button type="button" data-tool="laser" aria-pressed="false">Laser</button>
+            <label>Ink color <input id="ink-color" type="color" value="#e11d48" /></label>
+            <label>Width <input id="ink-width" type="range" min="2" max="16" value="5" /></label>
+            <button type="button" id="undo">Undo ink</button>
+            <button type="button" id="clear">Clear ink</button>
+            <span class="tool-divider"></span>
+            <button type="button" id="blank" aria-pressed="false">Blank canvas</button>
+            <button type="button" id="blackout" aria-pressed="false">Blackout</button>
+            <button type="button" id="shortcuts">Shortcuts</button>
+          </div>
+        </section>
+        <aside id="presenter-side" class="presenter-side">
+          <div class="progress"><strong id="slide-progress"></strong><span id="reveal-progress"></span><time id="timer">00:00</time></div>
+          <div class="navigation">
+            <button type="button" id="previous">← Previous</button>
+            <button type="button" id="next" class="primary">Next →</button>
+          </div>
+          <div class="tree-nav" role="group" aria-label="Slide tree navigation">
+            <button type="button" data-nav="up" aria-label="Up">↑</button>
+            <button type="button" data-nav="left" aria-label="Left">←</button>
+            <button type="button" data-nav="parent" aria-label="Parent slide">Parent</button>
+            <button type="button" data-nav="right" aria-label="Right">→</button>
+            <button type="button" data-nav="down" aria-label="Down">↓</button>
+          </div>
+          <label for="jump">Jump to slide</label><select id="jump"></select>
+          <h2>Up next</h2><div id="up-next" class="up-next"></div>
+          <h2>Speaker notes <span class="private-tag">Private</span></h2>
+          <div id="speaker-notes" class="speaker-notes"></div>
+          <p id="share-info" class="share-info">Local only. Sharing is off.</p>
+          <button type="button" class="inert" disabled title="Export is not available yet">Export (coming later)</button>
+          <button type="button" class="inert" disabled title="Annotation saving is not available yet">Save annotations (coming later)</button>
+        </aside>
+      </main>
+
+      <main id="audience-page" class="audience-page" hidden>
+        <p id="audience-status" role="status" aria-live="polite">Waiting for presentation…</p>
+        <div id="audience-frame" class="stage-frame" aria-label="Audience slide">
+          <div id="audience-stage" class="stage"></div>
+          <svg id="audience-ink" class="ink" viewBox="0 0 1000 562.5" preserveAspectRatio="none" aria-hidden="true"></svg>
+          <div id="audience-mode" class="stage-mode" hidden></div>
+        </div>
+      </main>
+    </div>
+    <div id="toast" class="toast" role="alert" hidden></div>
+
+    <dialog id="conflict-dialog" aria-labelledby="conflict-title">
+      <h2 id="conflict-title">This file changed on disk</h2>
+      <p>Your draft was not overwritten. Compare the disk version and your draft, then choose which text to keep.</p>
+      <div class="conflict-columns">
+        <label>Current disk version<textarea id="disk-text" readonly></textarea></label>
+        <label>Your draft<textarea id="draft-text" readonly></textarea></label>
+      </div>
+      <div class="dialog-actions">
+        <button type="button" id="use-disk">Use disk version</button>
+        <button type="button" id="keep-draft" class="primary">Keep my draft and retry save</button>
+      </div>
+    </dialog>
+    <dialog id="share-dialog" aria-labelledby="share-title">
+      <h2 id="share-title">Share on your local network</h2>
+      <p>Viewers get slides and ink only. Notes, source, and controls stay private. Network reachability is unverified.</p>
+      <label>Network interface to bind <input id="share-host" value="0.0.0.0" required /></label>
+      <div class="share-ports">
+        <label>First port <input id="port-start" type="number" min="1024" max="65535" value="50000" /></label>
+        <label>Last port <input id="port-end" type="number" min="1024" max="65535" value="50100" /></label>
+      </div>
+      <div class="dialog-actions">
+        <button type="button" data-close="share-dialog">Cancel</button>
+        <button type="button" id="start-share" class="primary">Start sharing</button>
+      </div>
+    </dialog>
+    <dialog id="end-dialog" aria-labelledby="end-title">
+      <h2 id="end-title">End this presentation?</h2>
+      <p id="end-warning"></p>
+      <div class="dialog-actions">
+        <button type="button" data-close="end-dialog">Cancel</button>
+        <button type="button" id="confirm-end" class="danger">End presentation</button>
+      </div>
+    </dialog>
+    <dialog id="shortcuts-dialog" aria-labelledby="shortcuts-title">
+      <h2 id="shortcuts-title">Presenter shortcuts</h2>
+      <p>Space, Page Down: next · Page Up, Backspace: previous · Arrow keys: navigate tree · B: blackout · C: blank canvas · D: pen · H: highlighter · L: laser · Escape: exit tool · Ctrl/⌘+Z: undo ink.</p>
+      <button type="button" data-close="shortcuts-dialog">Close</button>
+    </dialog>
+    <script>import '../client.ts';</script>
   </body>
 </html>

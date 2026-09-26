@@ -5,16 +5,27 @@
   "scripts": {
     "dev": "astro dev --host 127.0.0.1",
     "check": "astro check",
-    "build": "astro build && bun build ./src/host.ts --target=bun --outfile ./build/host.js",
+    "build": "astro build && bun ./scripts/audience-assets.ts && bun build ./src/host.ts --target=bun --outfile ./build/host.js",
     "start": "bun ./build/host.js",
     "test": "bun test"
   },
   "dependencies": {
-    "astro": "7.3.3"
+    "astro": "7.3.3",
+    "dompurify": "^3.4.15",
+    "echarts": "^6.1.0",
+    "highlight.js": "^11.12.0",
+    "katex": "^0.18.7",
+    "markdown-it": "^15.0.2",
+    "mermaid": "^12.0.0",
+    "yaml": "2.9.1"
   },
   "devDependencies": {
     "@astrojs/check": "0.9.10",
     "@types/bun": "1.4.2",
+    "@types/dompurify": "^3.2.0",
+    "@types/highlight.js": "^10.1.0",
+    "@types/katex": "^0.16.8",
+    "@types/markdown-it": "^14.2.0",
     "typescript": "5.9.3"
   }
 }

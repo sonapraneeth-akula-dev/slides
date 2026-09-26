@@ -1,0 +1,199 @@
+import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { compileDeck, audienceProjection } from '../src/deck';
+
+const source = `---
+slides:
+  formatVersion: 1
+  title: Journey
+  master:
+    theme: paper
+---
+::slide{id="root"}
+# Root
+Paragraph **bold**
+:::notes
+PRIVATE SECRET
+:::
+:::reveal{step="1"}
+- Reveal
+:::
+::slide{id="child" parent="root" layout="two-columns"}
+# Child
+\`\`\`markdown
+::slide{id="not-real"}
+:::
+\`\`\`
+::slide{id="end"}
+# End`;
+
+describe('compiler and audience projection', () => {
+  test('orders hierarchy, locates source and keeps fenced directives literal', () => {
+    const { deck, diagnostics } = compileDeck(source);
+    expect(diagnostics).toEqual([]);
+    expect(deck?.slides.map(s => [s.id, s.number])).toEqual([['root', '1'], ['child', '1.1'], ['end', '2']]);
+    expect(deck?.slides[1].items.some(item => item.text.includes('not-real'))).toBe(true);
+    const publicSlide = audienceProjection(deck!, 'root', 0);
+    expect(JSON.stringify(publicSlide)).not.toContain('PRIVATE SECRET');
+    expect(JSON.stringify(publicSlide)).not.toContain('Reveal');
+    expect(audienceProjection(deck!, 'root', 1).slide.items.some(item => item.text.includes('Reveal'))).toBe(true);
+  });
+
+  test('invalid metadata, cycles, ids, reveal gaps and unclosed fences report errors', () => {
+    const inputs = [
+      '::slide{id="a"}\n::slide{id="a"}',
+      '::slide{id="a" parent="b"}\n::slide{id="b" parent="a"}',
+      '::slide{id="a" parent="missing"}',
+      '::slide{id="a"}\n:::reveal{step="2"}\ntext\n:::',
+      '::slide{id="a"}\n```js\nalert(1)',
+      '---\nslides:\n  master:\n    theme: imaginary\n---\n::slide{id="a"}'
+    ];
+    for (const input of inputs) {
+      const result = compileDeck(input);
+      expect(result.deck).toBeNull();
+      expect(result.diagnostics.length).toBeGreaterThan(0);
+      expect(result.diagnostics.every(d => d.line > 0 && d.column > 0)).toBe(true);
+    }
+  });
+
+  test('rejects markup execution outside code fences', () => {
+    expect(compileDeck('::slide{id="a"}\n<img src=x onerror="alert(1)">').deck).toBeNull();
+    expect(compileDeck('::slide{id="a"}\n```html\n<img src=x onerror="alert(1)">\n```').deck).not.toBeNull();
+  });
+});
+
+let dir: string;
+let library: typeof import('../src/library');
+let session: typeof import('../src/session');
+
+beforeAll(async () => {
+  dir = await mkdtemp(join(tmpdir(), 'slides-backend-'));
+  process.env.SLIDES_LIBRARY = dir;
+  library = await import('../src/library');
+  session = await import('../src/session');
+});
+afterAll(async () => { if (dir) await rm(dir, { recursive: true, force: true }); });
+
+describe('persistent library and presentation', () => {
+  test('creates/opens, saves confirmed bytes and detects external edit without data loss', async () => {
+    const initial = await library.createDeck('study.md', source);
+    expect((await library.listDecks()).map(d => d.name)).toContain('study.md');
+    expect(initial.deck?.slides.length).toBe(3);
+    const saved = await library.saveDeck(initial.id, initial.revision, source.replace('Paragraph **bold**', 'Edited'));
+    expect((await readFile(join(dir, 'study.md'), 'utf8'))).toContain('Edited');
+    expect(saved.revision).not.toBe(initial.revision);
+    await writeFile(join(dir, 'study.md'), source);
+    try {
+      await library.saveDeck(initial.id, saved.revision, 'draft not lost');
+      throw new Error('Expected conflict');
+    } catch (error) {
+      expect(error).toBeInstanceOf(library.LibraryError);
+      expect((error as InstanceType<typeof library.LibraryError>).status).toBe(409);
+      expect((error as InstanceType<typeof library.LibraryError>).details).toMatchObject({ diskText: source, draftText: 'draft not lost' });
+    }
+    expect(await readFile(join(dir, 'study.md'), 'utf8')).toBe(source);
+  });
+
+  test('rejects traversal, unsupported extension and duplicate creates', async () => {
+    expect(() => library.deckId('../escape.md')).not.toThrow();
+    await expect(library.openDeck(library.deckId('../escape.md'))).rejects.toThrow();
+    await expect(library.openDeck(library.deckId('x.js'))).rejects.toThrow();
+    await expect(library.createDeck('../escape.md', source)).rejects.toThrow();
+    await expect(library.createDeck('study.md', source)).rejects.toThrow();
+  });
+
+  test('duplicates, renames and deletes only the confirmed revision', async () => {
+    const original = await library.openDeck(library.deckId('study.md'));
+    const copy = await library.duplicateDeck(original.id, 'copy.md');
+    expect(copy.text).toBe(original.text);
+    await expect(library.duplicateDeck(original.id, 'copy.md')).rejects.toThrow();
+    const renamed = await library.renameDeck(copy.id, 'renamed.md', copy.revision);
+    expect(renamed.text).toBe(original.text);
+    await expect(library.openDeck(copy.id)).rejects.toThrow();
+    await expect(library.deleteDeck(renamed.id, 'outdated', true)).rejects.toThrow('Deck changed on disk');
+    await expect(library.deleteDeck(renamed.id, renamed.revision, false)).rejects.toThrow('Confirmed revision required');
+    expect(await library.deleteDeck(renamed.id, renamed.revision, true)).toEqual({ deleted: true });
+    await expect(library.openDeck(renamed.id)).rejects.toThrow();
+    expect((await library.openDeck(original.id)).text).toBe(original.text);
+  });
+
+  test('snapshots source revision; reveal/slide navigation reverses; public state excludes notes', async () => {
+    const opened = await library.openDeck(library.deckId('study.md'));
+    const talk = await session.createTalk(opened.id, opened.revision);
+    const dispatch = (action: string, extra: Record<string, unknown> = {}) => session.event(talk, { action, sequence: talk.sequence, ...extra });
+    expect(JSON.stringify(session.publicState(talk))).not.toContain('PRIVATE SECRET');
+    dispatch('next'); expect([talk.slideId, talk.step]).toEqual(['root', 1]);
+    dispatch('next'); expect([talk.slideId, talk.step]).toEqual(['child', 0]);
+    dispatch('next'); expect([talk.slideId, talk.step]).toEqual(['end', 0]);
+    dispatch('next'); expect(talk.slideId).toBe('end');
+    dispatch('previous'); expect([talk.slideId, talk.step]).toEqual(['child', 0]);
+    dispatch('previous'); expect([talk.slideId, talk.step]).toEqual(['root', 1]);
+    dispatch('parent'); expect(talk.slideId).toBe('root');
+    expect(() => session.event(talk, { action: 'next', sequence: 0 })).toThrow();
+    await writeFile(join(dir, 'study.md'), source.replace('Root', 'Changed'));
+    expect(talk.deck.slides[0].title).toBe('Root');
+    await expect(session.createTalk(opened.id, opened.revision)).rejects.toThrow();
+    dispatch('stroke', { stroke: {
+      slideId: talk.slideId, step: talk.step, tool: 'pen', color: '#ff00aa', width: 5,
+      points: [{ x: 0.2, y: 0.3 }, { x: 0.4, y: 0.5 }]
+    } });
+    expect(() => session.endTalk(talk, false)).toThrow();
+    session.endTalk(talk, true);
+    expect(() => session.getTalk(talk.id)).toThrow();
+    await writeFile(join(dir, 'study.md'), source);
+  });
+
+  test('private API rejects forged host, origin, token, and malformed body', async () => {
+    const { privateRouter } = await import('../src/host');
+    const route = privateRouter(12345);
+    const request = (path: string, headers: Record<string, string> = {}, method = 'GET', value?: unknown) =>
+      new Request(`http://127.0.0.1:12345${path}`, {
+        method, headers: { host: '127.0.0.1:12345', ...headers },
+        body: value === undefined ? undefined : JSON.stringify(value)
+      });
+    expect((await route(request('/api/library'))).status).toBe(403);
+    expect((await route(request('/api/bootstrap', { host: 'evil.test' }))).status).toBe(403);
+    expect((await route(request('/api/bootstrap', { origin: 'http://evil.test' }))).status).toBe(403);
+    const bootstrap = await (await route(request('/api/bootstrap'))).json();
+    expect(typeof bootstrap.token).toBe('string');
+    expect((await route(request('/api/compile', { 'X-Slides-Token': bootstrap.token, 'Content-Type': 'application/json' }, 'POST', { text: source }))).status).toBe(200);
+    expect((await route(request('/api/compile', { 'X-Slides-Token': bootstrap.token }, 'POST', { text: source }))).status).toBe(415);
+  });
+
+  test('audience links and LAN server expose only public assets and state', async () => {
+    const address = session.shareOptions()[0];
+    if (!address) throw new Error('LAN interface required for audience integration test');
+    const opened = await library.openDeck(library.deckId('study.md'));
+    const talk = await session.createTalk(opened.id, opened.revision);
+    try {
+      const share = session.startShare(talk, address, 49152, 49252);
+      expect(share?.url).toBe(`http://${address}:${share?.port}/audience/#${talk.share?.key}`);
+      const base = `http://${address}:${share?.port}`;
+      const manifest = JSON.parse(await readFile(join(process.cwd(), 'build', 'audience-assets.json'), 'utf8')) as string[];
+      expect(manifest).toContain('audience/index.html');
+      expect(manifest).not.toContain('index.html');
+      const audienceScript = manifest.find(asset => asset.includes('audience.astro_astro_type_script'));
+      const ownerScript = (await readFile(join(process.cwd(), 'dist', 'index.html'), 'utf8'))
+        .match(/src="\/(_astro\/index\.astro_astro_type_script[^"]+)"/)?.[1];
+      expect(audienceScript).toBeDefined();
+      expect(ownerScript).toBeDefined();
+      expect(manifest).not.toContain(ownerScript!);
+      const get = (path: string, key?: string) => fetch(`${base}${path}`, key ? { headers: { 'X-Slides-Public': key } } : {});
+      expect((await get('/audience/')).status).toBe(200);
+      expect((await get(`/${audienceScript}`)).status).toBe(200);
+      expect((await get('/')).status).toBe(404);
+      expect((await get(`/${ownerScript}`)).status).toBe(404);
+      expect((await get('/api/bootstrap')).status).toBe(404);
+      expect((await get('/state')).status).toBe(403);
+      expect((await get('/state', 'wrong')).status).toBe(403);
+      const state = await (await get('/state', talk.share!.key)).text();
+      expect(state).toContain('"sessionId"');
+      expect(state).not.toContain('PRIVATE SECRET');
+      expect(state).not.toContain(talk.localKey);
+    } finally {
+      session.endTalk(talk, true);
+    }
+  });
+});

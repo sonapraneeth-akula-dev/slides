@@ -1,0 +1,813 @@
+import { addSlide, clearTheme, editableLine, layouts, replacePlainLine, setLayout, setMaster, setTheme, themeNames } from './source-edit';
+import { markdown, overlayMode, renderStage, type Deck, type Slide, type Snapshot, type Stroke } from './render';
+import { drawStage } from './stage-view';
+
+type LibraryEntry = { id: string; name: string; path: string; missing?: boolean };
+type Diagnostic = { severity: string; message: string; code?: string; sourceSpan?: { start?: number; end?: number }; slideId?: string };
+type DeckResponse = { text: string; revision: string; deck: Deck | null; diagnostics: Diagnostic[] };
+type SessionResponse = { sessionId: string; localKey: string; snapshot: Snapshot; notes: Record<string, string> };
+type Page = 'library' | 'editor' | 'presentation';
+type View = 'source' | 'split' | 'preview';
+
+const $ = <T extends Element = HTMLElement>(id: string): T => {
+  const element = document.querySelector<T>(`[id="${CSS.escape(id)}"]`);
+  if (!element) throw new Error(`Missing interface element: ${id}`);
+  return element;
+};
+const text = (id: string, value: string) => { $(id).textContent = value; };
+const sourceInput = $<HTMLTextAreaElement>('source');
+let page: Page = 'library';
+let token = '';
+let library: LibraryEntry[] = [];
+let deckId = '';
+let revision = '';
+let savedText = '';
+let validText = '';
+let compiled: Deck | null = null;
+let selected = '';
+let view: View = 'split';
+let compileGeneration = 0;
+let compileTimer: ReturnType<typeof setTimeout> | undefined;
+let saveTimer: ReturnType<typeof setTimeout> | undefined;
+let saving: Promise<boolean> | undefined;
+let conflicted = false;
+let diskConflict: { diskRevision: string; diskText: string; draftText: string } | null = null;
+let session: SessionResponse | null = null;
+let sharing = false;
+let shareUrl = '';
+let tool: 'pen' | 'highlighter' | 'laser' | null = null;
+let drawing: { points: Array<{ x: number; y: number }>; pointer: number } | null = null;
+let eventPending = false;
+let sessionStart = 0;
+let toastTimer: ReturnType<typeof setTimeout> | undefined;
+
+class ApiError extends Error {
+  constructor(readonly status: number, message: string, readonly data: unknown) { super(message); }
+}
+
+async function request<T>(path: string, method = 'GET', body?: object): Promise<T> {
+  const response = await fetch(path, {
+    method,
+    headers: { 'X-Slides-Token': token, ...(body ? { 'Content-Type': 'application/json' } : {}) },
+    ...(body ? { body: JSON.stringify(body) } : {}),
+  });
+  const data: unknown = response.status === 204 ? null : await response.json();
+  if (!response.ok) {
+    const detail = data && typeof data === 'object' && 'error' in data && typeof data.error === 'string'
+      ? data.error : `Request failed (${response.status}).`;
+    throw new ApiError(response.status, detail, data);
+  }
+  return data as T;
+}
+
+function message(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+function notify(value: string): void {
+  const toast = $('toast');
+  toast.textContent = value;
+  toast.hidden = false;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { toast.hidden = true; }, 6000);
+}
+function show(next: Page): void {
+  page = next;
+  for (const name of ['library', 'editor', 'presentation'] as const) {
+    $(`${name}-page`).hidden = name !== next;
+  }
+  $('editor-actions').hidden = next !== 'editor';
+  $('presenter-actions').hidden = next !== 'presentation';
+  $('app').setAttribute('aria-busy', 'false');
+}
+function errorNotice(error: unknown): void { notify(message(error)); }
+function dialog(id: string): HTMLDialogElement { return $<HTMLDialogElement>(id); }
+function selectedSlide(): Slide | undefined { return compiled?.slides.find(slide => slide.id === selected); }
+function isDirty(): boolean { return !!deckId && sourceInput.value !== savedText; }
+function status(value: string, warn = false): void {
+  const pill = $('save-status');
+  pill.hidden = false;
+  pill.textContent = value;
+  pill.classList.toggle('warning', warn);
+}
+
+function renderLibrary(): void {
+  text('library-count', `${library.length} deck${library.length === 1 ? '' : 's'}`);
+  const list = $('deck-list');
+  list.replaceChildren();
+  if (!library.length) list.textContent = 'No decks yet. Create or open a file to get started.';
+  for (const entry of library) {
+    const card = document.createElement('article');
+    card.className = 'deck-card';
+    const title = document.createElement('h3');
+    title.textContent = entry.name;
+    const path = document.createElement('p');
+    path.className = 'deck-path';
+    path.textContent = entry.path;
+    const actions = document.createElement('div');
+    actions.className = 'actions';
+    const open = document.createElement('button');
+    open.type = 'button';
+    open.textContent = entry.missing ? 'Relink' : 'Edit deck';
+    open.addEventListener('click', () => {
+      if (entry.missing) {
+        const input = $<HTMLInputElement>('deck-path');
+        input.value = entry.path;
+        input.focus();
+        input.dataset.relinkId = entry.id;
+        notify('Enter the new absolute path, then choose Relink file.');
+        text('open', 'Relink file');
+      } else void openDeck(entry.id);
+    });
+    const remove = document.createElement('button');
+    remove.type = 'button';
+    remove.textContent = 'Remove from library';
+    remove.setAttribute('aria-label', `Remove ${entry.name} from library (file remains on disk)`);
+    remove.addEventListener('click', async () => {
+      if (!confirm(`Remove "${entry.name}" from your library? The file stays on disk.`)) return;
+      try {
+        library = (await request<{ library: LibraryEntry[] }>('/api/library', 'POST', { action: 'remove', id: entry.id })).library;
+        renderLibrary();
+      } catch (error) { errorNotice(error); }
+    });
+    actions.append(open, remove);
+    card.append(title, path);
+    if (entry.missing) {
+      const missing = document.createElement('p');
+      missing.className = 'warning-text';
+      missing.textContent = 'File missing — relink to its new location.';
+      card.append(missing);
+    }
+    card.append(actions);
+    list.append(card);
+  }
+}
+
+async function libraryAction(payload: object): Promise<void> {
+  try {
+    const result = await request<{ library: LibraryEntry[]; id?: string }>('/api/library', 'POST', payload);
+    library = result.library;
+    renderLibrary();
+    const entry = payload as { action: string; id?: string; name?: string; path?: string };
+    if (entry.action === 'create' || entry.action === 'open') {
+      const added = library.find(item => item.id === result.id);
+      if (added) await openDeck(added.id);
+      else notify('Added to library. Select the deck to edit it.');
+    } else if (entry.action === 'relink' && entry.id) await openDeck(entry.id);
+  } catch (error) { errorNotice(error); }
+}
+
+async function openDeck(id: string): Promise<void> {
+  if (isDirty() && !confirm('Your changes are not saved. Leave this deck?')) return;
+  try {
+    if (saving) await saving;
+    const result = await request<DeckResponse>(`/api/decks/${encodeURIComponent(id)}`);
+    clearTimeout(saveTimer);
+    clearTimeout(compileTimer);
+    ++compileGeneration;
+    deckId = id;
+    sourceInput.value = savedText = result.text;
+    revision = result.revision;
+    compiled = result.deck;
+    validText = result.deck ? result.text : '';
+    conflicted = false;
+    diskConflict = null;
+    selected = result.deck?.order[0] || result.deck?.slides[0]?.id || '';
+    text('source-file', library.find(item => item.id === id)?.path || '');
+    text('page-title', result.deck?.title || library.find(item => item.id === id)?.name || 'Editor');
+    setView('split');
+    show('editor');
+    updateDiagnostics(result.diagnostics);
+    updateEditor();
+    if (result.deck) status('Saved');
+    else status('Source has errors — edit to preview', true);
+  } catch (error) { errorNotice(error); }
+}
+
+function setView(next: View): void {
+  view = next;
+  $('master-pane').hidden = true;
+  $('editor-panes').hidden = false;
+  $('editor-panes').dataset.view = next;
+  for (const button of document.querySelectorAll<HTMLButtonElement>('[data-view]')) {
+    button.setAttribute('aria-pressed', String(button.dataset.view === next));
+  }
+}
+function updateDiagnostics(diagnostics: Diagnostic[] = []): void {
+  const area = $('diagnostics');
+  area.replaceChildren();
+  for (const item of diagnostics) {
+    const row = document.createElement('button');
+    row.type = 'button';
+    row.className = item.severity === 'error' ? 'diagnostic error' : 'diagnostic warning-text';
+    row.textContent = `${item.severity.toUpperCase()}${item.code ? ` ${item.code}` : ''}: ${item.message}`;
+    row.addEventListener('click', () => {
+      setView('source');
+      if (item.slideId && compiled?.slides.some(slide => slide.id === item.slideId)) selectSlide(item.slideId);
+      if (item.sourceSpan?.start !== undefined) {
+        sourceInput.focus();
+        sourceInput.setSelectionRange(item.sourceSpan.start, item.sourceSpan.end ?? item.sourceSpan.start);
+      }
+    });
+    area.append(row);
+  }
+  if (!diagnostics.length) area.textContent = 'No diagnostics';
+}
+
+function selectSlide(id: string): void {
+  selected = id;
+  updateEditor();
+  const card = [...document.querySelectorAll<HTMLElement>('.preview-card')].find(item => item.dataset.slideId === id);
+  card?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+}
+
+function updateOutline(): void {
+  const outline = $('outline');
+  outline.replaceChildren();
+  const heading = document.createElement('h2');
+  heading.textContent = 'Slide outline';
+  outline.append(heading);
+  const settings = document.createElement('button');
+  settings.type = 'button';
+  settings.id = 'settings-button';
+  settings.textContent = 'Master settings';
+  settings.addEventListener('click', () => {
+    if ($('master-pane').hidden) openSettings();
+    else setView(view);
+  });
+  outline.append(settings);
+  const slides = compiled?.slides || [];
+  const byId = new Map(slides.map(slide => [slide.id, slide]));
+  for (const slide of slides) {
+    let depth = 0;
+    let parent = slide.parent;
+    const seen = new Set<string>();
+    while (parent && byId.has(parent) && !seen.has(parent)) {
+      seen.add(parent);
+      depth++;
+      parent = byId.get(parent)?.parent;
+    }
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'outline-item';
+    button.style.paddingInlineStart = `${12 + Math.min(depth, 5) * 16}px`;
+    button.setAttribute('aria-current', slide.id === selected ? 'true' : 'false');
+    button.textContent = `${slide.index + 1}. ${slide.body.match(/^#{1,3}\s+(.+)$/m)?.[1] || slide.id}`;
+    button.addEventListener('click', () => selectSlide(slide.id));
+    outline.append(button);
+  }
+  const add = document.createElement('button');
+  add.type = 'button';
+  add.className = 'add-slide';
+  add.textContent = '+ Add slide';
+  add.addEventListener('click', () => editSource(addSlide(sourceInput.value)));
+  outline.append(add);
+  if (selected) {
+    const child = document.createElement('button');
+    child.type = 'button';
+    child.className = 'add-slide';
+    child.textContent = '+ Add child slide';
+    child.addEventListener('click', () => editSource(addSlide(sourceInput.value, selected)));
+    outline.append(child);
+  }
+}
+
+async function updatePreview(): Promise<void> {
+  const list = $('preview');
+  list.replaceChildren();
+  const deck = compiled;
+  if (!deck) {
+    list.textContent = 'Fix source diagnostics to restore preview.';
+    return;
+  }
+  for (const slide of deck.slides) {
+    const card = document.createElement('article');
+    card.className = 'preview-card';
+    card.dataset.slideId = slide.id;
+    if (slide.id === selected) card.classList.add('selected');
+    const heading = document.createElement('div');
+    heading.className = 'preview-heading';
+    const label = document.createElement('strong');
+    label.textContent = `${slide.index + 1} · ${slide.id}`;
+    const layout = document.createElement('select');
+    layout.setAttribute('aria-label', `Layout for slide ${slide.index + 1}`);
+    for (const name of layouts) layout.add(new Option(name.replace(/-/g, ' '), name));
+    layout.value = slide.layout;
+    layout.disabled = !canEditPreview();
+    layout.addEventListener('change', () => {
+      try { editSource(setLayout(sourceInput.value, slide.id, layout.value)); }
+      catch (error) { errorNotice(error); }
+    });
+    heading.append(label, layout);
+    const stage = document.createElement('div');
+    stage.className = 'stage preview-stage';
+    stage.addEventListener('click', () => { selected = slide.id; updateOutline(); });
+    card.append(heading, stage);
+    list.append(card);
+    void renderStage(stage, deck, slide, slide.reveals.length).then(() => {
+      if (!card.isConnected || compiled !== deck || !canEditPreview()) return;
+      const line = editableLine(sourceInput.value, slide.id, slide.body);
+      const paragraph = stage.querySelector<HTMLElement>('.slide-markdown > p');
+      if (!line || !paragraph || paragraph.textContent !== line.display) return;
+      paragraph.contentEditable = 'plaintext-only';
+      paragraph.setAttribute('role', 'textbox');
+      paragraph.setAttribute('aria-label', `Edit plain text on slide ${slide.index + 1}`);
+      paragraph.setAttribute('aria-multiline', 'false');
+      paragraph.title = 'Click to edit this plain-text paragraph';
+      let canceled = false;
+      paragraph.addEventListener('keydown', event => {
+        if (event.key === 'Escape') { canceled = true; paragraph.textContent = line.display; paragraph.blur(); }
+        if (event.key === 'Enter') { event.preventDefault(); paragraph.blur(); }
+        event.stopPropagation();
+      });
+      paragraph.addEventListener('blur', () => {
+        if (canceled || paragraph.textContent === line.display) return;
+        if (!canEditPreview() || sourceInput.value.slice(line.start, line.end) !== line.text) {
+          notify('Preview changed while editing; draft was not modified.');
+          return;
+        }
+        try { editSource(replacePlainLine(sourceInput.value, line, paragraph.textContent || '')); }
+        catch (error) { errorNotice(error); }
+      });
+    }).catch(errorNotice);
+  }
+}
+
+function canEditPreview(): boolean { return !conflicted && !!compiled && validText === sourceInput.value; }
+function updateEditor(): void {
+  updateOutline();
+  void updatePreview();
+  const theme = $<HTMLSelectElement>('theme');
+  theme.value = compiled?.theme || 'signal';
+  $('present').toggleAttribute('disabled', !compiled || !compiled.slides.length || !canEditPreview());
+  $('preview-label').textContent = canEditPreview()
+    ? 'Plain-text paragraphs can be edited here'
+    : 'Preview edits paused until source is valid and current';
+}
+function editSource(value: string): void {
+  if (value === sourceInput.value) return;
+  sourceInput.value = value;
+  sourceInput.dispatchEvent(new Event('input', { bubbles: true }));
+}
+function scheduleCompile(): void {
+  const generation = ++compileGeneration;
+  validText = '';
+  status('Compiling draft…', true);
+  $('present').setAttribute('disabled', '');
+  clearTimeout(compileTimer);
+  compileTimer = setTimeout(async () => {
+    const draft = sourceInput.value;
+    try {
+      const result = await request<{ deck: Deck | null; diagnostics: Diagnostic[] }>('/api/compile', 'POST', { text: draft });
+      if (generation !== compileGeneration || draft !== sourceInput.value || page !== 'editor') return;
+      updateDiagnostics(result.diagnostics);
+      if (result.deck && !result.diagnostics.some(item => item.severity === 'error')) {
+        compiled = result.deck;
+        validText = draft;
+        if (!compiled.slides.some(slide => slide.id === selected)) selected = compiled.order[0] || compiled.slides[0]?.id || '';
+        text('page-title', compiled.title);
+        status(isDirty() ? 'Unsaved draft' : 'Saved');
+      } else {
+        status('Invalid source — showing last valid preview; edits disabled', true);
+      }
+      updateEditor();
+      if (!$('master-pane').hidden) openSettings();
+    } catch (error) {
+      if (generation !== compileGeneration) return;
+      updateEditor();
+      status(`Compile failed: ${message(error)}`, true);
+    }
+  }, 250);
+}
+async function save(): Promise<boolean> {
+  if (saving) {
+    if (!await saving) return false;
+    return isDirty() ? save() : true;
+  }
+  if (!isDirty()) return true;
+  if (conflicted) { dialog('conflict-dialog').showModal(); return false; }
+  const draft = sourceInput.value;
+  const baseRevision = revision;
+  status('Saving…');
+  saving = (async () => {
+    try {
+      const result = await request<{ revision: string; deck: Deck | null; diagnostics: Diagnostic[] }>(
+        `/api/decks/${encodeURIComponent(deckId)}`, 'PUT', { baseRevision, text: draft });
+      revision = result.revision;
+      savedText = draft;
+      if (sourceInput.value === draft) {
+        if (result.deck) compiled = result.deck;
+        validText = result.deck ? draft : '';
+        updateDiagnostics(result.diagnostics);
+        updateEditor();
+      }
+      status(result.deck ? (isDirty() ? 'Unsaved changes' : 'Saved') : 'Saved invalid source — showing last valid preview', !result.deck);
+      return true;
+    } catch (error) {
+      const details = error instanceof ApiError && error.data && typeof error.data === 'object' && 'details' in error.data
+        ? error.data.details : null;
+      if (error instanceof ApiError && error.status === 409 && details && typeof details === 'object' &&
+        'diskRevision' in details && typeof details.diskRevision === 'string' &&
+        'diskText' in details && typeof details.diskText === 'string') {
+        const body = { diskRevision: details.diskRevision, diskText: details.diskText, draftText: sourceInput.value };
+        diskConflict = body;
+        conflicted = true;
+        $<HTMLTextAreaElement>('disk-text').value = body.diskText;
+        $<HTMLTextAreaElement>('draft-text').value = sourceInput.value;
+        dialog('conflict-dialog').showModal();
+        status('Disk conflict — draft retained', true);
+      } else status(`Save failed — draft retained: ${message(error)}`, true);
+      return false;
+    } finally { saving = undefined; }
+  })();
+  return saving;
+}
+function scheduleSave(): void {
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => { if (page === 'editor' && !conflicted) void save(); }, 1500);
+}
+
+const masterFields: Array<{ name: string; label: string; type: 'color' | 'text' | 'number' | 'checkbox'; fallback?: string }> = [
+  { name: 'surface', label: 'Surface', type: 'color', fallback: '#ffffff' },
+  { name: 'text', label: 'Text color', type: 'color', fallback: '#1b1f24' },
+  { name: 'accent', label: 'Accent', type: 'color', fallback: '#2563eb' },
+  { name: 'muted', label: 'Muted text', type: 'color', fallback: '#5b6470' },
+  { name: 'headingFont', label: 'Heading font', type: 'text' },
+  { name: 'bodyFont', label: 'Body font', type: 'text' },
+  { name: 'codeFont', label: 'Code font', type: 'text' },
+  { name: 'headingSize', label: 'Heading size', type: 'number' },
+  { name: 'bodySize', label: 'Body size', type: 'number' },
+  { name: 'codeSize', label: 'Code size', type: 'number' },
+  { name: 'footer', label: 'Footer text', type: 'text' },
+  { name: 'footerNumber', label: 'Slide number in footer', type: 'checkbox' },
+];
+function openSettings(): void {
+  $('editor-panes').hidden = true;
+  $('master-pane').hidden = false;
+  const fields = $('settings-fields');
+  fields.replaceChildren();
+  for (const field of masterFields) {
+    const label = document.createElement('label');
+    label.textContent = field.label;
+    const input = document.createElement('input');
+    input.type = field.type;
+    input.value = String(compiled?.master?.[field.name] ?? field.fallback ?? '');
+    if (field.type === 'checkbox') input.checked = compiled?.master?.[field.name] === true;
+    if (field.type === 'number') { input.min = '10'; input.max = '120'; }
+    input.addEventListener('change', () => {
+      try {
+        const value = field.type === 'checkbox' ? input.checked
+          : field.type === 'number' ? Number(input.value) : input.value;
+        if (field.type === 'number' && (!Number.isFinite(Number(value)) || Number(value) < 10 || Number(value) > 120)) {
+          throw new Error('Font size must be between 10 and 120.');
+        }
+        editSource(setMaster(sourceInput.value, field.name, value));
+      } catch (error) { errorNotice(error); }
+    });
+    label.append(input);
+    fields.append(label);
+  }
+  const preview = $('master-preview');
+  preview.replaceChildren();
+  const slide = selectedSlide();
+  if (compiled) void renderStage(preview, compiled, slide, slide?.reveals.length || 0).catch(errorNotice);
+}
+
+function currentSlide(snapshot: Snapshot): Slide | undefined {
+  return snapshot.stage.slides.find(slide => slide.id === snapshot.slideId);
+}
+function drawPresenter(): void {
+  if (!session || page !== 'presentation') return;
+  const snapshot = session.snapshot;
+  const slide = currentSlide(snapshot);
+  void drawStage(snapshot, $('stage'), $<SVGSVGElement>('ink'), $('stage-mode'), $('stage-frame')).catch(errorNotice);
+  const slides = snapshot.stage.slides;
+  const index = slides.findIndex(item => item.id === snapshot.slideId);
+  text('slide-progress', `Slide ${index + 1} / ${slides.length}`);
+  text('reveal-progress', slide?.reveals.length ? `Reveal ${snapshot.step} / ${slide.reveals.length}` : 'No reveals');
+  $('previous').toggleAttribute('disabled', index <= 0 && snapshot.step === 0);
+  $('next').toggleAttribute('disabled', index >= slides.length - 1 && snapshot.step >= (slide?.reveals.length || 0));
+  const next = snapshot.step < (slide?.reveals.length || 0) ? `Next reveal on ${slide?.id}`
+    : slides[index + 1]?.body.match(/^#{1,3}\s+(.+)$/m)?.[1] || slides[index + 1]?.id || 'End of deck';
+  text('up-next', next);
+  const notes = session.notes?.[snapshot.slideId] || slide?.notes || '';
+  $('speaker-notes').replaceChildren(markdown(notes));
+  const jump = $<HTMLSelectElement>('jump');
+  jump.replaceChildren();
+  slides.forEach((item, position) => jump.add(new Option(`${position + 1}. ${item.body.match(/^#{1,3}\s+(.+)$/m)?.[1] || item.id}`, item.id)));
+  jump.value = snapshot.slideId;
+  const byId = new Map(slides.map(item => [item.id, item]));
+  const children = slides.filter(item => item.parent === snapshot.slideId);
+  const siblings = slides.filter(item => item.parent === slide?.parent);
+  const siblingIndex = siblings.findIndex(item => item.id === snapshot.slideId);
+  for (const button of document.querySelectorAll<HTMLButtonElement>('[data-nav]')) {
+    const direction = button.dataset.nav;
+    button.disabled = direction === 'parent' ? !slide?.parent || !byId.has(slide.parent)
+      : direction === 'down' ? !children.length
+      : direction === 'up' ? !slide?.parent || !byId.has(slide.parent)
+      : direction === 'left' ? siblingIndex <= 0 : siblingIndex >= siblings.length - 1;
+  }
+  for (const button of document.querySelectorAll<HTMLButtonElement>('[data-tool]')) {
+    button.setAttribute('aria-pressed', String(button.dataset.tool === tool));
+  }
+  $('blank').setAttribute('aria-pressed', String(overlayMode(snapshot.overlay?.mode) === 'canvas'));
+  $('blackout').setAttribute('aria-pressed', String(overlayMode(snapshot.overlay?.mode) === 'blackout'));
+  $('undo').toggleAttribute('disabled', !snapshot.overlay?.strokes?.length);
+  $('clear').toggleAttribute('disabled', !snapshot.overlay?.strokes?.length);
+  text('share-info', sharing
+    ? `Audience URL: ${shareUrl} — network reachability unverified. Share only with trusted viewers.`
+    : 'Local only. Sharing is off.');
+  text('share', sharing ? 'Stop LAN sharing' : 'Share on LAN…');
+}
+async function sendEvent(action: string, extra: Record<string, unknown> = {}): Promise<void> {
+  if (!session || eventPending) return;
+  eventPending = true;
+  try {
+    const result = await request<{ snapshot: Snapshot; notes: Record<string, string> }>(
+      `/api/sessions/${encodeURIComponent(session.sessionId)}/events`, 'POST',
+      { sequence: session.snapshot.sequence, action, ...extra });
+    session.snapshot = result.snapshot;
+    session.notes = result.notes;
+    drawPresenter();
+  } catch (error) {
+    errorNotice(error);
+    try {
+      const current = await request<{ snapshot: Snapshot; notes: Record<string, string> }>(`/api/sessions/${encodeURIComponent(session.sessionId)}`);
+      session.snapshot = current.snapshot;
+      session.notes = current.notes;
+      drawPresenter();
+    } catch (refreshError) { status(`Presentation disconnected: ${message(refreshError)}`, true); }
+  } finally { eventPending = false; }
+}
+async function startPresentation(): Promise<void> {
+  clearTimeout(saveTimer);
+  clearTimeout(compileTimer);
+  if (!canEditPreview()) { notify('Wait for a valid, current preview before presenting.'); return; }
+  if (isDirty() && !(await save())) return;
+  if (!canEditPreview()) { notify('Fix diagnostics before presenting.'); return; }
+  try {
+    session = await request<SessionResponse>('/api/sessions', 'POST', { deckId, revision });
+    sharing = false;
+    sessionStart = Date.now();
+    text('page-title', session.snapshot.stage.title);
+    show('presentation');
+    drawPresenter();
+  } catch (error) { errorNotice(error); }
+}
+function point(event: PointerEvent): { x: number; y: number } {
+  const box = $('stage-frame').getBoundingClientRect();
+  return {
+    x: Math.max(0, Math.min(1, (event.clientX - box.left) / box.width)),
+    y: Math.max(0, Math.min(1, (event.clientY - box.top) / box.height)),
+  };
+}
+function toggleTool(value: typeof tool): void {
+  tool = tool === value ? null : value;
+  $('stage-frame').dataset.tool = tool || '';
+  $('laser').hidden = true;
+  drawPresenter();
+}
+function presenterKeys(event: KeyboardEvent): void {
+  if (page !== 'presentation' || dialog('shortcuts-dialog').open || dialog('share-dialog').open ||
+    dialog('end-dialog').open || drawing) return;
+  if (event.target instanceof HTMLElement && (event.target.closest('input, textarea, select, button, [contenteditable]'))) return;
+  const shortcut = event.key;
+  if ((event.ctrlKey || event.metaKey) && shortcut.toLowerCase() === 'z') {
+    event.preventDefault();
+    void sendEvent('undo');
+    return;
+  }
+  if (event.ctrlKey || event.metaKey || event.altKey) return;
+  const navigation: Record<string, string> = {
+    ' ': 'next', PageDown: 'next', PageUp: 'previous', Backspace: 'previous',
+    ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right',
+  };
+  if (navigation[shortcut]) {
+    event.preventDefault();
+    void sendEvent(navigation[shortcut]);
+  } else if (shortcut.toLowerCase() === 'b') void sendEvent('mode', { mode: overlayMode(session?.snapshot.overlay?.mode) === 'blackout' ? 'normal' : 'blackout' });
+  else if (shortcut.toLowerCase() === 'c') void sendEvent('mode', { mode: overlayMode(session?.snapshot.overlay?.mode) === 'canvas' ? 'normal' : 'canvas' });
+  else if (shortcut.toLowerCase() === 'd') toggleTool('pen');
+  else if (shortcut.toLowerCase() === 'h') toggleTool('highlighter');
+  else if (shortcut.toLowerCase() === 'l') toggleTool('laser');
+  else if (shortcut === 'Escape') toggleTool(null);
+}
+
+function wire(): void {
+  $<HTMLSelectElement>('theme').replaceChildren(...themeNames.map(name => new Option(name, name)));
+  $('create').addEventListener('click', () => {
+    const name = $<HTMLInputElement>('deck-name').value.trim();
+    if (!name) { notify('Enter a deck name.'); return; }
+    void libraryAction({ action: 'create', name });
+  });
+  $('open').addEventListener('click', () => {
+    const input = $<HTMLInputElement>('deck-path');
+    const path = input.value.trim();
+    if (!path) { notify('Enter an absolute path.'); return; }
+    const id = input.dataset.relinkId;
+    void libraryAction(id ? { action: 'relink', id, path } : { action: 'open', path });
+    delete input.dataset.relinkId;
+    text('open', 'Open file');
+  });
+  $('deck-path').addEventListener('keydown', event => { if (event.key === 'Enter') $('open').click(); });
+  $('deck-name').addEventListener('keydown', event => { if (event.key === 'Enter') $('create').click(); });
+  $('home').addEventListener('click', event => {
+    event.preventDefault();
+    if (page === 'presentation') { dialog('end-dialog').showModal(); return; }
+    if (isDirty() && !confirm('Leave without saving your draft?')) return;
+    clearTimeout(saveTimer);
+    deckId = '';
+    show('library');
+    text('page-title', 'Local presentations');
+    $('save-status').hidden = true;
+  });
+  for (const button of document.querySelectorAll<HTMLButtonElement>('[data-view]')) {
+    button.addEventListener('click', () => setView(button.dataset.view as View));
+  }
+  $<HTMLSelectElement>('theme').addEventListener('change', event => {
+    try { editSource(setTheme(sourceInput.value, (event.target as HTMLSelectElement).value)); }
+    catch (error) { errorNotice(error); }
+  });
+  sourceInput.addEventListener('input', () => { scheduleCompile(); scheduleSave(); });
+  sourceInput.addEventListener('keydown', event => {
+    if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's') {
+      event.preventDefault();
+      clearTimeout(saveTimer);
+      void save();
+    }
+    if (event.key === 'Tab') {
+      event.preventDefault();
+      const start = sourceInput.selectionStart;
+      sourceInput.setRangeText('  ', start, sourceInput.selectionEnd, 'end');
+      sourceInput.dispatchEvent(new Event('input'));
+    }
+  });
+  $('save').addEventListener('click', () => { clearTimeout(saveTimer); void save(); });
+  $('present').addEventListener('click', () => { void startPresentation(); });
+  $('use-disk').addEventListener('click', () => {
+    if (!diskConflict) return;
+    revision = diskConflict.diskRevision;
+    savedText = diskConflict.diskText;
+    sourceInput.value = savedText;
+    conflicted = false;
+    diskConflict = null;
+    dialog('conflict-dialog').close();
+    scheduleCompile();
+  });
+  $('keep-draft').addEventListener('click', () => {
+    if (!diskConflict) return;
+    revision = diskConflict.diskRevision;
+    savedText = diskConflict.diskText;
+    conflicted = false;
+    diskConflict = null;
+    dialog('conflict-dialog').close();
+    void save();
+  });
+  $('reset-master').addEventListener('click', () => {
+    if (!confirm('Remove presentation master overrides from the source?')) return;
+    try {
+      let source = sourceInput.value;
+      for (const field of masterFields) source = setMaster(source, field.name);
+      source = clearTheme(source);
+      editSource(source);
+      openSettings();
+    } catch (error) { errorNotice(error); }
+  });
+  $('outline').addEventListener('dblclick', () => openSettings());
+  $('next').addEventListener('click', () => { void sendEvent('next'); });
+  $('previous').addEventListener('click', () => { void sendEvent('previous'); });
+  for (const button of document.querySelectorAll<HTMLButtonElement>('[data-nav]')) {
+    button.addEventListener('click', () => { void sendEvent(button.dataset.nav!); });
+  }
+  $<HTMLSelectElement>('jump').addEventListener('change', event => {
+    void sendEvent('jump', { slideId: (event.target as HTMLSelectElement).value });
+  });
+  for (const button of document.querySelectorAll<HTMLButtonElement>('[data-tool]')) {
+    button.addEventListener('click', () => toggleTool(button.dataset.tool as typeof tool));
+  }
+  $('undo').addEventListener('click', () => { void sendEvent('undo'); });
+  $('clear').addEventListener('click', () => { void sendEvent('clear'); });
+  for (const [id, mode] of [['blank', 'canvas'], ['blackout', 'blackout']]) {
+    $(id).addEventListener('click', () => {
+      void sendEvent('mode', { mode: overlayMode(session?.snapshot.overlay?.mode) === mode ? 'normal' : mode });
+    });
+  }
+  $('shortcuts').addEventListener('click', () => dialog('shortcuts-dialog').showModal());
+  for (const button of document.querySelectorAll<HTMLButtonElement>('[data-close]')) {
+    button.addEventListener('click', () => dialog(button.dataset.close!).close());
+  }
+  const frame = $('stage-frame');
+  frame.addEventListener('pointerdown', event => {
+    if (page !== 'presentation' || event.button !== 0 || !tool || eventPending) return;
+    if (tool === 'laser') return;
+    event.preventDefault();
+    drawing = { points: [point(event)], pointer: event.pointerId };
+    frame.setPointerCapture(event.pointerId);
+  });
+  frame.addEventListener('pointermove', event => {
+    if (page !== 'presentation') return;
+    if (tool === 'laser') {
+      const laser = $('laser');
+      laser.hidden = false;
+      const position = point(event);
+      laser.style.left = `${position.x * 100}%`;
+      laser.style.top = `${position.y * 100}%`;
+    }
+    if (drawing?.pointer === event.pointerId && drawing.points.length < 2000) drawing.points.push(point(event));
+  });
+  frame.addEventListener('pointerleave', () => { $('laser').hidden = true; });
+  frame.addEventListener('pointerup', event => {
+    if (!drawing || drawing.pointer !== event.pointerId) return;
+    const points = drawing.points;
+    drawing = null;
+    if (points.length < 2 || !session) return;
+    const stroke: Stroke = {
+      slideId: session.snapshot.slideId, step: session.snapshot.step,
+      points, tool: tool || 'pen', color: $<HTMLInputElement>('ink-color').value,
+      width: Number($<HTMLInputElement>('ink-width').value),
+    };
+    void sendEvent('stroke', { stroke });
+  });
+  frame.addEventListener('pointercancel', () => { drawing = null; });
+  $('local-audience').addEventListener('click', () => {
+    if (!session) return;
+    window.open(`/audience/?session=${encodeURIComponent(session.sessionId)}#${encodeURIComponent(session.localKey)}`, '_blank', 'noopener');
+  });
+  $('share').addEventListener('click', async () => {
+    if (!session) return;
+    if (!sharing) { dialog('share-dialog').showModal(); return; }
+    try {
+      await request(`/api/sessions/${encodeURIComponent(session.sessionId)}/share`, 'DELETE');
+      sharing = false;
+      shareUrl = '';
+      drawPresenter();
+      notify('LAN sharing stopped.');
+    } catch (error) { errorNotice(error); }
+  });
+  $('start-share').addEventListener('click', async () => {
+    if (!session) return;
+    const host = $<HTMLInputElement>('share-host').value.trim();
+    const portStart = Number($<HTMLInputElement>('port-start').value);
+    const portEnd = Number($<HTMLInputElement>('port-end').value);
+    if (!host || !Number.isInteger(portStart) || !Number.isInteger(portEnd) ||
+      portStart < 1024 || portEnd > 65535 || portStart > portEnd) {
+      notify('Enter a host and a valid port range (1024–65535).');
+      return;
+    }
+    try {
+      const result = await request<{ url: string; port: number; reachability: 'unverified' }>(
+        `/api/sessions/${encodeURIComponent(session.sessionId)}/share`, 'POST', { host, portStart, portEnd });
+      sharing = true;
+      shareUrl = result.url;
+      dialog('share-dialog').close();
+      drawPresenter();
+    } catch (error) { errorNotice(error); }
+  });
+  $('end').addEventListener('click', () => {
+    if (!session) return;
+    text('end-warning', session.snapshot.overlay?.strokes?.length
+      ? 'Ink will be discarded. Saving annotations is not available yet.'
+      : 'Audience windows will stop receiving updates.');
+    dialog('end-dialog').showModal();
+  });
+  $('confirm-end').addEventListener('click', async () => {
+    if (!session) return;
+    try {
+      await request(`/api/sessions/${encodeURIComponent(session.sessionId)}`, 'DELETE');
+      session = null;
+      sharing = false;
+      shareUrl = '';
+      tool = null;
+      dialog('end-dialog').close();
+      show('editor');
+      text('page-title', compiled?.title || 'Editor');
+      updateEditor();
+    } catch (error) { errorNotice(error); }
+  });
+  document.addEventListener('keydown', presenterKeys);
+  window.addEventListener('beforeunload', event => {
+    if (isDirty() || session) { event.preventDefault(); event.returnValue = ''; }
+  });
+  setInterval(() => {
+    if (page !== 'presentation' || !session) return;
+    const seconds = Math.floor((Date.now() - sessionStart) / 1000);
+    text('timer', `${String(Math.floor(seconds / 60)).padStart(2, '0')}:${String(seconds % 60).padStart(2, '0')}`);
+  }, 1000);
+}
+
+async function init(): Promise<void> {
+  wire();
+  try {
+    const bootstrap = await fetch('/api/bootstrap', { cache: 'no-store' });
+    if (!bootstrap.ok) throw new Error(`Bootstrap failed (${bootstrap.status}).`);
+    const response = await bootstrap.json() as { token: string; library: LibraryEntry[] };
+    token = response.token;
+    library = response.library;
+    renderLibrary();
+    show('library');
+  } catch (error) {
+    show('library');
+    status(`Unable to load library: ${message(error)}`, true);
+  }
+}
+
+void init();
