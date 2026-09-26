@@ -1,14 +1,16 @@
 # Discovery: Slides
 
-**Date**: 2026-09-21 | **Updated**: 2026-09-22 | **Status**: Draft | **Owner**: Project owner (requester)
+**Date**: 2026-09-21 | **Updated**: 2026-09-25 | **Status**: Draft | **Owner**: Project owner (requester)
 
 Name provisional. Summary confirmed and draft saved on 2026-09-21; formal approval pending. Architecture, stack, APIs, schema, and engineering backlog are outside discovery.
 
 **Decision status**: user-confirmed behavior is the scope baseline. Items marked **Proposed** are recommendations awaiting acceptance, even when their intended priority is Must. Priority is not approval; this document remains Draft.
 
+This document owns product behavior and priorities; the companion technical design owns implementation choices. Its owner-selected stack direction does not approve every Proposed requirement or waive a Must. Open feasibility gates are unresolved implementation evidence, not contradictory product requirements or permission to reduce scope.
+
 ## 1. Idea Summary
 
-Build a lightweight application for personal use by programmers, software engineers, and data scientists, extensible by its owner and inspired by Deckrun. Author in Markdown-based MDX, optionally add JSX/React or JavaScript, and produce recursive slides, continuous documents, and clean PDF/HTML exports with presenter tools. Windows, macOS, and Linux executables open a document without a separate runtime installation; preview stays private, while explicit live presentation provides a separate LAN port and IP-address URLs.
+Build a lightweight application for personal use by programmers, software engineers, and data scientists, extensible by its owner and inspired by Deckrun. Author in Markdown-based MDX, optionally add JSX/React or JavaScript, and produce recursive slides, continuous documents, and clean PDF/HTML exports with presenter tools. Windows, macOS, and Linux executables open a document without a separate runtime installation; preview and local-only presentation stay private, while explicitly starting LAN sharing for a live presentation provides a separate audience port and IP-address URLs.
 
 ## 2. Problem & Motivation
 
@@ -31,7 +33,7 @@ Single-author, local ownership; owner, author, and presenter may be one person. 
 
 | Goal | Success criterion |
 | --- | --- |
-| Complete workflow | Three technical decks: author, externally edit, present in two windows, annotate, and export without manual HTML repair. |
+| Complete workflow | Three technical decks: find each in the local library, open a pages view, author, externally edit, present in two windows, annotate, and export without manual HTML repair. |
 | Narrative order | 100% agreement between Next/Previous, export order, and navigation-fixture hierarchy. |
 | Responsiveness and motion | Meet NFR-001 through NFR-004 on the reference workload: 3-second launch, 200 ms preview, 100 ms navigation, and 60 fps targets. |
 | Export quality | All built-in content renders without missing assets, unintended clipping, or private-note leakage. |
@@ -60,7 +62,7 @@ Additional unconfirmed numeric targets are marked **Proposed** in section 8. No 
 
 Full selected v1, not a reduced presentation-only MVP. Section 7 defines the complete feature set:
 
-- Draft-mode `.mdx`/`.md` authoring with browser editor, hot-reloading preview, autosave/library, and external editors; one source for slides and continuous reading. Presentation mode freezes authored content and design.
+- Draft-mode `.mdx`/`.md` authoring with browser editor, hot-reloading preview, autosave, a local deck gallery/pages view, and external editors; one source for slides and continuous reading. Presentation mode freezes authored content and design.
 - Recursive navigation, rich technical content, themes, an editable presentation master, per-slide templates, motion, and presenter/annotation tools; catalogs below, behavior in section 6.
 - Original-source/Markdown, interactive HTML, continuous HTML, private presenter HTML, and headless PDF exports. Offline HTML may be a folder bundle requiring local serving.
 - Application and noninteractive local/CI linting; offline core, explicit code/network permissions, no mandatory cloud service.
@@ -117,7 +119,9 @@ Full selected v1, not a reduced presentation-only MVP. Section 7 defines the com
 
 ### Open and Edit a Local Deck
 
-Run the executable with a `.mdx`/`.md` file to open draft/creation mode; without a file, open the library. Source, component, local asset/data, master, and template changes hot reload the draft preview. Save status is visible, conflicts preserve competing versions, and invalid edits retain source and the last valid preview (FR-001 through FR-016).
+Run the executable with a `.mdx`/`.md` file to open draft/creation mode; without a file, open the local **My Decks** library. New decks save under a writable, per-user application deck directory by default; choosing another location saves there instead and keeps that deck in the library. If the default directory cannot be created or written, report the failure and let the author choose another location; never silently save elsewhere or claim persistence. The library shows all app-created or opened decks, including those saved elsewhere, as searchable cover cards with titles; only explicitly added/opened external files or directories are indexed, not the whole disk. Opening one file authorizes that deck and read-only resolution of its referenced files beneath its folder, not indexing sibling decks; references outside that folder need explicit authorization. Selecting a card opens a pages view with ordered slide thumbnails and hierarchy, from which the author can open a slide in draft mode or start presenting from the first slide. The supplied gallery reference guides the local cover-card layout, not cloud/team sharing, exact branding, or category requirements.
+
+Source, component, local asset/data, master, and template changes hot reload the draft preview and pages view. Save status is visible, conflicts preserve competing versions, and invalid edits retain source and the last valid preview (FR-001 through FR-016). Missing or unreadable decks stay identifiable in the library with relink and remove-from-library actions rather than silently disappearing; removal never deletes files.
 
 ### Start and End Presentation Mode
 
@@ -125,17 +129,17 @@ Normal launch requires a valid draft with no unresolved file conflicts. Invalid 
 
 Starting presentation captures the selected valid source, referenced local assets/data/components, notes, master, and template assignments as a fixed session version. The presentation surface disables authoring and hot reload; a separate draft editor may continue editing. Neither browser-editor nor external-file changes affect an existing instance. Start a new presentation instance to pick up changes; there is no in-place republishing. Existing instances keep their own captured versions until closed.
 
-Navigation, reveals, playback of authored demos/media, and annotation tools remain available; these change presentation state, not source content. Pen/highlights/comments, laser, blank canvas, and blackout are temporary overlays. Private notes and tool controls never become audience content merely because the public output is synchronized.
+The presentation surface shows the selected slide stage without library, card, pages, or editor chrome; the draft may stay open in its own window. Projected and LAN audience views contain no application navigation, deck thumbnails, sidebars, or presenter chrome. Private notes and tools stay on the separate presenter surface. Navigation, reveals, playback of authored demos/media, and annotation tools remain available; these change presentation state, not source content. Pen/highlights/comments, laser, blank canvas, and blackout are temporary overlays. Private notes and tool controls never become audience content merely because the public output is synchronized.
 
 ### Share a Live Presentation on the Local Network
 
-Start live presentation to share the selected deck's audience view on approved LAN interfaces, leaving private capabilities on loopback. Each active presentation gets a distinct, successfully bound port using FR-087 through FR-089. An exhausted range can be changed without interrupting the editor or existing services. Ending a session closes its connections and releases its port for reuse; already delivered content cannot be recalled.
+Starting a presentation creates a live instance, which may remain local-only. Explicitly start LAN sharing to expose that instance's audience view on approved interfaces, leaving private capabilities on loopback. Each LAN-shared instance gets a distinct, successfully bound audience port using FR-087 through FR-089; a local-only instance has no LAN listener. An exhausted range can be changed without interrupting the editor or existing services. Stopping sharing releases its audience port/connections but preserves the local instance and its marks; ending the instance also discards its unsaved marks. Already delivered content cannot be recalled.
 
 Viewers enter a displayed URL from the same reachable network. Example: `http://192.168.1.25:50001` illustrates a host IP plus bound port, not prescribed/current values. Addresses come from approved host interfaces, labeled Wi-Fi/Ethernet; do not assign new IPs or scan other devices. FR-091 defines URL formatting and excludes loopback/wildcard addresses from remote URLs.
 
 All live viewers, including late joins/reconnections, see the same public presentation output as the presenter: layout, slide/reveal, animations, chart hover/selection, React widget state, JavaScript results, media playback position, and visible annotations/modes. Time/random/data-driven results must not diverge per viewer. Viewers cannot navigate or interact independently during the live session; standalone exports retain independent navigation. Uniform fit-to-screen scaling is allowed without layout reflow; device accessibility settings may suppress motion without changing content/state. Network delay is measured separately, not treated as instantaneous pixel-identical delivery.
 
-If a component/embed cannot meet shared-output requirements, report it before presenting; use a presenter-approved fallback identically for everyone or block launch rather than silently show different content. This specifies behavior, not streaming versus state synchronization. Keep local preview/presentation usable when sharing fails. Interface discovery does not prove reachability: firewall, guest isolation, VPN, and routing restrictions need guidance, not automatic security changes, elevation, or public internet exposure.
+If a component/embed cannot meet shared-output requirements, report it before starting audience delivery; use a presenter-approved fallback identically for everyone or block that delivery rather than silently show different content. This applies to linked local audience views as well as LAN sharing and specifies behavior, not streaming versus state synchronization. Keep the private local preview/presentation usable when sharing fails. Interface discovery does not prove reachability: firewall, guest isolation, VPN, and routing restrictions need guidance, not automatic security changes, elevation, or public internet exposure.
 
 ### Present a Recursive Narrative
 
@@ -166,9 +170,9 @@ Two reveal steps produce three default PDF pages: initial, first reveal, second 
 
 Keep private notes and presenter controls separate from public output. Capture live pen strokes, text highlights, and comments per presentation instance and slide; comments stay private unless explicitly made public. Tools preserve position and marks stay aligned across window sizes. Marks belong to the reveal step where created and remain visible at that step and later steps, never earlier ones; erasing removes them from the current annotation set, not from already saved copies.
 
-On export, ask **Save annotations**, **Clear annotations and export**, or **Cancel** when the selected draft session or live instance has annotations. Save writes an annotated copy, preserves its marks on reopening that artifact, and leaves session marks available. Clear produces a clean export and removes only unchanged captured marks after success, synchronizing that removal to linked views. Cancel or failure changes no marks; later additions/edits are untouched. Source-only/converted Markdown needs an annotated PDF/HTML companion to save ink; failure of that companion must not block a raw-source backup or falsely mark annotations saved.
+On export, ask **Save annotations**, **Clear annotations and export**, or **Cancel** when the selected draft session or live instance has annotations. Save writes an annotated copy, preserves its included marks on reopening that artifact, and leaves session marks available. Disclose omitted private comments before confirmation; a public artifact never counts as saving those comments. Clear explicitly discards unchanged captured marks and their comments only after a successful clean export, synchronizing that removal to linked views. Cancel or failure changes no marks; later additions/edits are untouched. Source-only/converted Markdown needs an annotated PDF/HTML companion to save ink; failure of that companion must not block a raw-source backup or falsely mark annotations saved.
 
-An instance ends when its controlling live window is closed, the presenter ends it, or the host application exits. Unsaved annotations then cannot be recovered through reopening, browser restoration, or a new presentation; no automatic annotation backup is kept. Controlled close offers save/discard/cancel, waits for save success, and stays open on failure; abrupt closure may offer no warning. Closing/reloading an audience view only disconnects/rejoins that viewer. Draft-preview highlights belong to their own session and fully revealed preview state; they never enter a live instance/export implicitly.
+An instance ends when its controlling live document is closed/reloaded, the presenter ends it, or the host application exits. Unsaved annotations then cannot be recovered through reopening, browser restoration, or a new presentation; no automatic annotation backup is kept. Controlled close offers save/discard/cancel, waits for save success, and stays open on failure; abrupt closure may offer no warning. **Proposed**: because a crashed owner cannot be distinguished from a lost connection, losing contact with the controlling document beyond a bounded reconnect window counts as abrupt closure; a transient disconnect within that window does not end the session. Closing/reloading an audience view only disconnects/rejoins that viewer. Draft-preview highlights belong to their own session and fully revealed preview state; they never enter a live instance/export implicitly. Switching pages/editor/master views of that same open draft preserves its session; closing/reloading it follows the same annotation save/discard rule. Starting a separate live instance does not close the draft.
 
 ### Use a React Demonstration or External Media
 
@@ -176,17 +180,17 @@ Permit authored JavaScript/React execution separately from launching the applica
 
 ### Export and Share Reliably
 
-Live exports use the selected instance's frozen version, never newer editor/disk content. At export request capture its surviving annotations, relevant displayed state, options, and static representations; the Save/Clear decision uses that snapshot. Later edits, strokes, or playback cannot change the job. A save succeeds only when its artifact is written; closing the instance before completion cancels an unfinished annotated job and does not create annotation recovery.
+Live exports use the selected instance's frozen version, never newer editor/disk content. At export request capture its surviving annotations, relevant displayed state, options, and static representations; the Save/Clear decision uses that snapshot. Later edits, strokes, or playback cannot change the job. A save succeeds only when its artifact is written; closing the instance before completion cancels its unfinished annotation-dependent outputs and does not create annotation recovery.
 
 | Output | Input and validation |
 | --- | --- |
 | Original MDX/Markdown source | Exact selected source, even if malformed, plus available authorized companion files. For a file conflict, explicitly choose editor or disk version without overwriting either. No code execution; report missing companions without blocking the source backup. |
-| Converted Markdown or rendered draft output | Current valid draft with resolved file conflicts; never silently substitute the last valid preview. Conversion/rendering diagnostics apply. |
-| Live rendered/annotated output | Captured live version and export-time state, unaffected by draft changes. Apply the annotation choice above and ordinary export diagnostics. |
+| Converted Markdown or rendered draft output | Current valid editor revision with resolved file conflicts, even if source autosave is still pending; never silently substitute disk or the last valid preview. Conversion/rendering diagnostics apply. Annotated draft output captures the relevant displayed preview state so marks stay aligned. |
+| Live converted/rendered/annotated output | Captured live version and applicable export-time state, unaffected by draft changes. Apply the annotation choice above and ordinary export diagnostics. |
 
-PDF follows canonical node/reveal order: one initial page plus each reveal step; continuous HTML shows each node once, fully revealed. Saved marks appear from their creation step onward, so a circle drawn at reveal 2 is absent on states 0 and 1. Save the surviving set, not stroke history; final-state-only output shows all surviving slide marks. An annotated HTML copy preserves reveal navigation but uses labeled static snapshots for marked dynamic content to maintain alignment. Unmarked content and clean interactive exports retain supported interaction; annotated copies do not promise recording/replay of arbitrary widget/media behavior.
+Public rendered exports contain authored slide content and explicitly saved public annotations/comments, not the library, pages view, editor/presenter toolbars, private notes, or private comments. Independent HTML retains its own navigation, permission, playback, and accessibility controls outside the slide content; these are not exported application chrome. Original source and converted Markdown are text outputs without a public-safety guarantee, and private presenter HTML is explicitly labeled private. PDF follows canonical node/reveal order: one initial page plus each reveal step; continuous HTML shows each node once, fully revealed. An optional PDF table of contents can precede the slides, linking numbered node titles to their first emitted page (initial state by default, fully revealed state for final-only output); it is off by default so ordinary page counts are unchanged. Saved marks appear from their creation step onward, so a circle drawn at reveal 2 is absent on states 0 and 1. Save the surviving set, not stroke history; final-state-only output shows all surviving slide marks. An annotated HTML copy preserves reveal navigation but uses labeled static snapshots for marked dynamic content to maintain alignment. Unmarked content and clean interactive exports retain supported interaction; annotated copies do not promise recording/replay of arbitrary widget/media behavior.
 
-Blank-canvas drawings are separate from slide ink: save one labeled final canvas per marked slide, after the deck in canonical slide order. These appendix pages/sections do not change slide numbering or the 160-page unannotated benchmark. Laser position, blackout, and tool controls are never exported. Save discloses which marks/comments the format preserves; private comments require private presenter HTML, while public PDF/HTML physically omit them and authored notes. Source and private presenter exports warn that they are not audience-safe.
+Blank-canvas drawings are separate from slide ink: save one labeled final canvas per marked slide, after the deck in canonical slide order. These appendix pages/sections do not change slide numbering or the 160-page unannotated benchmark. Laser position, blackout, and tool controls are never exported. Save discloses which marks/comments the format preserves; private comments require private presenter HTML, while public PDF/HTML physically omit them and authored notes. Source, converted Markdown, and private presenter exports warn that they are not audience-safe.
 
 ## 7. Functional Requirements
 
@@ -197,7 +201,7 @@ Blank-canvas drawings are separate from slide ink: save one labeled final canvas
 | ID | Requirement | Priority | Notes |
 | --- | --- | --- | --- |
 | FR-001 | The system shall open the supplied document in a local preview when invoked through the platform executable with its file path. | Must | Paths containing spaces and non-ASCII characters must work; the executable-driven workflow does not prescribe a web-app architecture. |
-| FR-002 | The system shall open the local library when launched without a document path. | Must | Proposed default entry behavior. |
+| FR-002 | The system shall open the local My Decks library when launched without a document path. | Must | Show app-created decks from the default directory and explicitly selected other locations. |
 | FR-003 | The system shall serve authoring, the library, private preview, and presenter controls on a configurable private port bound only to `127.0.0.1`. | Must | LAN audience delivery uses a separate port; opening a preview does not expose private capabilities. |
 | FR-004 | The system shall offer a different private authoring port when the requested port is occupied. | Must | Report the resulting URL; never terminate the existing process. Live audience ports are selected automatically under FR-088. |
 | FR-005 | The system shall support Markdown-only deck content within its primary MDX authoring format without requiring JSX, JavaScript expressions, or imports. | Must | Accept both `.mdx` and `.md` files in the same workflow; document MDX-specific syntax differences rather than assuming universal CommonMark compatibility. |
@@ -206,10 +210,10 @@ Blank-canvas drawings are separate from slide ink: save one labeled final canvas
 | FR-008 | The system shall autosave draft source edits to the selected local file with an observable save status. | Must | Browser storage is not authoritative; live annotations never autosave into source. |
 | FR-009 | The system shall refresh the draft editor/preview after nonconflicting external changes to source or referenced local assets, data, and components. | Must | External editors remain first-class; active presentation versions are unaffected. |
 | FR-010 | The system shall preserve competing versions for an explicit conflict decision when browser and external edits overlap. | Must | Proposed data-loss safeguard; no silent last-writer-wins. |
-| FR-011 | The system shall maintain a searchable library of decks and document views in author-selected local locations. | Must | Both modes refer to the same authored source. |
+| FR-011 | The system shall maintain a searchable library of decks and document views in the default per-user application deck directory and explicitly selected local locations. | Must | New decks use the default directory unless another is chosen; decks created elsewhere remain listed after restart. Both modes refer to the same authored source; do not scan unrelated disk locations. |
 | FR-012 | The system shall initialize a new local document with a presentation master and a selected first-slide template. | Must | A useful starting point without required hand-written setup; master and slide layout are distinct. |
 | FR-013 | The system shall duplicate a library document without overwriting the original. | Must | Retain resolvable asset references. |
-| FR-014 | The system shall rename a library document without silently breaking its asset references. | Must | Report conflicts or invalid paths. |
+| FR-014 | The system shall rename a library document without silently breaking its asset references. | Must | Report conflicts or invalid paths. Proposed: rename and delete require closing any open draft of that deck first. |
 | FR-015 | The system shall require confirmation before deleting a document through the library. | Must | Do not delete shared assets implicitly. |
 | FR-016 | The system shall retain the last valid preview when incomplete or invalid source cannot render. | Must | Identify the preview as stale and preserve edited text/diagnostics. Retaining a preview does not authorize silent launch of that version; see FR-102. |
 
@@ -219,7 +223,7 @@ Blank-canvas drawings are separate from slide ink: save one labeled final canvas
 | --- | --- | --- | --- |
 | FR-017 | The system shall represent slides as an ordered recursive tree in which a slide can have its own content and child slides. | Must | Not restricted to a two-level stack; validate at least ten levels. |
 | FR-018 | The system shall alternate sibling orientation by depth, starting vertically at the top level. | Must | Automatic rule, not author-selectable orientation in v1. |
-| FR-019 | The system shall display hierarchical slide numbering alongside overall slide progress. | Must | Example: `1.1.2` and `4 / 100`; reveals do not create new slide numbers. |
+| FR-019 | The system shall display hierarchical slide numbering alongside overall slide progress. | Must | Example: `1.1.2` and `4 / 100`; reveals do not create new slide numbers. Show these in private presentation controls and independent HTML navigation, not as mandatory audience/export overlays. Author-defined master footers remain slide content. |
 | FR-020 | The system shall advance Next through current reveal states and then through slide nodes in depth-first preorder. | Must | Complete descendants before the next sibling; no repeated ancestor pages. |
 | FR-021 | The system shall make Previous the inverse of the canonical Next sequence. | Must | Reverses slide/reveal position, not annotations, widget edits, or playback history; independent of jump history. |
 | FR-022 | The system shall provide Up, Down, Left, and Right controls following the hierarchy rules in section 6. | Must | Controls expose available destinations and disable unavailable moves. |
@@ -252,7 +256,7 @@ Blank-canvas drawings are separate from slide ink: save one labeled final canvas
 
 | ID | Requirement | Priority | Notes |
 | --- | --- | --- | --- |
-| FR-042 | The system shall provide 14 selectable theme presets. | Must | Distinct palettes and typography; catalog names remain a design decision. |
+| FR-042 | The system shall provide 14 selectable theme presets. | Must | Distinct palettes and typography; catalog names remain a design decision. Proposed: switching presets keeps explicit master overrides; a separate Reset restores the preset. |
 | FR-043 | The system shall apply master palette changes across draft slides, draft-based exports, and newly started presentations. | Must | Includes built-in charts/diagrams; existing instances and their exports keep their captured palette. |
 | FR-044 | The system shall apply master heading, body, and code fonts across draft slides, draft-based exports, and newly started presentations. | Must | Preserve math fonts and report missing fonts. Existing instances and their exports keep captured typography. |
 | FR-045 | The system shall apply master font-size settings across draft slides, draft-based exports, and newly started presentations. | Must | Draft-only editing without individual content edits; existing instances and their exports keep captured sizes. Warn about overflow rather than silently clipping content. |
@@ -277,7 +281,7 @@ Blank-canvas drawings are separate from slide ink: save one labeled final canvas
 | FR-059 | The system shall show shortcut help when the presenter invokes `?` outside text input. | Must | Help must also have a discoverable control. |
 | FR-060 | The system shall support marker-style text highlighting in draft preview and live presentation. | Must | Draft marks belong to its fully revealed preview; each live instance is isolated. Never implicitly transfer marks or change source. After draft edits discard unresolvable anchors rather than mark wrong content. |
 | FR-061 | The system shall attach editable comments to text highlights. | Must | Private by default; deliberately showing a comment is a separate action. |
-| FR-062 | The system shall discard unsaved annotations irrecoverably within the application when their owning session closes. | Must | No automatic backup/restore. Live owner close/end/host exit ends an instance; viewer disconnect does not. Controlled Save-and-close waits for success; failure stays open, discard/abrupt closure cancels unfinished annotated jobs. Saved artifacts retain marks when explicitly reopened, never through automatic new-session recovery. |
+| FR-062 | The system shall discard unsaved annotations irrecoverably within the application when their owning session closes. | Must | No automatic backup/restore. Owner close/reload/end/host exit ends its session; viewer disconnect and transient owner disconnect do not. Proposed: owner-contact loss beyond a bounded reconnect window counts as abrupt closure. Controlled Save-and-close waits for success and requires explicit discard consent for any omitted private comments; failure stays open. Discard/abrupt closure cancels unfinished annotation-dependent outputs, including a Clear's clean output; an independent raw backup may still complete. Saved artifacts retain included marks when explicitly reopened, never through automatic new-session recovery. |
 | FR-063 | The system shall require Save annotations, Clear annotations and export, or Cancel when exporting a session with annotations. | Must | Capture that draft session/live instance only. Clear removes unchanged captured marks after successful clean export, not newer edits; cancel/failure preserves them. Source needs a PDF/HTML companion to save ink, whose failure cannot block raw backup. Show preserved/omitted marks/comments; private comments require private presenter HTML. |
 
 ### Export
@@ -285,15 +289,15 @@ Blank-canvas drawings are separate from slide ink: save one labeled final canvas
 | ID | Requirement | Priority | Notes |
 | --- | --- | --- | --- |
 | FR-064 | The system shall export the exact selected MDX/Markdown source regardless of syntax validity. | Must | Include available authorized companions and report missing ones without blocking text backup. For conflicts, explicitly choose editor/disk version without overwriting either. Never execute code to back up source; notes/code make it non-public. |
-| FR-065 | The system shall export Markdown while preserving Markdown content and reporting any MDX-specific content that cannot be represented. | Must | Markdown-only content needs no MDX-specific fallback. For added JSX/React behavior or executable expressions that cannot be represented, use supplied static representations or identified placeholders, never silent omission. |
+| FR-065 | The system shall export Markdown while preserving Markdown content and reporting any MDX-specific content that cannot be represented. | Must | Markdown-only content needs no MDX-specific fallback. For added JSX/React behavior or executable expressions that cannot be represented, use supplied static representations or identified placeholders, never silent omission. Authored notes remain as labeled Markdown sections; the output is not audience-safe. |
 | FR-066 | The system shall export an offline interactive HTML presentation bundle preserving tree navigation and reveals. | Must | Folder output/local serving is acceptable; no authoring app required. Recipient permission gates authored code/network access; navigation and static content remain available without it. |
 | FR-067 | The system shall export an offline continuous-reading HTML bundle in canonical slide-node order. | Must | Each node appears once with all revealed content visible. |
 | FR-068 | The system shall export a separately identified private presenter-ready HTML bundle with notes and presenter tools. | Must | Not safe to distribute as a public artifact; document any local-server requirement. |
-| FR-069 | The system shall export a headless-rendered PDF with one page per canonical slide/reveal state by default. | Must | Initial state and every reveal, then descendants/siblings in Next order; installed compatible browser. Saved ink follows FR-104; saved blank canvases add labeled appendix pages after the deck. |
+| FR-069 | The system shall export a headless-rendered PDF with one page per canonical slide/reveal state by default. | Must | Initial state and every reveal, then descendants/siblings in Next order; installed compatible browser. No application chrome. Saved ink follows FR-104; saved blank canvases add labeled appendix pages after the deck. |
 | FR-070 | The system shall offer a final-state-only PDF export option. | Should | Proposed convenience; the agreed default remains every reveal step. |
 | FR-071 | The system shall include redistributable assets/fonts needed for an HTML bundle's declared offline representation. | Must | No silent CDN dependency. Remote services use declared local fallbacks offline; unavailable or non-embeddable required resources are reported as blocking unless an explicit fallback is selected. |
 | FR-072 | The system shall use defined static representations for executable components, media, external embeds, and motion in PDF and offline fallbacks. | Must | Require an author representation when automatic output is unreliable; never run authored code without execution permission, including export. |
-| FR-073 | The system shall omit authored notes and private comments from every part of public PDF/HTML artifacts. | Must | Removal includes embedded data, comments, source maps, and companion files, not merely visual hiding. |
+| FR-073 | The system shall omit authored notes, private comments, and application/library/editor/presenter chrome from every part of public PDF/HTML artifacts. | Must | Removal includes embedded data, HTML comments, source maps, and companion files, not merely visual hiding. Saved public annotation comments are permitted; standalone HTML includes its own navigation/permission/playback/accessibility controls. Private presenter HTML is a separately labeled non-public output. |
 | FR-074 | The system shall report export failure before claiming a complete artifact or saved annotations. | Must | Validate format-specific prerequisites. For source plus annotation companion, report each result separately; a source-only success is not an annotation save. Invalid rendering never blocks raw backup. Cancel/failure never clears marks or overwrites source. |
 
 ### Validation and Permissions
@@ -309,7 +313,7 @@ Blank-canvas drawings are separate from slide ink: save one labeled final canvas
 | FR-081 | The system shall expose deck linting through a noninteractive local/CI operation with a failing exit status for errors. | Must | Same rules as editor; warnings are distinct. Permission-dependent checks require explicit prior authorization; otherwise report them blocked/incomplete with nonzero status, never hang for input or silently pass. |
 | FR-082 | The system shall require the executing device's user to permit document-supplied code before it runs. | Must | Local author/presenter in the app; recipient for runnable HTML. Covers preview, presentation, export, and executing lint. Permission is not inherited from the sender; passive Markdown/static inspection and built-in controls require none. Denial leaves code inactive with readable content/fallbacks. |
 | FR-083 | The system shall require explicit permission before deck content contacts an external origin. | Must | Code-execution permission does not grant network access; includes remote media/fonts/data/embeds. LAN delivery is separately authorized by starting sharing, not by permitting arbitrary external requests. |
-| FR-084 | The system shall restrict application-mediated file access to locations explicitly authorized by the owner. | Must | Imported references cannot silently read or overwrite arbitrary files. |
+| FR-084 | The system shall restrict application-mediated file access to locations explicitly authorized by the owner. | Must | Imported references cannot silently read or overwrite arbitrary files. Opening a deck authorizes read-only resolution of its referenced files beneath its folder; other locations need explicit authorization. |
 | FR-085 | The system shall identify a failed content block without discarding the document or unrelated valid slide content. | Must | Proposed reliability safeguard for malformed or failing components. |
 | FR-086 | The system shall preserve presentation settings when the source and companion files are reopened or moved together. | Must | Includes master, per-slide template assignments, theme, fonts, and motion; not only a port-specific cache. |
 
@@ -318,14 +322,14 @@ Blank-canvas drawings are separate from slide ink: save one labeled final canvas
 | ID | Requirement | Priority | Notes |
 | --- | --- | --- | --- |
 | FR-087 | The system shall allow configuration of an inclusive port range for live audience presentations. | Must | Validate legal, usable port bounds and an ordered, nonempty range; the default numeric range remains a technical-design choice. |
-| FR-088 | The system shall automatically bind a distinct available port from the configured range when starting a live presentation. | Must | Exclude the private authoring port and occupied ports; retry bind collisions within the range, and advertise only a successfully bound port. Applies to `.mdx` and `.md` decks. |
+| FR-088 | The system shall automatically bind a distinct available audience port from the configured range when explicitly starting LAN sharing for a presentation instance. | Must | Local-only presentation binds no audience port. Exclude the private authoring port and occupied ports; retry bind collisions within the range, and advertise only a successfully bound port. Applies to `.mdx` and `.md` decks. |
 | FR-089 | The system shall report when no port in the configured presentation range can be bound. | Must | Preserve private authoring and existing presentations; do not terminate another process or silently select outside the range. |
 | FR-090 | The system shall serve only the selected presentation version's read-only public output through approved LAN interfaces. | Must | Explicit live session; no viewer installation or requirement to execute unapproved document code. LAN viewers cannot independently navigate, change widgets, or control playback; host permission never silently grants viewer-device execution. |
 | FR-091 | The system shall display copyable audience URLs containing each usable approved LAN IP address and the actual bound presentation port. | Must | Show in the presenter surface and launcher output with interface labels; support IPv4, use bracketed IPv6 when offered, and do not advertise loopback/wildcard addresses as remotely reachable URLs. |
 | FR-092 | The system shall deny LAN audience access to private authoring data and presenter control capabilities. | Must | Includes editor/library access, raw source, authored notes, private comments, write/control operations, and private data embedded in delivered assets or diagnostics. A separate port alone is not sufficient protection. |
 | FR-093 | The system shall reproduce the presenter's public presentation output in every local/LAN audience view. | Must | Includes layout, reveals/animation, chart hover/selection, React state, JavaScript results, media play/pause/seek position, visible comments/marks, laser, canvas, and blackout. No per-viewer time/random/data divergence or private notes/tool UI. |
 | FR-094 | The system shall initialize joining or reconnecting LAN browsers with the active version and current public presentation state. | Must | Includes widget/code/media/annotation state; do not restart at the first slide or expose private state. Surface disconnection while resynchronizing. |
-| FR-095 | The system shall stop audience serving and release its presentation port when its controlling live session ends. | Must | Close that instance's audience connections and discard unsaved marks; leave editor/other instances untouched. Already delivered content cannot be revoked. |
+| FR-095 | The system shall stop LAN audience serving and release its audience port when sharing stops or its controlling live session ends. | Must | Stop-sharing preserves the local instance, local audience view, and its marks; ending the instance closes all its audience views and discards unsaved marks. Leave editor/other instances untouched. Already delivered content cannot be revoked. |
 | FR-096 | The system shall report LAN-sharing unavailability with actionable connection guidance. | Must | Distinguish local-only operation from network sharing; explain relevant interface/firewall/routing checks without claiming host-side address discovery proves remote reachability or automatically changing network security settings. |
 
 ### Presentation Versions and Master Inheritance
@@ -336,16 +340,25 @@ Blank-canvas drawings are separate from slide ink: save one labeled final canvas
 | FR-098 | The system shall disable authoring edits and hot reload on the presentation surface. | Must | A separate draft editor may continue editing/reloading without affecting live instances. Navigation, prepared demos/media, and temporary annotations remain presentation actions, not source edits. |
 | FR-099 | The system shall provide a draft presentation master view whose shared-property edits update every draft slide, including descendants. | Must | Colors, fonts/sizes, background, logos/footers; themes are styling presets. Changes affect new instances and draft-based exports only; existing instances and their exports retain the captured master. |
 | FR-100 | The system shall make every slide template inherit the presentation master's shared properties. | Must | Templates define per-slide content arrangement without silently overriding master styling. Master changes do not replace slide content or individual layout choices. |
-| FR-101 | The system shall identify content that cannot be faithfully shared before starting live presentation. | Must | Block launch or use a presenter-approved fallback identically on host/public views; never silently downgrade only viewers. Delivery architecture is deferred. |
+| FR-101 | The system shall identify content that cannot be faithfully shared before starting linked local audience delivery or LAN sharing. | Must | Block that delivery or use a presenter-approved fallback identically on host/public views; never silently downgrade only viewers. Preserve private local presentation when sharing fails; the delivery mechanism remains subject to technical-design feasibility gates. |
 | FR-102 | The system shall block normal presentation launch from an invalid draft or one with unresolved file conflicts. | Must | Show errors; warnings alone do not block. Explicit **Present last valid version** selects a retained coherent snapshot of source and dependencies, not merely cached HTML; preserve current edits/conflicts and recheck permissions/readiness. Disable the option if no usable snapshot remains. |
-| FR-103 | The system shall use one captured input version for each export job. | Must | Live jobs capture the selected instance and relevant state/annotations/options at request; later edits or playback cannot change them. Rendered/converted draft jobs require valid, resolved input; raw source uses FR-064. Close before annotated-save completion cancels that job; successful files persist independently. |
+| FR-103 | The system shall use one captured input version for each export job. | Must | Live jobs capture the selected instance and relevant state/annotations/options at request; later edits or playback cannot change them. Rendered/converted draft jobs require valid, resolved input; raw source uses FR-064. Owner closure before an annotation-dependent output completes cancels those unfinished outputs; independent outputs and successfully committed files persist. |
 | FR-104 | The system shall save surviving slide annotations with their creation reveal step and apply them only at that step or later. | Must | Final/continuous output shows all surviving marks; no stroke-history replay. Annotated dynamic content uses labeled static snapshots; clean/unmarked HTML retains supported interaction. Append final canvases in canonical slide order; omit laser/blackout/tool chrome. |
+
+### Local Library, Pages View, and Output Boundaries
+
+| ID | Requirement | Priority | Notes |
+| --- | --- | --- | --- |
+| FR-105 | The system shall show every app-created or opened deck in a local cover-card gallery, including decks saved outside the default directory. | Must | Search at least by title; cover is the first slide's static public-content preview or a safe placeholder if unavailable/invalid. Missing or denied files remain identifiable with relink or remove-from-library actions; removal never deletes files. No cloud or team-deck requirement. |
+| FR-106 | The system shall open a selected deck in a pages view showing slide thumbnails in canonical node order with visible hierarchy, draft-opening controls, and a separate Present action. | Must | One fully revealed static thumbnail per node, not per reveal; draft changes refresh it. Covers/thumbnails include no notes or session annotations and trigger no authored-code execution or external requests; use static fallbacks/placeholders. Page selection does not launch presentation; Present starts at the first canonical state. |
+| FR-107 | The system shall keep application chrome out of the projected/LAN stage and public rendered exports. | Must | The stage includes selected slide content and deliberate public presentation overlays (such as laser/blackout), but no library/cards/pages/editor/presenter chrome. Exports include authored master elements, explicitly saved annotations/canvas appendices, and an optional PDF TOC; private presenter HTML, raw source, and converted Markdown are distinct, labeled non-public outputs. |
+| FR-108 | The system shall offer an optional linked table of contents in PDF export when the supported PDF renderer can produce it. | Should | Owner-requested, conditional feature: numbered hierarchical slide titles link to their first emitted PDF page in either reveal mode; TOC pages precede the deck. Default off preserves ordinary page counts. Disclose unsupported capability; a requested but unsupported TOC must not silently yield a TOC-free export. |
 
 ## 8. Non-Functional Requirements
 
 | ID | Category | Target | Priority | Notes |
 | --- | --- | --- | --- | --- |
-| NFR-001 | Startup | Cold launch to first correctly rendered, usable slide p95 <= 3 seconds on the reference workload. | Must | Owner-accepted target; includes application startup and opening the local preview surface. |
+| NFR-001 | Startup | Cold launch to first correctly rendered, usable slide p95 <= 3 seconds on the reference workload. | Must | Owner-accepted target; includes application startup and opening the local preview surface. Measured launching with the reference document path; no-path launch opens the library instead. |
 | NFR-002 | Preview latency | Draft source edit to corresponding valid preview paint p95 <= 200 ms across the reference edit set. | Must | Owner-accepted target; text, equation, chart, diagram edits. Does not authorize hot reload during presentation. |
 | NFR-003 | Navigation latency | Navigation input to the start of a valid visual transition p95 <= 100 ms across the reference sequence. | Must | Owner-accepted target; intentional transition duration is distinct from input latency. |
 | NFR-004 | Motion | Target 60 fps at 60 Hz, with <= 1% dropped frames during the 60-second reference navigation, scrolling, and drawing run. | Must | The 60 fps goal is agreed; frame-drop measurement is the proposed operational definition. |
@@ -370,7 +383,7 @@ Blank-canvas drawings are separate from slide ink: save one labeled final canvas
 
 ### Confirmed Decisions
 
-Confirmed behavior includes the lightweight local application, Markdown-based MDX, recursive traversal, requested v1 features, standalone distribution, and LAN access. The owner's latest clarifications require draft-only hot reload, fixed content during presentation, identical public output for viewers, and both a presentation master and per-slide templates. These coexist with proposed catalog details, safeguards, and performance targets; sections 5-8 are not a blanket approval of every detail.
+Confirmed behavior includes the lightweight local application, Markdown-based MDX, recursive traversal, requested v1 features, standalone distribution, LAN access, a default local deck directory with selected-location overrides, a gallery/pages view, and chrome-free public presentation/export surfaces. The owner's latest clarifications require draft-only hot reload, fixed content during presentation, identical public output for viewers, and both a presentation master and per-slide templates. PDF table-of-contents behavior is conditional on renderer support. These coexist with proposed catalog details, safeguards, and performance targets; sections 5-8 are not a blanket approval of every detail.
 
 Annotations are temporary until explicitly saved: exporting asks Save/Clear/Cancel, and closing a live instance loses unsaved marks without recovery. Reveal-step mapping, transactional clear, and canvas appendices specify this workflow without changing default unannotated export order.
 
@@ -417,7 +430,7 @@ Documentation reviewed on 2026-09-21; no comparative benchmarks or exhaustive ex
 
 ### Build / Adopt Conclusion
 
-Evaluate adopting/extending Deckrun against a custom local application reusing proven capabilities. Browser views need no hosted product. Validate MDX/React, recursive navigation, executables, LAN sharing, file-backed library, and offline bundles before choosing; no web framework, native shell, runtime, or fork is selected.
+The original discovery left adoption versus custom implementation open. The companion technical design now records the owner-selected Bun + Astro + TypeScript/islands direction, with custom orchestration and established content renderers; Deckrun remains a workflow reference, not a selected fork. Discovery does not duplicate stack details. Packaging, live output delivery, code isolation, durable saves, session lifetime, and export fidelity remain unproven gates (G-01 through G-06) in that draft design; stack selection alone does not approve the full design.
 
 ## 11. Suggestions & Opportunities
 
@@ -426,7 +439,7 @@ Evaluate adopting/extending Deckrun against a custom local application reusing p
 - **Explicit sharing**: distinguish private/audience URLs, interfaces, and ports; provide stop-sharing without firewall changes or implicit embed permission.
 - **Hierarchy clarity**: parent navigation, numbering, quick-jump outline; test deep paths and long labels.
 - **Preflight**: overflow, missing fonts/media, denied permissions, unsupported equations, and absent fallbacks before talks/exports.
-- **Presenter extras (Should)**: elapsed timer and next-slide preview later in v1 if practical, not Must additions.
+- **Presenter extras (suggested Should, no FR yet)**: elapsed timer and next-slide preview later in v1 if practical; add numbered Should requirements if accepted. Not Must additions.
 - **Mode separation (confirmed Must)**: draft-only editing/hot reload; active content/design stays frozen until presentation ends. No optional in-place publishing control.
 - **Scientific charts (Could)**: histograms, box plots, heatmaps beyond the six-type commitment.
 - **Reproducible demos**: stable defaults/static representations for code, asynchronous data, and media, not incidental widget state.
@@ -441,7 +454,7 @@ Evaluate adopting/extending Deckrun against a custom local application reusing p
 | --- | --- |
 | Full scope: large downloads, slow rendering, long delivery | Separate startup/plain-deck/rich-content budgets; no promised deadline. |
 | Flattened tree: wrong arrows, missing descendants, misordered exports | Section 6 fixture plus deep branches/boundaries. |
-| Reveal expansion: large/slow PDFs | Report page count; all states by default, final-only option proposed. |
+| Reveal expansion: large/slow PDFs | Report page count; all states by default, final-only is a Should option (FR-070). |
 | Failing/malicious code: freezes, data leaks, unsafe access | Separate execution/network/file permissions, isolation and resource limits; permission is not proof of safety or transferable device consent. |
 | Draft/master edits or new strokes leak into a live export | Capture live inputs at request; only a new instance uses draft changes. Save/Clear affects captured marks, not newer strokes. |
 | Export/close loses annotations unexpectedly | Explicit Save/Clear/Cancel; save completion before closing; failed/canceled jobs preserve open-session marks. No recovery after instance ends. |
@@ -465,12 +478,12 @@ Evaluate adopting/extending Deckrun against a custom local application reusing p
 
 - [ ] Formal owner approval, including proposed safeguards, catalogs, and numeric thresholds.
 - [ ] Final product name and named owner.
-- [ ] OS versions, CPU architectures, browsers, native prerequisites; all three OS families remain required.
+- [ ] OS versions, CPU architectures, browsers, native prerequisites; all three OS families remain required. Includes whether live presenting (scoped stage capture) and rendered lint may require an installed desktop Chromium, beyond the accepted PDF prerequisite.
 - [ ] Default presentation-port range, interface selection, LAN audience-size/latency/media-skew profile; automatic range allocation, IP URLs, and complete public-output parity remain required.
 - [ ] Reference hardware and frozen performance/export-fidelity fixtures covering meaningful theme/template/content combinations.
 - [ ] Hierarchy, notes, reveal, block, presentation-master, and slide-template syntax; behavior is specified, notation remains technical design.
 - [ ] Packaging feasibility and signing/notarization; no assumed undisclosed paid-service budget.
-- [ ] JavaScript/React permission lifetime, execution limits, and fallback/delivery contract meeting live parity without unapproved viewer-side code; no blanket guarantee for unbounded code.
+- [ ] JavaScript/React permission lifetime (Proposed: an authored-code execution, network-origin, or file-capture grant lasts only for its draft session or presentation instance, is never persisted, and never travels in source or exports; persisted library file/directory selections are separate), execution limits, and fallback/delivery contract meeting live parity without unapproved viewer-side code; no blanket guarantee for unbounded code.
 - [ ] Font/media catalog and redistribution rights; licensing review not yet performed.
 
 Resolve technical questions in technical design with focused feasibility checks, without reopening scope. Material behavior changes require owner approval.
@@ -493,7 +506,7 @@ Resolve technical questions in technical design with focused feasibility checks,
 | Theme | Palette/typography preset applied through the presentation master. |
 | Draft mode | Creation/editing with live preview and hot reload. |
 | Presentation mode | Fixed authored-content session with playback/navigation and temporary annotations, not authoring edits. |
-| Presentation instance | One started presentation with its own captured version, annotations, audience port, and lifetime; closing it ends that instance only. |
+| Presentation instance / live instance | One started presentation with its own captured version, annotations, and owner lifetime; it can be local-only or LAN-shared. Only LAN sharing binds an audience port; stopping sharing does not end the instance. |
 | Public presentation output | Audience-visible content, layout, and runtime state; excludes private notes and presenter controls. |
 | MDX | Markdown plus optional JSX, expressions, imports/exports; documented syntax rules still apply. |
 | Executable slide content | Authored JavaScript/React, not the application launcher. |
@@ -502,10 +515,10 @@ Resolve technical questions in technical design with focused feasibility checks,
 | Local-first | Local ownership/authoring, opt-in cloud-free LAN sharing, other external connections permissioned; not browser-only persistence. |
 | Loopback | Same-machine access at `127.0.0.1` for private authoring/control, separate from LAN delivery. |
 | LAN audience URL | Approved host IP plus actual presentation port; routing/firewalls govern reachability. |
-| Presentation-port range | Configurable inclusive audience-port range per active presentation, not an IP range. |
+| Presentation-port range | Configurable inclusive port range from which each LAN-shared instance binds one distinct audience port; not an IP range. |
 | Offline HTML bundle | HTML/local assets independent of authoring app/remote services; local server may be needed. |
 | Static fallback | Declared noninteractive substitute for unavailable live code/media/remote content. |
-| Presenter-ready export | Private HTML with notes/tools; not audience-safe. |
-| Owning session | Draft session or individual live instance owning temporary marks. Live owner close/end/application exit discards unsaved marks without recovery; audience disconnect is not session end. |
+| Presenter-ready export | Private HTML with notes/tools; not audience-safe. Original source and converted Markdown are also not guaranteed public-safe. |
+| Owning session | Draft session or individual live instance owning temporary marks. Owner close/reload/end/application exit, or owner-contact loss beyond the proposed reconnect window, discards unsaved marks without recovery; audience disconnect, transient owner disconnect, and in-document view changes are not session end. |
 
-After explicit approval: **prd-writer** for formal requirements/acceptance criteria, then **technical-design** for architecture/stack.
+The companion technical design already exists as a draft. After explicit requirements/design approval and resolution of blocking feasibility gates, refine acceptance criteria as needed and create implementation work items; this document does not itself authorize implementation.
