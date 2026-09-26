@@ -238,12 +238,12 @@ Permission and scheduling are separate: visibility/idle policies never authorize
 
 Precompute preorder node IDs and each node's parent/sibling/child destinations. A position is `(nodeId, revealStep)`, with zero the initial step. Next increments reveal state before the next preorder node; Previous reverses that sequence and enters a preceding node at its final reveal. Direct, parent, overview, and arrow jumps enter step zero. Boundaries do not wrap.
 
-| Current depth | Sibling axis | Enter first child | Backward at first sibling |
-| --- | --- | --- | --- |
-| Even, including root depth 0 | Up / Down | Right | Up returns parent if present. |
-| Odd | Left / Right | Down | Left returns parent if present. |
+| Current depth | Sibling axis | Enter first child | Backward at first sibling | Forward at last sibling | Enter end of previous branch |
+| --- | --- | --- | --- | --- | --- |
+| Even, including root depth 0 | Up / Down | Right | Up returns parent if present. | Down continues to the nearest ancestor's next sibling if present. | Left, when the previous sibling has children. |
+| Odd | Left / Right | Down | Left returns parent if present. | Right continues to the nearest ancestor's next sibling if present. | Up, when the previous sibling has children. |
 
-The remaining perpendicular backward direction is unavailable; a parent control works from any sibling. The supplied fixture must visit `1, 1.1, 1.1.1, 1.1.2, 1.2, 2`. Private presentation controls and independent HTML navigation show hierarchical numbering from sibling positions and overall node progress, such as `1.1.2` and `4 / 100`; reveal steps never change these counts. The progress control opens the hierarchy-aware jump overview outside the public stage. Library pages view uses the same preorder nodes (one fully revealed static thumbnail per node), while PDF page iteration expands their reveal states. Thumbnail selection does not change a live instance's playback position. Canonical traversal, continuous reading, pages view, and PDF call the same pure model. No graph database, routing library, or presentation engine is needed to compute this tree walk.
+"End of previous branch" is the previous sibling's last descendant in preorder; otherwise that perpendicular backward direction is unavailable. A parent control works from any sibling. The supplied fixture must visit `1, 1.1, 1.1.1, 1.1.2, 1.2, 2` with Next. Arrows must reach `1.2` by Down from `1.1.2` and `2` by Right from `1.2`, and reverse those moves by Left from `2` and Up from `1.2`. Private presentation controls and independent HTML navigation show hierarchical numbering from sibling positions and overall node progress, such as `1.1.2` and `4 / 100`; reveal steps never change these counts. The progress control opens the hierarchy-aware jump overview outside the public stage. Library pages view uses the same preorder nodes (one fully revealed static thumbnail per node), while PDF page iteration expands their reveal states. Thumbnail selection does not change a live instance's playback position. Canonical traversal, continuous reading, pages view, and PDF call the same pure model. No graph database, routing library, or presentation engine is needed to compute this tree walk.
 
 ### 3.4 Captured Versions And Public Delivery
 
@@ -298,6 +298,8 @@ sequenceDiagram
 ```
 
 Preview scheduling is independent of the autosave debounce. External clean changes reload; overlapping changes preserve editor and disk candidates. The local host serializes its own writers and uses content-hash preconditions, not timestamps alone. A watcher and a pre-write hash check cannot eliminate the final check-to-replace race with an uncooperative editor. The file adapter must retain the generation it actually displaces, using tested platform replace/swap semantics or an equivalent recoverable operation; a simple rename plus a previously copied backup is not proof. Source-only safety copies are allowed; annotations never enter them. G-04 decides whether a small native adapter is needed.
+
+Preview text editing (FR-109) is a second input path into the same source document, not a separate model. The compiler marks a preview block as text-editable only when it is a heading, paragraph, blockquote, or list item whose `DeckIR` source range contains only plain text and backslash escapes, with no inline formatting, links, math, JSX, or expressions; its rendered element carries that node ID and source range, keyed to the preview revision. On input, the draft workspace computes the replacement text for exactly that range (preserving the block's leading Markdown prefix), escapes any newly typed Markdown- or directive-significant characters, and dispatches it as a CodeMirror transaction. Undo/redo, autosave, conflicts, and hot reload therefore follow the normal edit path above. If the preview revision no longer matches the editor revision, or the preview is stale, invalid, or conflicted, the preview is read-only and edits are rejected rather than remapped. Non-editable blocks (code, diagrams, charts, images, media, components, and richly formatted text) only move the CodeMirror caret to their source location. Presenter, audience, LAN, and export shells never receive editable markup or source ranges.
 
 Rename/duplicate first inspect the source and dependency manifest. Rename within a directory retains relative references; a move recalculates resolvable references or copies authorized dependencies, reports collisions, and retains the original until success. Duplicate gets a new document identity without overwriting shared assets. Library deletion requires confirmation and only deletes the selected source file, never referenced assets or shared resources implicitly.
 
@@ -629,7 +631,7 @@ AstroStaticShell
 		LibraryView (searchable local deck covers)
 		DraftWorkspace (private React island where justified)
 			PagesView + CodeMirror + Outline + InsertCatalog
-			DraftPreview + Diagnostics + SaveStatus + ConflictDialog
+			DraftPreview (plain-text inline editing) + Diagnostics + SaveStatus + ConflictDialog
 			MasterEditor + SlideTemplateSelector
 		PresenterWorkspace (private React island where justified)
 			PublicStage + SvgAnnotationLayer
@@ -769,6 +771,7 @@ Freeze per-OS hardware, exact versions, test decks, sample operations, expected 
 | FR-087 through FR-096 | Actual range binding, approved address URLs, public-only router, authoritative delivery, late-join and teardown; G-01/G-02/G-05. |
 | FR-097 through FR-104 | Immutable versions/master/templates, no presentation hot reload, explicit last-valid choice, request-time job state, reveal-aware surviving marks; G-04/G-05/G-06. |
 | FR-105 through FR-108 | Default and selected-location deck cards, canonical pages thumbnails, clean public presentation/export shells, conditional linked PDF TOC; G-01/G-06 and browser journeys. |
+| FR-109 | Plain-text preview blocks mapped to `DeckIR` source ranges and applied as CodeMirror transactions; read-only on stale/invalid/conflicted previews; no editable markup in public shells. Round-trip, markup-preservation, and undo/autosave browser journeys. |
 | NFR-001 through NFR-004 | Exact reference workload and sample counts; production latency/frame traces. |
 | NFR-005 through NFR-008 | Proposed save/same-machine propagation/size/plain-player budgets remain separately marked and measured; G-01/G-02/G-04. |
 | NFR-009 and NFR-010 | Export fidelity/selectability and proposed 60-second 160-page PDF throughput; G-06. |

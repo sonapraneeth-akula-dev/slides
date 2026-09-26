@@ -109,6 +109,8 @@ kbd { background: var(--panel2); border: 1px solid var(--line); border-radius: 4
 .slide .rv-mark::after { content: "reveal " attr(data-step); position: absolute; top: -40px; right: 0; font: 600 20px system-ui; color: var(--s-accent); }
 .slide [contenteditable]:hover { outline: 2px solid color-mix(in srgb, var(--s-accent) 40%, transparent); }
 .slide [contenteditable]:focus { outline: 3px solid var(--s-accent); }
+.slide [data-src] { cursor: pointer; }
+.slide [data-src]:hover { outline: 2px dashed color-mix(in srgb, var(--s-accent) 40%, transparent); }
 
 /* ---- Cards / thumbnails ---- */
 .thumb { cursor: pointer; }

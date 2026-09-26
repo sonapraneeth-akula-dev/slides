@@ -96,7 +96,7 @@ Full selected v1, not a reduced presentation-only MVP. Section 7 defines the com
 | Public internet hosting, automatic tunnels/router forwarding, cross-device presenter control | LAN audience viewing only; editing, notes, and control stay private on the host. |
 | Live Python/R, shell, notebook kernels, server-side code runners | Execute simple JavaScript/React only; other languages can be displayed. |
 | Plugin marketplace/third-party extension distribution | Maintainer changes and local React components provide extensibility. |
-| Arbitrary object-placement editor, arbitrary HTML import/editing | Master settings and slide templates are included, but not a PowerPoint-style freeform editor. MDX/Markdown is source; HTML is output; pen is a presenting tool. |
+| Arbitrary object-placement editor, arbitrary HTML import/editing | Master settings and slide templates are included, but not a PowerPoint-style freeform editor. MDX/Markdown is source; HTML is output; pen is a presenting tool. In-place preview text editing (FR-109) rewrites MDX source and does not place objects. |
 | PPTX, notebook, office-document import/export | Not selected. |
 | Full TeX compilation, arbitrary LaTeX packages, TikZ | KaTeX-compatible equations only. |
 | Full mobile authoring/native mobile executables | Desktop keyboard/mouse first; exported reading remains responsive. |
@@ -121,7 +121,7 @@ Full selected v1, not a reduced presentation-only MVP. Section 7 defines the com
 
 Run the executable with a `.mdx`/`.md` file to open draft/creation mode; without a file, open the local **My Decks** library. New decks save under a writable, per-user application deck directory by default; choosing another location saves there instead and keeps that deck in the library. If the default directory cannot be created or written, report the failure and let the author choose another location; never silently save elsewhere or claim persistence. The library shows all app-created or opened decks, including those saved elsewhere, as searchable cover cards with titles; only explicitly added/opened external files or directories are indexed, not the whole disk. Opening one file authorizes that deck and read-only resolution of its referenced files beneath its folder, not indexing sibling decks; references outside that folder need explicit authorization. Selecting a card opens a pages view with ordered slide thumbnails and hierarchy, from which the author can open a slide in draft mode or start presenting from the first slide. The supplied gallery reference guides the local cover-card layout, not cloud/team sharing, exact branding, or category requirements.
 
-Source, component, local asset/data, master, and template changes hot reload the draft preview and pages view. Save status is visible, conflicts preserve competing versions, and invalid edits retain source and the last valid preview (FR-001 through FR-016). Missing or unreadable decks stay identifiable in the library with relink and remove-from-library actions rather than silently disappearing; removal never deletes files.
+Source, component, local asset/data, master, and template changes hot reload the draft preview and pages view. Save status is visible, conflicts preserve competing versions, and invalid edits retain source and the last valid preview (FR-001 through FR-016). Plain-text headings, paragraphs, quotes, and list items can also be edited directly in the draft preview, which rewrites the matching source; code, diagrams, charts, media, and richly formatted text are edited in source (FR-109). Missing or unreadable decks stay identifiable in the library with relink and remove-from-library actions rather than silently disappearing; removal never deletes files.
 
 ### Start and End Presentation Mode
 
@@ -155,9 +155,9 @@ If a component/embed cannot meet shared-output requirements, report it before st
 Next follows `1 -> 1.1 -> 1.1.1 -> 1.1.2 -> 1.2 -> 2`; Previous reverses this canonical order, not jump history. Completing a branch does not redisplay ancestors.
 
 - Sibling axes alternate by depth: vertical roots, horizontal children, vertical grandchildren, continuing recursively.
-- Along-axis arrows move among siblings; the forward perpendicular direction enters the first child. At the first sibling, the backward along-axis direction returns to its parent, if any. A parent/breadcrumb action returns directly from any sibling.
-- From `1`: Right enters `1.1`, Down skips to `2`. From `1.1`: Down enters `1.1.1`, Right skips to `1.2`. Arrows may skip detail; Next does not.
-- Disable unavailable directions; directional moves never wrap branches. Next/Previous traverse ancestors as needed and stop at the deck boundaries.
+- Along-axis arrows move among siblings; the forward perpendicular direction enters the first child. At the first sibling, the backward along-axis direction returns to its parent, if any. At the last sibling, the forward along-axis direction leaves the branch for the next node after it, which is the nearest ancestor's next sibling, if any. The backward perpendicular direction reverses that exit by entering the last node of the previous sibling's branch, if that sibling has children. A parent/breadcrumb action returns directly from any sibling.
+- From `1`: Right enters `1.1`, Down skips to `2`. From `1.1`: Down enters `1.1.1`, Right skips to `1.2`. From `1.1.2`: Down continues to `1.2`. From `1.2`: Right continues to `2`. In reverse, from `2`: Left returns to `1.2`; from `1.2`: Up returns to `1.1.2`. Arrows may skip detail; Next does not.
+- Disable unavailable directions; directional moves never wrap to a branch's first sibling. Next/Previous traverse ancestors as needed and stop at the deck boundaries.
 - Show hierarchical and overall slide progress, excluding reveal counts; overview, directional, and parent jumps enter the destination's initial reveal state.
 
 ### Reveal Content Without Duplicating Authored Slides
@@ -216,7 +216,7 @@ Blank-canvas drawings are separate from slide ink: save one labeled final canvas
 | FR-014 | The system shall rename a library document without silently breaking its asset references. | Must | Report conflicts or invalid paths. Proposed: rename and delete require closing any open draft of that deck first. |
 | FR-015 | The system shall require confirmation before deleting a document through the library. | Must | Do not delete shared assets implicitly. |
 | FR-016 | The system shall retain the last valid preview when incomplete or invalid source cannot render. | Must | Identify the preview as stale and preserve edited text/diagnostics. Retaining a preview does not authorize silent launch of that version; see FR-102. |
-
+| FR-109 | The system shall let authors edit the text of plain-text headings, paragraphs, quotes, and list items directly in the draft preview, writing each edit back to the matching MDX source. | Should | Owner-requested convenience; the source editor (FR-006) stays authoritative. Only blocks whose source is plain text (backslash escapes allowed) are editable in place. Blocks with inline formatting, links, math, JSX, or expressions, and all code, diagram, chart, image, media, and component blocks, are edited in source: selecting one moves the source caret to it. Each preview edit is an ordinary source edit with undo/redo, autosave (FR-008), conflict handling (FR-010), and hot reload (FR-007). Disabled while the preview is stale or invalid (FR-016) or a conflict is unresolved; never offered in presentation or exports. Not a freeform object-placement editor. |
 ### Hierarchy and Navigation
 
 | ID | Requirement | Priority | Notes |
@@ -460,6 +460,7 @@ The original discovery left adoption versus custom implementation open. The comp
 | Export/close loses annotations unexpectedly | Explicit Save/Clear/Cancel; save completion before closing; failed/canceled jobs preserve open-session marks. No recovery after instance ends. |
 | Marks appear before their content or drift across dynamic output | Record creation reveal step, snapshot annotated dynamic content, and save blank canvases as labeled appendices. |
 | Invalid draft silently launches an older preview | Block normal launch; require explicit selection of a retained validated version, preserving current edits/conflicts. |
+| Preview text edits corrupt markup or write to the wrong source line | Edit in place only plain-text blocks mapped to exact source ranges; everything else is edited in source; stale, invalid, or conflicted previews are read-only (FR-109). |
 | Widgets, media, time/random results diverge between viewers | Match public output/state; preflight unsupported content, common fallback or block, and measure delivery delay/media skew. |
 | Slide layouts override master properties | Test master edits across every slide template and output without replacing individual content/layout choices. |
 | Blocked/unavailable/authenticated embeds: broken/offline claims | Permission and author fallback; no universal embedding or remote-service offline guarantee. |

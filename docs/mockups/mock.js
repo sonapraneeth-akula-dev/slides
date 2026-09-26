@@ -473,7 +473,10 @@ function checkMaster(k, v) {
 }
 
 // ---------- renderer ----------
-const inline = t => esc(t).replace(/`([^`]+)`/g, '<code>$1</code>').replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>').replace(/\*([^*]+)\*/g, '<em>$1</em>');
+const MD_ESC = /\\([\\`*_{}[\]()<>#+\-.!$~|:])/g;
+const inline = t => { const kept = []; t = t.replace(MD_ESC, (_, c) => `\u0000${kept.push(c) - 1}\u0000`); return esc(t).replace(/`([^`]+)`/g, '<code>$1</code>').replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>').replace(/\*([^*]+)\*/g, '<em>$1</em>').replace(/\u0000(\d+)\u0000/g, (_, n) => esc(kept[n])); };
+// FR-109: only plain text (backslash escapes allowed) is editable in the draft preview; inline markup, links, math, JSX, and expressions are edited in source.
+const isPlainText = t => !/[\\`*_[\]<>{}$~]/.test(t.replace(MD_ESC, ''));
 
 function toBlocks(items) {
 	const out = [];
@@ -500,16 +503,18 @@ function toBlocks(items) {
 }
 
 function blockHTML(b, o = {}) {
-	const ed = line => o.editable ? ` data-line="${line}" contenteditable="plaintext-only" spellcheck="false"` : '';
+	// Draft preview only ('editable' in o): plain-text blocks are editable in place; every other block moves the source caret (data-src).
+	const draft = 'editable' in o, src = line => draft ? ` data-src="${line}" title="Edit in source"` : '';
+	const ed = (line, text) => o.editable && isPlainText(text) ? ` data-line="${line}" contenteditable="plaintext-only" spellcheck="false"` : src(line);
 	const rv = !b.step ? '' : b.step > (o.step ?? Infinity) ? ' class="rv-hidden"' : o.markReveals ? ` class="rv-mark" data-step="${b.step}"` : '';
 	switch (b.type) {
-		case 'h': return `<h${b.level}${rv}${ed(b.line)}>${inline(b.text)}</h${b.level}>`;
-		case 'p': return `<p${rv}${ed(b.line)}>${inline(b.text)}</p>`;
-		case 'quote': return `<blockquote${rv}${ed(b.line)}>${inline(b.text)}</blockquote>`;
-		case 'code': return `<pre${rv}><code>${esc(b.text)}</code></pre>`;
-		case 'diagram': case 'chart': { let svg; try { svg = RICH[b.type](b.text); } catch (e) { svg = `<div class="diagram-error">⚠ ${esc(e.message)}</div>`; } return `<figure${rv}><div class="${b.type}">${svg}</div></figure>`; }
-		case 'img': return `<div class="figure"${rv}>🖼 ${esc(b.text)}</div>`;
-		case 'ul': return `<ul${rv}>${b.items.map(li => `<li${ed(li.line)}>${inline(li.text)}</li>`).join('')}</ul>`;
+		case 'h': return `<h${b.level}${rv}${ed(b.line, b.text)}>${inline(b.text)}</h${b.level}>`;
+		case 'p': return `<p${rv}${ed(b.line, b.text)}>${inline(b.text)}</p>`;
+		case 'quote': return `<blockquote${rv}${ed(b.line, b.text)}>${inline(b.text)}</blockquote>`;
+		case 'code': return `<pre${rv}${src(b.line)}><code>${esc(b.text)}</code></pre>`;
+		case 'diagram': case 'chart': { let svg; try { svg = RICH[b.type](b.text); } catch (e) { svg = `<div class="diagram-error">⚠ ${esc(e.message)}</div>`; } return `<figure${rv}${src(b.line)}><div class="${b.type}">${svg}</div></figure>`; }
+		case 'img': return `<div class="figure"${rv}${src(b.line)}>🖼 ${esc(b.text)}</div>`;
+		case 'ul': return `<ul${rv}>${b.items.map(li => `<li${ed(li.line, li.text)}>${inline(li.text)}</li>`).join('')}</ul>`;
 	}
 	return '';
 }

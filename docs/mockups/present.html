@@ -70,7 +70,7 @@
 		</div>
 	</main>
 	<aside class="side">
-		<div><div class="prog"><span class="big" id="num"></span><span class="muted" id="count"></span><span class="grow"></span><span class="muted small" id="timer">00:00</span></div>
+		<div><div class="prog"><span class="big" id="num"></span><span class="muted" id="count"></span><span class="grow"></span><span class="muted small" id="timer" title="Elapsed timer: optional Should (REQ-016), no FR yet">00:00</span></div>
 			<div class="small" id="slideTitle"></div><div class="dots small" id="dots" style="margin-top:6px"></div></div>
 		<div class="row" style="align-items:flex-start">
 			<div class="pad" id="pad">
@@ -83,7 +83,7 @@
 				<span class="small muted">Arrows follow the slide tree; Next/Previous follow reading order.</span>
 			</div>
 		</div>
-		<div><h4 style="margin-top:0">Up next</h4><div id="next"></div></div>
+		<div><h4 style="margin-top:0">Up next <span class="muted small">· optional (REQ-016, Should)</span></h4><div id="next"></div></div>
 		<h4 style="margin:0">Speaker notes <span class="muted">· private</span></h4>
 		<div class="notes" id="notes"></div>
 	</aside>
@@ -101,7 +101,7 @@
 	<p class="small muted">Viewers on the same network get a read-only audience view. Notes, tools, and editing stay on this computer.</p>
 	<label><input type="checkbox" name="ip" value="192.168.1.25" checked> Wi-Fi · 192.168.1.25</label><br>
 	<label><input type="checkbox" name="ip" value="10.0.0.12"> Ethernet · 10.0.0.12</label>
-	<p>Port range <input value="50000" size="6"> – <input value="50100" size="6"></p>
+	<p>Port range <input id="portLo" type="number" value="50000" min="1024" max="65535" style="width:8ch"> – <input id="portHi" type="number" value="50100" min="1024" max="65535" style="width:8ch"> <span class="small muted">(Proposed default)</span></p>
 	<div class="row"><span class="grow"></span><button value="cancel">Cancel</button><button class="primary" value="start">Start sharing</button></div>
 </form></dialog>
 
@@ -237,7 +237,10 @@ if (isAudience) {
 	$('#shareDlg').addEventListener('close', () => {
 		if ($('#shareDlg').returnValue !== 'start') return;
 		const ips = $$('#shareDlg [name=ip]:checked').map(x => x.value); if (!ips.length) return alert('Pick at least one network.');
-		sharing = ips.map(ip => `http://${ip}:50001/#s=7f3a`);
+		const lo = +$('#portLo').value, hi = +$('#portHi').value;
+		if (!(lo >= 1024 && hi <= 65535 && lo <= hi)) return alert('Enter a valid port range.');
+		const port = lo; // mock: the real host binds the first free port in the range on every selected address
+		sharing = ips.map(ip => `http://${ip}:${port}/#s=7f3a`);
 		$('#sharePill').className = 'pill ok'; $('#sharePill').innerHTML = `● Sharing · ${sharing.map(u => `<a href="#" title="Copy" onclick="navigator.clipboard?.writeText('${u}');return false">${u.replace('http://', '').replace('/#s=7f3a', '')}</a>`).join(' · ')} · 0 viewers`;
 		$('#shareBtn').textContent = 'Stop sharing';
 	});

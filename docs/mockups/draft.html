@@ -56,7 +56,7 @@
 	<aside class="sidebar outline" id="outline"></aside>
 	<main class="split" id="split">
 		<section class="pane src"><div class="pane-h" id="file"></div><textarea id="src" spellcheck="false"></textarea></section>
-		<section class="pane prev"><div class="pane-h">Preview <span>· exactly as presented · click text to edit it here</span></div><div id="preview" class="preview-list"></div></section>
+		<section class="pane prev"><div class="pane-h">Preview <span>· exactly as presented · plain text is editable here and rewrites the MDX source; click code, diagrams, charts, or formatted text to edit them in source (FR-109)</span></div><div id="preview" class="preview-list"></div></section>
 	</main>
 	<main class="master" id="masterView" hidden>
 		<section class="mform" id="mform"></section>
@@ -68,6 +68,7 @@
 <script>
 const d = getDeck(param('deck')), ta = $('#src');
 let deck = null, lastValid = null, active = null, saveTimer, renderTimer, view = 'split', editView = 'split';
+let previewCurrent = false; // FR-109: true only while the preview is valid and matches the source
 ta.value = loadSource(d.id);
 $('#path').textContent = `${d.dir}/${d.file}`;
 $('#file').textContent = d.file;
@@ -158,7 +159,7 @@ function render() {
 	const show = lastValid || deck;
 	const warns = ok ? deck.warnings : [];
 	$('#diag').className = 'statusbar' + (ok ? (warns.length ? ' warn' : '') : ' err');
-	$('#diag').innerHTML = !ok ? deck.errors.map(e => `⚠ Line ${e.line}: ${esc(e.msg)}`).join(' &nbsp; ') + ' — showing last valid preview'
+	$('#diag').innerHTML = !ok ? deck.errors.map(e => `⚠ Line ${e.line}: ${esc(e.msg)}`).join(' &nbsp; ') + ' — showing last valid preview (read-only until the source is valid)'
 		: warns.length ? warns.map(e => `⚠ Line ${e.line}: ${esc(e.msg)}`).join(' &nbsp; ') + ` · ${show.slides.length} slides`
 		: `✓ No problems · ${show.slides.length} slides · autosave on`;
 	$('#title').textContent = show.meta.title; document.title = show.meta.title + (view === 'master' ? ' · Master' : ' · Draft');
@@ -170,7 +171,8 @@ function render() {
 		<div class="pv-h"><span class="num">${s.num}</span><span>${esc(s.title)}</span><span class="grow"></span>
 		${s.reveals ? `<span>${s.reveals} reveal steps</span>` : ''}${s.notes.length ? '<span>· has notes</span>' : ''}
 		<select data-layout="${esc(s.id)}" title="Slide template">${Object.entries(LAYOUTS).map(([k, v]) => `<option value="${k}"${k === s.layout ? ' selected' : ''}>${v}</option>`).join('')}</select></div>
-		${scaled(slideHTML(s, show.meta, { editable: ok, markReveals: true }))}</div>`).join('');
+		${scaled(slideHTML(s, show.meta, ok ? { editable: true, markReveals: true } : { markReveals: true }))}</div>`).join(''); // FR-109: stale/invalid preview is read-only
+	previewCurrent = ok;
 	observeScalers($('#preview'));
 }
 
@@ -193,8 +195,9 @@ function setActive(id, { scrollPreview = false, moveCaret = false } = {}) {
 	}
 }
 
-// Source -> preview
-ta.addEventListener('input', () => { markDirty(); clearTimeout(renderTimer); renderTimer = setTimeout(render, 120); });
+// Source -> preview. FR-109: until the preview catches up with the source, drop its edit targets so no edit or caret jump uses stale line numbers.
+const lockPreview = () => { previewCurrent = false; $$('#preview [data-line], #preview [data-src]').forEach(el => { el.removeAttribute('contenteditable'); el.removeAttribute('data-line'); el.removeAttribute('data-src'); el.removeAttribute('title'); }); };
+ta.addEventListener('input', () => { lockPreview(); markDirty(); clearTimeout(renderTimer); renderTimer = setTimeout(render, 120); });
 const caretSync = () => {
 	const line = ta.value.slice(0, ta.selectionStart).split('\n').length - 1;
 	const s = [...(lastValid || deck).slides].sort((a, b) => b.line - a.line).find(x => x.line <= line);
@@ -202,17 +205,26 @@ const caretSync = () => {
 };
 ta.addEventListener('click', caretSync); ta.addEventListener('keyup', caretSync);
 
-// Preview -> source (edit text in place; template and theme pickers rewrite front matter)
+// Preview -> source (FR-109: plain-text blocks edit in place; template and theme pickers rewrite front matter)
+const mdLiteral = t => t.replace(/[\\`*_[\]<>{}$~]/g, '\\$&').replace(/^([#>+:-])/, '\\$1').replace(/^(\d+)\./, '$1\\.'); // keep typed characters literal, incl. ::/::: directives
 $('#preview').addEventListener('input', e => {
 	const el = e.target.closest('[data-line]'); if (!el) return;
 	const lines = ta.value.split('\n'), n = +el.dataset.line;
-	lines[n] = lines[n].match(/^\s*(#{1,6}\s+|[-*]\s+|>\s?)?/)[0] + el.textContent.replace(/\n/g, ' ');
+	lines[n] = lines[n].match(/^\s*(#{1,6}\s+|[-*]\s+|>\s?)?/)[0] + mdLiteral(el.textContent.replace(/\n/g, ' '));
 	ta.value = lines.join('\n'); markDirty();
 	renderOutline(parseDeck(ta.value));
 });
 $('#preview').addEventListener('focusout', () => setTimeout(render));
-$('#preview').addEventListener('change', e => { const id = e.target.dataset.layout; if (id) { ta.value = setLayout(ta.value, id, e.target.value); markDirty(); render(); } });
-$('#preview').addEventListener('click', e => { const pv = e.target.closest('.pv'); if (pv && !e.target.closest('select,[contenteditable]')) setActive(pv.dataset.id, { moveCaret: true }); });
+$('#preview').addEventListener('change', e => { const id = e.target.dataset.layout; if (id) { lockPreview(); ta.value = setLayout(ta.value, id, e.target.value); markDirty(); e.target.blur(); render(); } });
+$('#preview').addEventListener('click', e => {
+	const pv = e.target.closest('.pv'); if (!pv || e.target.closest('select,[contenteditable]')) return;
+	if (!previewCurrent) return setActive(pv.dataset.id); // read-only preview: select the slide, never jump the caret by stale line numbers
+	const rich = e.target.closest('[data-src]');
+	if (!rich) return setActive(pv.dataset.id, { moveCaret: true });
+	setActive(pv.dataset.id); // code, diagrams, charts, media, and formatted text are edited in source: jump to the block's line
+	const n = +rich.dataset.src, pos = ta.value.split('\n').slice(0, n).join('\n').length + (n ? 1 : 0);
+	ta.focus({ preventScroll: true }); ta.setSelectionRange(pos, pos); ta.scrollTop = Math.max(0, n * 20 - 60);
+});
 $('#theme').onchange = e => { ta.value = setTheme(ta.value, e.target.value); markDirty(); render(); };
 
 $('#outline').onclick = e => {
