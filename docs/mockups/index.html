@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>My Decks · Slides (mock)</title>
+<link rel="stylesheet" href="mock.css">
+<style>
+	.deck { display: flex; gap: 10px; padding: 8px; border-radius: 8px; cursor: pointer; align-items: center; }
+	.deck:hover { background: var(--panel2); }
+	.deck.sel { background: #1d2a44; box-shadow: inset 3px 0 var(--accent); }
+	.deck .scaler { width: 84px; flex: none; }
+	.deck .t { font-weight: 600; line-height: 1.25; }
+	.deck.missing { opacity: .7; }
+	.deck.missing .ph { width: 84px; aspect-ratio: 16/9; flex: none; border: 1px dashed var(--line); border-radius: 4px; display: grid; place-items: center; }
+	.group { margin: 14px 6px 4px; font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); display: flex; justify-content: space-between; }
+	.head { position: sticky; top: 0; z-index: 1; background: var(--bg); padding: 16px 22px 12px; border-bottom: 1px solid var(--line); display: flex; align-items: center; gap: 10px; }
+	.head h2 { margin: 0; font-size: 20px; }
+	.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 22px; padding: 20px 22px; }
+	.list { padding: 12px 22px; }
+	.list .thumb { display: flex; gap: 14px; align-items: center; padding: 6px 8px; border-radius: 8px; }
+	.list .thumb:hover { background: var(--panel); }
+	.list .scaler { width: 150px; flex: none; }
+	.list .cap { margin: 0; font-size: 14px; }
+	.badge { font-size: 11px; color: var(--muted); border: 1px solid var(--line); border-radius: 99px; padding: 0 7px; }
+	.empty { padding: 60px; text-align: center; }
+</style>
+</head>
+<body>
+<header class="topbar">
+	<span class="brand">▦ Slides</span><span class="muted">My Decks</span>
+	<div class="grow"></div>
+	<input id="q" placeholder="Search decks…" style="width:240px">
+	<button onclick="alert('Mock: native file picker. The chosen file is authorized and added to the library.')">Open file…</button>
+	<button class="primary" onclick="alert('Mock: new deck is created in ~/Slides/Decks from a template.')">+ New deck</button>
+</header>
+<div class="layout">
+	<aside class="sidebar" id="decks"></aside>
+	<main class="main" id="pages"></main>
+</div>
+<script src="mock.js"></script>
+<script>
+let selected = localStorage.getItem('mock-selected') || DECKS[0].id, view = 'grid';
+
+function renderDecks() {
+	const q = $('#q').value.toLowerCase();
+	const card = d => {
+		if (q && !(d.title || parseDeck(loadValid(d.id)).meta.title).toLowerCase().includes(q)) return '';
+		if (d.missing) return `<div class="deck missing${d.id === selected ? ' sel' : ''}" data-id="${d.id}"><div class="ph">⚠</div><div><div class="t">${esc(d.title)}</div><div class="small muted">${esc(d.dir)}/${esc(d.file)}</div><div class="small" style="color:var(--warn)">Unavailable</div></div></div>`;
+		const deck = parseDeck(loadValid(d.id));
+		return `<div class="deck${d.id === selected ? ' sel' : ''}" data-id="${d.id}">${scaled(slideHTML(deck.slides[0], deck.meta))}<div><div class="t">${esc(deck.meta.title)}</div><div class="small muted">${esc(d.file)} · ${deck.slides.length} slides</div><div class="small muted">${esc(d.updated)}</div></div></div>`;
+	};
+	const home = DECKS.filter(d => d.dir === '~/Slides/Decks'), other = DECKS.filter(d => d.dir !== '~/Slides/Decks');
+	$('#decks').innerHTML =
+		`<div class="group"><span>~/Slides/Decks · default</span></div>${home.map(card).join('')}` +
+		`<div class="group"><span>Other locations</span><a href="#" onclick="alert('Mock: grant a folder to index it.');return false">+ Add folder</a></div>${other.map(card).join('')}`;
+	observeScalers($('#decks'));
+}
+
+function renderPages() {
+	const d = getDeck(selected);
+	if (d.missing) {
+		$('#pages').innerHTML = `<div class="empty"><h2>${esc(d.title)}</h2><p class="muted">File not found at ${esc(d.dir)}/${esc(d.file)}</p>
+			<div class="row" style="justify-content:center"><button onclick="alert('Mock: pick the moved file; deck identity is kept.')">Relink…</button>
+			<button onclick="alert('Mock: removes only the library entry. No file is deleted.')">Remove from library</button></div></div>`;
+		return;
+	}
+	const deck = parseDeck(loadValid(d.id));
+	const item = s => `<div class="thumb" data-slide="${esc(s.id)}" ${view === 'list' ? `style="padding-left:${8 + s.depth * 28}px"` : ''}>
+		${scaled(slideHTML(s, deck.meta))}
+		<div class="cap"><span class="num">${s.num}</span><span>${esc(s.title)}</span>
+		${view === 'list' ? `<span class="grow"></span>${s.reveals ? `<span class="badge">${s.reveals} reveals</span>` : ''}${s.notes.length ? '<span class="badge">notes</span>' : ''}<span class="badge">${LAYOUTS[s.layout]}</span>` : ''}</div></div>`;
+	$('#pages').innerHTML = `<div class="head">
+		<div><h2>${esc(deck.meta.title)}</h2><div class="small muted">${esc(d.dir)}/${esc(d.file)} · ${deck.slides.length} slides · ${THEMES[deck.meta.theme]?.name || deck.meta.theme} theme · edited ${esc(d.updated)}</div></div>
+		<div class="grow"></div>
+		<div class="seg"><button data-v="grid" class="${view === 'grid' ? 'on' : ''}">▦ Grid</button><button data-v="list" class="${view === 'list' ? 'on' : ''}">☰ List</button></div>
+		<button onclick="window.open('draft.html?deck=${d.id}','_blank')">✎ Open in draft ↗</button>
+		<button class="primary" onclick="window.open('present.html?deck=${d.id}','_blank')">▶ Present</button></div>
+		<div class="${view}">${deck.slides.map(item).join('')}</div>`;
+	observeScalers($('#pages'));
+}
+
+$('#decks').onclick = e => { const el = e.target.closest('.deck'); if (!el) return; selected = el.dataset.id; localStorage.setItem('mock-selected', selected); renderDecks(); renderPages(); };
+$('#pages').onclick = e => {
+	const v = e.target.closest('[data-v]'); if (v) { view = v.dataset.v; renderPages(); return; }
+	const t = e.target.closest('.thumb'); if (t) window.open(`draft.html?deck=${selected}#${t.dataset.slide}`, '_blank');
+};
+$('#q').oninput = renderDecks;
+addEventListener('storage', () => { renderDecks(); renderPages(); }); // draft tab autosaves refresh covers/pages
+renderDecks(); renderPages();
+</script>
+</body>
+</html>

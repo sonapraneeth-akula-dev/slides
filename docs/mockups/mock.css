@@ -1,0 +1,79 @@
+:root {
+	--bg: #111418; --panel: #181c21; --panel2: #1f242b; --line: #2a3038;
+	--fg: #e6e9ed; --muted: #8b949e; --accent: #4f8cff; --ok: #3fb950; --warn: #d29922; --err: #f85149;
+	font: 14px/1.45 system-ui, "Segoe UI", sans-serif; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--fg); height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+button, select, input { font: inherit; color: inherit; background: var(--panel2); border: 1px solid var(--line); border-radius: 6px; padding: 5px 10px; }
+button { cursor: pointer; }
+button:hover:not(:disabled) { border-color: var(--accent); }
+button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+button.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+button:disabled { opacity: .35; cursor: default; }
+a { color: var(--accent); text-decoration: none; }
+h4 { margin: 18px 0 8px; font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+.muted { color: var(--muted); }
+.small { font-size: 12px; }
+.grow { flex: 1; }
+.row { display: flex; gap: 8px; align-items: center; }
+
+.topbar { display: flex; align-items: center; gap: 10px; padding: 8px 14px; background: var(--panel); border-bottom: 1px solid var(--line); flex: none; }
+.brand { font-weight: 700; letter-spacing: .02em; }
+.pill { font-size: 12px; padding: 2px 9px; border-radius: 99px; background: var(--panel2); border: 1px solid var(--line); white-space: nowrap; }
+.pill.ok { color: var(--ok); } .pill.warn { color: var(--warn); } .pill.err { color: var(--err); }
+.pill.live { color: #fff; background: #d73a49; border-color: #d73a49; font-weight: 600; }
+.layout { flex: 1; display: flex; min-height: 0; }
+.sidebar { width: 290px; flex: none; background: var(--panel); border-right: 1px solid var(--line); overflow: auto; padding: 10px; }
+.main { flex: 1; min-width: 0; overflow: auto; }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+.seg button { border: 0; border-radius: 0; }
+.statusbar { flex: none; padding: 4px 14px; background: var(--panel); border-top: 1px solid var(--line); font-size: 12px; }
+.banner { padding: 8px 12px; border-radius: 6px; margin-bottom: 12px; font-size: 13px; }
+.banner.warn { background: #3a2d0c; color: #f0c65a; }
+.banner.private { background: #3b1219; color: #ff9aa5; font-weight: 600; }
+dialog { background: var(--panel); color: var(--fg); border: 1px solid var(--line); border-radius: 10px; min-width: 380px; }
+dialog::backdrop { background: #0008; }
+kbd { background: var(--panel2); border: 1px solid var(--line); border-radius: 4px; padding: 0 5px; font-size: 12px; }
+
+/* ---- Slide rendering (fixed 1600x900 logical stage, scaled to fit) ---- */
+.scaler { position: relative; aspect-ratio: 16 / 9; overflow: hidden; border-radius: 4px; background: #fff; }
+.stage { position: absolute; left: 0; top: 0; width: 1600px; height: 900px; transform-origin: 0 0; }
+.stage .ink { position: absolute; inset: 0; width: 1600px; height: 900px; pointer-events: none; }
+.slide {
+	width: 1600px; height: 900px; padding: 80px 100px 100px; display: flex; flex-direction: column; gap: 36px;
+	background: var(--s-bg); color: var(--s-fg); font-family: var(--s-body); font-size: 36px; line-height: 1.4; position: relative; overflow: hidden;
+}
+.slide h1 { font: 700 92px/1.1 var(--s-head); margin: 0; }
+.slide h2 { font: 700 62px/1.15 var(--s-head); margin: 0; }
+.slide h3 { font: 600 42px/1.2 var(--s-head); margin: 0; color: var(--s-accent); }
+.slide p { margin: 0; }
+.slide ul { margin: 0; padding-left: 1.2em; }
+.slide li { margin: .2em 0; }
+.slide li::marker { color: var(--s-accent); }
+.slide blockquote { margin: 0; padding: 22px 30px; border-left: 10px solid var(--s-accent); background: color-mix(in srgb, var(--s-accent) 12%, transparent); border-radius: 10px; font-style: italic; }
+.slide pre { margin: 0; background: #0d1117; color: #e6edf3; padding: 28px 34px; border-radius: 14px; font: 28px/1.5 ui-monospace, Consolas, monospace; white-space: pre; }
+.slide code { font-family: ui-monospace, Consolas, monospace; font-size: .9em; }
+.slide strong { color: var(--s-accent); }
+.slide .body { display: grid; gap: 48px; flex: 1; min-height: 0; align-content: start; }
+.slide .col { display: flex; flex-direction: column; gap: 26px; min-width: 0; }
+.layout-two-columns .body { grid-template-columns: 1fr 1fr; }
+.layout-three-columns .body { grid-template-columns: repeat(3, 1fr); }
+.layout-picture-text .body { grid-template-columns: 1fr 1fr; align-items: center; }
+.slide.is-title { justify-content: center; }
+.slide.is-title .body { flex: none; color: var(--s-muted); font-size: 44px; }
+.slide.is-title h1 { border-bottom: 10px solid var(--s-accent); padding-bottom: 24px; align-self: flex-start; }
+.slide .figure { background: color-mix(in srgb, var(--s-accent) 20%, var(--s-bg)); border-radius: 18px; aspect-ratio: 4 / 3; display: grid; place-items: center; color: var(--s-muted); font-size: 30px; }
+.slide .footer { position: absolute; left: 100px; right: 100px; bottom: 36px; display: flex; justify-content: space-between; font-size: 22px; color: var(--s-muted); }
+.slide .rv-hidden { visibility: hidden; }
+.slide .rv-mark { outline: 4px dashed color-mix(in srgb, var(--s-accent) 55%, transparent); outline-offset: 8px; border-radius: 4px; position: relative; }
+.slide .rv-mark::after { content: "reveal " attr(data-step); position: absolute; top: -40px; right: 0; font: 600 20px system-ui; color: var(--s-accent); }
+.slide [contenteditable]:hover { outline: 2px solid color-mix(in srgb, var(--s-accent) 40%, transparent); }
+.slide [contenteditable]:focus { outline: 3px solid var(--s-accent); }
+
+/* ---- Cards / thumbnails ---- */
+.thumb { cursor: pointer; }
+.thumb .scaler { box-shadow: 0 0 0 1px var(--line); transition: box-shadow .1s; }
+.thumb:hover .scaler { box-shadow: 0 0 0 2px var(--accent); }
+.thumb .cap { margin-top: 6px; font-size: 13px; display: flex; gap: 6px; }
+.thumb .num { color: var(--accent); font-variant-numeric: tabular-nums; }

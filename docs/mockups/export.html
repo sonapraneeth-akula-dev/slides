@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Export · Slides (mock)</title>
+<link rel="stylesheet" href="mock.css">
+<style>
+	#opts { width: 350px; }
+	#opts label { display: block; padding: 3px 0; cursor: pointer; }
+	#opts .desc { display: block; margin-left: 22px; font-size: 12px; color: var(--muted); }
+	#out { padding: 18px 24px 60px; }
+	.doc-h { margin-bottom: 12px; color: var(--muted); }
+	.pdf { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 18px; }
+	.page { margin: 0; background: #2a2f36; padding: 8px; border-radius: 6px; }
+	.page figcaption { font-size: 12px; color: var(--muted); margin-top: 6px; }
+	.browser { border: 1px solid var(--line); border-radius: 10px; overflow: hidden; max-width: 1100px; margin: 0 auto; }
+	.browser .bar { background: var(--panel2); padding: 6px 12px; font-size: 12px; color: var(--muted); display: flex; gap: 8px; }
+	.player { background: #000; }
+	.ctrl { display: flex; gap: 8px; align-items: center; padding: 8px 12px; background: #15181c; font-size: 13px; }
+	.priv { display: grid; grid-template-columns: 1fr 300px; }
+	.priv .side { background: var(--panel); padding: 12px 14px; font-size: 14px; border-left: 1px solid var(--line); }
+	.reading { background: var(--s-bg); color: var(--s-fg); font-family: var(--s-body); padding: 40px 12%; font-size: 17px; line-height: 1.6; max-height: 75vh; overflow: auto; }
+	.reading section { margin-bottom: 36px; }
+	.reading h1, .reading h2 { font-family: var(--s-head); margin: 0 0 10px; }
+	.reading h3 { font-family: var(--s-head); color: var(--s-accent); margin: 12px 0 4px; }
+	.reading pre { background: #0d1117; color: #e6edf3; padding: 12px 16px; border-radius: 8px; overflow: auto; }
+	.reading blockquote { border-left: 4px solid var(--s-accent); margin: 0; padding: 4px 14px; }
+	.reading .figure { background: color-mix(in srgb, var(--s-accent) 18%, var(--s-bg)); border-radius: 8px; padding: 40px; text-align: center; }
+	.reading .snap { max-width: 520px; margin: 10px 0; }
+	.reading .snap .scaler { outline: 1px solid color-mix(in srgb, var(--s-fg) 20%, transparent); }
+	.reading .snap figcaption { font-size: 12px; opacity: .7; }
+	pre.code { background: #0d1014; color: #d6dde6; padding: 16px; border-radius: 8px; font: 13px/1.5 ui-monospace, Consolas, monospace; max-height: 75vh; overflow: auto; }
+	.progress { height: 6px; background: var(--panel2); border-radius: 3px; overflow: hidden; margin-top: 12px; }
+	.progress div { height: 100%; width: 0; background: var(--accent); transition: width 1.2s linear; }
+	#result p { margin: 8px 0 0; font-size: 13px; }
+</style>
+</head>
+<body>
+<header class="topbar">
+	<strong>⤓ Export</strong><span id="title"></span><span class="pill" id="srcPill"></span>
+	<div class="grow"></div><span class="muted small">Preview shows exactly what will be written</span>
+</header>
+<div class="layout">
+	<aside class="sidebar" id="opts">
+		<h4 style="margin-top:4px">From</h4>
+		<label><input type="radio" name="from" value="draft"> Draft · current editor revision</label>
+		<label><input type="radio" name="from" value="live"> Live presentation · captured version</label>
+		<h4>Format</h4><div id="formats"></div>
+		<div id="pdfOpts"><h4>PDF options</h4>
+			<label><input type="radio" name="reveal" value="all" checked> One page per reveal step</label>
+			<label><input type="radio" name="reveal" value="final"> Final state only</label>
+			<label><input type="checkbox" id="toc"> Table of contents</label></div>
+		<div id="annOpts"><h4>Annotations</h4><p class="small" id="annSummary"></p>
+			<label><input type="radio" name="ann" value="save" checked> Save annotations</label>
+			<label><input type="radio" name="ann" value="clear"> Clear annotations and export</label>
+			<p class="small muted" id="annNote"></p></div>
+		<h4>Save to</h4><input id="dest" style="width:100%">
+		<div class="row" style="margin-top:16px"><span class="grow"></span><button id="cancel">Cancel</button><button class="primary" id="go">Export</button></div>
+		<div id="result"></div>
+	</aside>
+	<main class="main" id="out"></main>
+</div>
+<script src="mock.js"></script>
+<script>
+const d = getDeck(param('deck'));
+const FORMATS = {
+	pdf: { label: 'PDF', ext: '.pdf', desc: 'Static pages in reading order.' },
+	html: { label: 'Interactive HTML', ext: '-html/', desc: 'Same slides as presentation mode, with its own navigation.' },
+	continuous: { label: 'Continuous HTML', ext: '-reading/', desc: 'One scrolling document, each slide once, fully revealed.' },
+	private: { label: 'Private presenter HTML', ext: '-presenter/', desc: 'Slides plus notes and private comments. Not for the audience.' },
+	source: { label: 'Original source', ext: '.mdx', desc: 'Exact source file and companion assets. Not audience-safe.', text: true },
+	markdown: { label: 'Converted Markdown', ext: '.md', desc: 'Plain Markdown; notes become labeled sections. Not audience-safe.', text: true },
+};
+let live = null, player = { i: 0, step: 0 };
+const opt = n => $(`[name=${n}]:checked`)?.value;
+
+$('#formats').innerHTML = Object.entries(FORMATS).map(([k, f], i) => `<label><input type="radio" name="fmt" value="${k}"${i ? '' : ' checked'}> ${f.label}<span class="desc">${f.desc}</span></label>`).join('');
+$(`[name=from][value=${param('from') === 'live' ? 'live' : 'draft'}]`).checked = true;
+
+// Live annotations are held in the presenter's memory; ask it for them. Fall back to demo marks when opened standalone.
+window.opener?.postMessage({ type: 'hello', role: 'export' }, '*');
+addEventListener('message', e => { if (e.data?.type === 'live') { live = { ...e.data, fromPresenter: true }; update(); } });
+const liveData = () => live || { src: loadValid(d.id), marks: DEMO_MARKS, comments: DEMO_COMMENTS, fromPresenter: false };
+
+function inputs() {
+	const from = opt('from');
+	if (from === 'live') { const l = liveData(); return { src: l.src, marks: l.marks, comments: l.comments, demo: !l.fromPresenter }; }
+	return { src: loadSource(d.id), marks: {}, comments: [] };
+}
+
+function update() {
+	const fmt = opt('fmt'), F = FORMATS[fmt], inp = inputs(), deck = parseDeck(inp.src);
+	const nMarks = Object.values(inp.marks).reduce((n, l) => n + l.length, 0), nComments = inp.comments.length;
+	const save = nMarks > 0 && opt('ann') === 'save', marks = save ? inp.marks : {};
+	$('#title').textContent = deck.meta.title;
+	$('#srcPill').textContent = opt('from') === 'live' ? 'Live instance · frozen version' : 'Draft · current revision';
+	$('#pdfOpts').hidden = fmt !== 'pdf';
+	$('#annOpts').hidden = !nMarks;
+	$('#annSummary').innerHTML = `This ${opt('from') === 'live' ? 'presentation' : 'draft session'} has <b>${nMarks} mark${nMarks === 1 ? '' : 's'}</b>${nComments ? ` and <b>${nComments} private comment</b>` : ''}${inp.demo ? ' <span class="muted">(demo data)</span>' : ''}.`;
+	$('#annNote').textContent = F.text ? (save ? 'Source/Markdown cannot hold ink, so an annotated PDF companion is also written.' : 'Marks are cleared only after the clean export succeeds.')
+		: fmt === 'private' ? 'Includes speaker notes and private comments.' : nComments ? `Private comments (${nComments}) are never included in public PDF/HTML.` : '';
+	$('#dest').value = `~/Slides/Exports/${d.file.replace(/\.\w+$/, '')}${F.ext}`;
+
+	const out = $('#out');
+	if (deck.errors.length && fmt !== 'source') {
+		out.innerHTML = `<div class="banner warn">The draft has problems (${esc(deck.errors[0].msg)}). Fix them first; only Original source can be exported now.</div>`;
+		$('#go').disabled = true; return;
+	}
+	$('#go').disabled = false;
+	const stageWith = (s, step) => scaled(slideHTML(s, deck.meta, { step }) + inkSVG(marks[s.id], step));
+
+	if (fmt === 'pdf') {
+		const final = opt('reveal') === 'final', toc = $('#toc').checked;
+		const pages = deck.slides.flatMap(s => (final ? [s.reveals] : [...Array(s.reveals + 1).keys()]).map(st => ({ s, st })));
+		const firstPage = {}; pages.forEach((p, k) => firstPage[p.s.id] ??= k + 1 + (toc ? 1 : 0));
+		const canv = deck.slides.filter(s => marks['canvas:' + s.id]?.length).map(s => 'canvas:' + s.id);
+		const tocPage = toc ? `<figure class="page">${scaled(`<div class="slide" style="${themeStyle(deck.meta.theme)};gap:18px"><h2>Contents</h2>${deck.slides.map(s => `<div style="display:flex;padding-left:${s.depth * 44}px;font-size:30px"><span style="color:var(--s-accent);min-width:110px">${s.num}</span>${esc(s.title)}<span style="flex:1"></span>${firstPage[s.id]}</div>`).join('')}</div>`)}<figcaption>Page 1 · Contents</figcaption></figure>` : '';
+		const total = pages.length + (toc ? 1 : 0) + canv.length;
+		out.innerHTML = `<div class="doc-h">PDF · <b>${total} pages</b> · ${final ? 'final state of each slide' : 'one page per reveal step'}${save ? ' · with annotations' : ''}</div><div class="pdf">${tocPage}` +
+			pages.map((p, k) => `<figure class="page">${stageWith(p.s, p.st)}<figcaption>Page ${k + 1 + (toc ? 1 : 0)} · ${p.s.num} ${esc(p.s.title)}${p.s.reveals && !final ? ` · step ${p.st}/${p.s.reveals}` : ''}</figcaption></figure>`).join('') +
+			canv.map((k, j) => { const s = deck.slides.find(x => 'canvas:' + x.id === k); return `<figure class="page">${scaled('<div style="position:absolute;inset:0;background:#fff"></div>' + inkSVG(marks[k]))}<figcaption>Page ${total - canv.length + j + 1} · Canvas appendix · ${s ? s.num + ' ' + esc(s.title) : ''}</figcaption></figure>`; }).join('') + '</div>';
+	} else if (fmt === 'html' || fmt === 'private') {
+		const s = deck.slides[Math.min(player.i, deck.slides.length - 1)], cmts = inp.comments.filter(c => c.slide === s.id);
+		const stage = `<div class="player">${stageWith(s, player.step)}<div class="ctrl"><button data-nav="prev">◂</button><button data-nav="next">▸</button>
+			<span>${s.num} · ${player.i + 1} / ${deck.slides.length}${s.reveals ? ` · reveal ${player.step}/${s.reveals}` : ''}</span><span class="grow"></span><span class="muted">🔒 Deck code runs only after the viewer allows it</span></div></div>`;
+		out.innerHTML = (fmt === 'private' ? '<div class="banner private">PRIVATE · contains speaker notes and private comments. Do not share with the audience.</div>' : '') +
+			`<div class="browser"><div class="bar">📁 ${esc($('#dest').value)}index.html</div>` +
+			(fmt === 'private' ? `<div class="priv">${stage}<div class="side"><h4 style="margin-top:0">Notes</h4>${notesHTML(s)}<h4>Private comments</h4>${cmts.length ? cmts.map(c => `<p>💬 ${esc(c.text)}</p>`).join('') : '<p class="muted">None on this slide.</p>'}</div></div>` : stage) + '</div>';
+	} else if (fmt === 'continuous') {
+		out.innerHTML = `<div class="browser"><div class="bar">📁 ${esc($('#dest').value)}index.html</div><article class="reading" style="${themeStyle(deck.meta.theme)}">` +
+			deck.slides.map(s => `<section><h2>${s.num} · ${esc(s.title)}</h2>${marks[s.id]?.length ? `<figure class="snap">${stageWith(s, Infinity)}<figcaption>Annotated slide (static snapshot)</figcaption></figure>` : ''}${toBlocks(s.items).filter(b => !(b.type === 'h' && b.text === s.title)).map(b => blockHTML(b)).join('')}</section>`).join('') +
+			deck.slides.filter(s => marks['canvas:' + s.id]?.length).map(s => `<section><h2>Canvas appendix · ${s.num} ${esc(s.title)}</h2><figure class="snap">${scaled('<div style="position:absolute;inset:0;background:#fff"></div>' + inkSVG(marks['canvas:' + s.id]))}</figure></section>`).join('') + '</article></div>';
+	} else if (fmt === 'source') {
+		out.innerHTML = `<div class="banner warn">Original source is not audience-safe: it contains speaker notes and all authored content.</div><pre class="code">${esc(inp.src)}</pre>`;
+	} else {
+		const md = deck.slides.map(s => {
+			const body = s.items.map(x => x.text).join('\n').replace(/\n{3,}/g, '\n\n').trim();
+			const notes = s.notes.map(x => x.text).join(' ').trim();
+			return body + (notes ? `\n\n> **Speaker notes:** ${notes}` : '');
+		}).join('\n\n---\n\n');
+		out.innerHTML = `<div class="banner warn">Converted Markdown keeps speaker notes as labeled sections and is not audience-safe.</div><pre class="code">${esc(deck.slides[0]?.title === deck.meta.title ? md : `# ${deck.meta.title}\n\n${md}`)}</pre>`;
+	}
+	observeScalers(out);
+}
+
+$('#opts').addEventListener('change', () => { $('#result').innerHTML = ''; update(); });
+$('#out').addEventListener('click', e => {
+	const b = e.target.closest('[data-nav]'); if (!b) return;
+	const deck = parseDeck(inputs().src);
+	player = b.dataset.nav === 'next' ? nextPos(deck, player) : prevPos(deck, player); update();
+});
+$('#cancel').onclick = () => { window.close(); $('#result').innerHTML = '<p class="muted">Canceled. Nothing was written and no annotations changed.</p>'; };
+$('#go').onclick = () => {
+	const fmt = opt('fmt'), inp = inputs(), nMarks = Object.values(inp.marks).reduce((n, l) => n + l.length, 0), ann = nMarks ? opt('ann') : null;
+	$('#go').disabled = true;
+	$('#result').innerHTML = '<div class="progress"><div></div></div><p class="muted">Rendering captured version…</p>';
+	requestAnimationFrame(() => requestAnimationFrame(() => { $('#result .progress div').style.width = '100%'; }));
+	setTimeout(() => {
+		const lines = [`✓ Saved <b>${esc($('#dest').value)}</b>`];
+		if (FORMATS[fmt].text && ann === 'save') lines.push(`✓ Saved annotation companion <b>${esc($('#dest').value.replace(/\.\w+$/, ''))}-annotated.pdf</b>`);
+		if (ann === 'save') lines.push('Session marks stay available until the presentation ends.');
+		if (ann === 'save' && inp.comments.length && fmt !== 'private') lines.push(`${inp.comments.length} private comment omitted (use Private presenter HTML to keep it).`);
+		if (ann === 'clear') { lines.push('Annotations cleared after the clean export succeeded.'); if (live?.fromPresenter) window.opener?.postMessage({ type: 'cleared' }, '*'); live = { ...liveData(), marks: {}, comments: [] }; }
+		$('#result').innerHTML = lines.map(l => `<p>${l}</p>`).join('');
+		$('#go').disabled = false;
+		if (ann === 'clear') update();
+	}, 1300);
+};
+update();
+</script>
+</body>
+</html>

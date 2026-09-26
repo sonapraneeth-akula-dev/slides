@@ -1,0 +1,260 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Presenting · Slides (mock)</title>
+<link rel="stylesheet" href="mock.css">
+<style>
+	.pres { overflow: hidden; }
+	.stage-wrap { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 16px; }
+	#stageBox { width: min(100%, calc((100vh - 150px) * 16 / 9)); box-shadow: 0 8px 40px #0008; touch-action: none; }
+	#stageBox.tool-pen, #stageBox.tool-highlight { cursor: crosshair; }
+	#stageBox.tool-laser { cursor: none; }
+	#canvasBg { position: absolute; inset: 0; background: #fff; }
+	#canvasBg::after { content: "Blank canvas"; position: absolute; top: 24px; left: 32px; font: 600 24px system-ui; color: #9aa4b2; }
+	#black { position: absolute; inset: 0; background: #000; }
+	#laser { position: absolute; width: 26px; height: 26px; margin: -13px 0 0 -13px; border-radius: 50%; background: #ff2b2b; box-shadow: 0 0 18px 8px #ff2b2b88; pointer-events: none; }
+	.toolbar { display: flex; gap: 6px; align-items: center; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 6px 8px; }
+	.toolbar .sep { width: 1px; align-self: stretch; background: var(--line); margin: 0 4px; }
+	.swatch { width: 22px; height: 22px; border-radius: 50%; padding: 0; border: 2px solid transparent; }
+	.swatch.on { border-color: #fff; }
+	.side { width: 360px; flex: none; background: var(--panel); border-left: 1px solid var(--line); display: flex; flex-direction: column; padding: 14px; gap: 14px; overflow: auto; }
+	.prog { display: flex; align-items: baseline; gap: 10px; }
+	.prog .big { font-size: 34px; font-weight: 700; color: var(--accent); font-variant-numeric: tabular-nums; }
+	.dots span { display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: var(--line); margin-right: 5px; }
+	.dots span.on { background: var(--accent); }
+	.pad { display: grid; grid-template-columns: repeat(3, 44px); grid-template-rows: repeat(3, 34px); gap: 4px; }
+	.pad button { padding: 0; }
+	.notes { font-size: 17px; line-height: 1.5; background: var(--panel2); border-radius: 8px; padding: 12px 14px; flex: 1; overflow: auto; min-height: 120px; }
+	.notes p, .notes ul { margin: 0 0 8px; }
+	.ended { flex: 1; display: grid; place-items: center; text-align: center; }
+	/* Audience window: slide only, no chrome */
+	body.audience { background: #000; }
+	body.audience .topbar, body.audience .side, body.audience .toolbar { display: none; }
+	body.audience .stage-wrap { padding: 0; }
+	body.audience #stageBox { width: min(100vw, calc(100vh * 16 / 9)); box-shadow: none; border-radius: 0; cursor: none; }
+	#waiting { color: #666; }
+</style>
+</head>
+<body>
+<header class="topbar">
+	<span class="pill live">● LIVE</span><strong id="title"></strong><span class="muted small" id="captured"></span>
+	<div class="grow"></div>
+	<span class="pill" id="sharePill">Local only</span>
+	<button id="shareBtn">📡 Share on LAN…</button>
+	<button id="audBtn">🖥 Audience window ↗</button>
+	<button id="exportBtn">⤓ Export…</button>
+	<button id="endBtn">■ End</button>
+</header>
+<div class="layout pres" id="root">
+	<main class="stage-wrap">
+		<div class="scaler" id="stageBox"><div class="stage">
+			<div id="slideHost"></div><div id="canvasBg" hidden></div><div id="inkHost"></div><div id="laser" hidden></div><div id="black" hidden></div>
+		</div></div>
+		<div class="toolbar" id="tools">
+			<button data-tool="pen" title="Pen (D)">✎ Pen</button>
+			<button data-tool="highlight" title="Highlight (H)">▬ Highlight</button>
+			<button data-tool="laser" title="Laser (L)">● Laser</button>
+			<span class="sep"></span>
+			<button class="swatch on" data-color="#e11d48" style="background:#e11d48" title="Red"></button>
+			<button class="swatch" data-color="#2563eb" style="background:#2563eb" title="Blue"></button>
+			<button class="swatch" data-color="#16a34a" style="background:#16a34a" title="Green"></button>
+			<select id="width" title="Pen width"><option value="4">Thin</option><option value="7" selected>Medium</option><option value="12">Thick</option></select>
+			<span class="sep"></span>
+			<button id="undo" title="Undo (Ctrl+Z)">↶ Undo</button>
+			<button id="clear" title="Clear marks on this slide">⌫ Clear</button>
+			<span class="sep"></span>
+			<button id="canvasBtn" title="Blank canvas (C)">▢ Canvas</button>
+			<button id="blackBtn" title="Blackout (B)">◼ Blackout</button>
+			<button id="helpBtn" title="Shortcuts (?)">?</button>
+		</div>
+	</main>
+	<aside class="side">
+		<div><div class="prog"><span class="big" id="num"></span><span class="muted" id="count"></span><span class="grow"></span><span class="muted small" id="timer">00:00</span></div>
+			<div class="small" id="slideTitle"></div><div class="dots small" id="dots" style="margin-top:6px"></div></div>
+		<div class="row" style="align-items:flex-start">
+			<div class="pad" id="pad">
+				<span></span><button data-k="ArrowUp">↑</button><span></span>
+				<button data-k="ArrowLeft">←</button><button data-k="parent" title="Parent">⤴</button><button data-k="ArrowRight">→</button>
+				<span></span><button data-k="ArrowDown">↓</button><span></span>
+			</div>
+			<div style="display:flex;flex-direction:column;gap:6px;flex:1">
+				<button id="nextBtn" class="primary">Next ▸</button><button id="prevBtn">◂ Previous</button>
+				<span class="small muted">Arrows follow the slide tree; Next/Previous follow reading order.</span>
+			</div>
+		</div>
+		<div><h4 style="margin-top:0">Up next</h4><div id="next"></div></div>
+		<h4 style="margin:0">Speaker notes <span class="muted">· private</span></h4>
+		<div class="notes" id="notes"></div>
+	</aside>
+</div>
+
+<dialog id="help"><h3 style="margin-top:0">Presenter shortcuts</h3>
+	<p><kbd>Space</kbd> <kbd>PgDn</kbd> next · <kbd>Backspace</kbd> <kbd>PgUp</kbd> previous</p>
+	<p><kbd>↑</kbd><kbd>↓</kbd><kbd>←</kbd><kbd>→</kbd> move through the slide tree (axes alternate by depth)</p>
+	<p><kbd>D</kbd> pen · <kbd>H</kbd> highlight · <kbd>L</kbd> laser · <kbd>Esc</kbd> no tool</p>
+	<p><kbd>C</kbd> blank canvas · <kbd>B</kbd> blackout · <kbd>Ctrl</kbd>+<kbd>Z</kbd> undo · <kbd>?</kbd> this help</p>
+	<form method="dialog"><button class="primary">Close</button></form></dialog>
+
+<dialog id="shareDlg"><form method="dialog">
+	<h3 style="margin-top:0">Share on local network</h3>
+	<p class="small muted">Viewers on the same network get a read-only audience view. Notes, tools, and editing stay on this computer.</p>
+	<label><input type="checkbox" name="ip" value="192.168.1.25" checked> Wi-Fi · 192.168.1.25</label><br>
+	<label><input type="checkbox" name="ip" value="10.0.0.12"> Ethernet · 10.0.0.12</label>
+	<p>Port range <input value="50000" size="6"> – <input value="50100" size="6"></p>
+	<div class="row"><span class="grow"></span><button value="cancel">Cancel</button><button class="primary" value="start">Start sharing</button></div>
+</form></dialog>
+
+<dialog id="endDlg"><form method="dialog">
+	<h3 style="margin-top:0">End presentation?</h3>
+	<p id="endMsg"></p>
+	<div class="row"><span class="grow"></span><button value="cancel">Cancel</button><button value="save" id="endSave">Save annotations…</button><button class="primary" value="end" id="endGo">End</button></div>
+</form></dialog>
+
+<script src="mock.js"></script>
+<script>
+const id = param('deck') || DECKS[0].id, isAudience = location.hash === '#audience';
+let captured = isAudience ? null : loadValid(id), deck = captured && parseDeck(captured);
+let pos = { i: 0, step: 0 }, marks = {}, blackout = false, canvas = false, laser = null;
+let tool = null, color = '#e11d48', drawing = null, undoStack = [], audWin = null, sharing = null;
+const t0 = Date.now();
+
+const key = () => (canvas ? 'canvas:' : '') + deck.slides[pos.i].id;
+const markCount = () => Object.values(marks).reduce((n, l) => n + l.length, 0);
+
+function toStage(e) { const r = $('#stageBox').getBoundingClientRect(); return [Math.round((e.clientX - r.left) * 1600 / r.width), Math.round((e.clientY - r.top) * 900 / r.height)]; }
+
+function drawStage() {
+	const s = deck.slides[pos.i], list = (marks[key()] || []).concat(drawing ? [drawing] : []);
+	$('#slideHost').innerHTML = slideHTML(s, deck.meta, { step: pos.step });
+	$('#canvasBg').hidden = !canvas; $('#black').hidden = !blackout;
+	$('#inkHost').innerHTML = inkSVG(list, canvas ? Infinity : pos.step);
+	$('#laser').hidden = !laser; if (laser) { $('#laser').style.left = laser[0] + 'px'; $('#laser').style.top = laser[1] + 'px'; }
+}
+
+function render() {
+	drawStage();
+	if (isAudience) return;
+	const s = deck.slides[pos.i], nx = nextPos(deck, pos), t = arrowTargets(s);
+	$('#num').textContent = s.num; $('#count').textContent = `${pos.i + 1} / ${deck.slides.length}`;
+	$('#slideTitle').textContent = s.title;
+	$('#dots').innerHTML = s.reveals ? 'Reveal ' + Array.from({ length: s.reveals + 1 }, (_, k) => `<span class="${k <= pos.step ? 'on' : ''}"></span>`).join('') : '';
+	$$('#pad [data-k]').forEach(b => b.disabled = b.dataset.k === 'parent' ? !s.parentRef : !t[b.dataset.k]);
+	$('#nextBtn').disabled = nx === pos; $('#prevBtn').disabled = prevPos(deck, pos) === pos;
+	const ns = nx === pos ? null : deck.slides[nx.i];
+	$('#next').innerHTML = !ns ? '<p class="muted">End of deck</p>' : nx.i === pos.i ? `<p class="small muted">Next reveal on this slide (step ${nx.step} of ${s.reveals})</p>`
+		: `${scaled(slideHTML(ns, deck.meta, { step: 0 }))}<div class="small muted" style="margin-top:4px">${ns.num} · ${esc(ns.title)}</div>`;
+	observeScalers($('#next'));
+	$('#notes').innerHTML = notesHTML(s);
+	$$('#tools [data-tool]').forEach(b => b.classList.toggle('on', b.dataset.tool === tool));
+	$('#canvasBtn').classList.toggle('on', canvas); $('#blackBtn').classList.toggle('on', blackout);
+	$('#stageBox').className = 'scaler' + (tool ? ' tool-' + tool : '');
+	sync();
+}
+
+const state = () => ({ type: 'state', src: captured, pos, marks, blackout, canvas, laser });
+function sync() { if (audWin && !audWin.closed) audWin.postMessage(state(), '*'); }
+function go(p) { pos = p; laser = null; render(); }
+
+addEventListener('message', e => {
+	const m = e.data || {};
+	if (isAudience) {
+		if (!$('#stageBox')) return;
+		if (m.type === 'ended') { document.body.innerHTML = '<div class="ended" style="color:#888">The presentation has ended.</div>'; return; }
+		if (m.type !== 'state') return;
+		if (m.src !== captured) { captured = m.src; deck = parseDeck(captured); }
+		({ pos, marks, blackout, canvas, laser } = m); $('#waiting')?.remove(); drawStage(); return;
+	}
+	if (m.type === 'hello' && m.role === 'audience') e.source.postMessage(state(), '*');
+	if (m.type === 'hello' && m.role === 'export') e.source.postMessage({ type: 'live', src: captured, marks, comments: [] }, '*');
+	if (m.type === 'cleared') { marks = {}; undoStack = []; render(); }
+});
+
+if (isAudience) {
+	document.body.classList.add('audience'); document.title = 'Audience · Slides';
+	$('#stageBox').insertAdjacentHTML('beforebegin', '<p id="waiting">Waiting for presenter…</p>');
+	deck = parseDeck(loadValid(id));
+	window.opener?.postMessage({ type: 'hello', role: 'audience' }, '*');
+} else {
+	$('#title').textContent = deck.meta.title; document.title = 'Presenting · ' + deck.meta.title;
+	$('#captured').textContent = `Captured ${new Date().toTimeString().slice(0, 5)} · draft edits won't change this session`;
+	setInterval(() => { const s = Math.floor((Date.now() - t0) / 1000); const el = $('#timer'); if (el) el.textContent = `${String(s / 60 | 0).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`; }, 1000);
+
+	// Navigation
+	const arrow = k => { const s = deck.slides[pos.i], t = k === 'parent' ? s.parentRef : arrowTargets(s)[k]; if (t) go({ i: t.index, step: 0 }); };
+	$('#pad').onclick = e => { const b = e.target.closest('[data-k]'); if (b) arrow(b.dataset.k); };
+	$('#nextBtn').onclick = () => go(nextPos(deck, pos));
+	$('#prevBtn').onclick = () => go(prevPos(deck, pos));
+
+	// Tools
+	const setTool = t => { tool = tool === t ? null : t; laser = null; render(); };
+	$('#tools').onclick = e => {
+		const b = e.target.closest('button'); if (!b) return;
+		if (b.dataset.tool) setTool(b.dataset.tool);
+		if (b.dataset.color) { color = b.dataset.color; $$('.swatch').forEach(x => x.classList.toggle('on', x === b)); }
+	};
+	$('#undo').onclick = () => { const k = undoStack.pop(); if (k) { marks[k].pop(); render(); } };
+	$('#clear').onclick = () => { delete marks[key()]; undoStack = undoStack.filter(k => k !== key()); render(); };
+	$('#canvasBtn').onclick = () => { canvas = !canvas; render(); };
+	$('#blackBtn').onclick = () => { blackout = !blackout; render(); };
+	$('#helpBtn').onclick = () => $('#help').showModal();
+
+	const box = $('#stageBox');
+	box.addEventListener('pointerdown', e => {
+		if (tool !== 'pen' && tool !== 'highlight') return;
+		box.setPointerCapture(e.pointerId);
+		const [x, y] = toStage(e), hl = tool === 'highlight';
+		drawing = { d: `M ${x} ${y}`, color: hl ? '#facc15' : color, width: hl ? 40 : +$('#width').value, opacity: hl ? .45 : 1, step: pos.step };
+	});
+	box.addEventListener('pointermove', e => {
+		if (drawing) { const [x, y] = toStage(e); drawing.d += ` L ${x} ${y}`; drawStage(); sync(); }
+		else if (tool === 'laser') { laser = toStage(e); drawStage(); sync(); }
+	});
+	box.addEventListener('pointerup', () => { if (!drawing) return; (marks[key()] ||= []).push(drawing); undoStack.push(key()); drawing = null; render(); });
+	box.addEventListener('pointerleave', () => { if (tool === 'laser') { laser = null; drawStage(); sync(); } });
+
+	addEventListener('keydown', e => {
+		if (!$('#slideHost') || e.target.closest('input,select,dialog')) return;
+		const k = e.key;
+		if (k.startsWith('Arrow')) { arrow(k); e.preventDefault(); }
+		else if ([' ', 'PageDown', 'Enter', 'n'].includes(k)) { go(nextPos(deck, pos)); e.preventDefault(); }
+		else if (['PageUp', 'Backspace', 'p'].includes(k)) { go(prevPos(deck, pos)); e.preventDefault(); }
+		else if (k === 'b' || k === 'B') $('#blackBtn').click();
+		else if (k === 'c' || k === 'C') $('#canvasBtn').click();
+		else if (k === 'd') setTool('pen'); else if (k === 'h') setTool('highlight'); else if (k === 'l') setTool('laser');
+		else if (k === 'Escape') { tool = null; blackout = false; laser = null; render(); }
+		else if (k === '?') $('#help').showModal();
+		else if (k === 'z' && (e.ctrlKey || e.metaKey)) $('#undo').click();
+	});
+
+	// Windows, sharing, export, end
+	$('#audBtn').onclick = () => { audWin = window.open(`present.html?deck=${id}#audience`, 'slides-audience', 'popup,width=1100,height=640'); };
+	$('#exportBtn').onclick = () => window.open(`export.html?deck=${id}&from=live`, '_blank');
+	$('#shareBtn').onclick = () => {
+		if (sharing) { sharing = null; $('#sharePill').textContent = 'Local only'; $('#sharePill').className = 'pill'; $('#shareBtn').textContent = '📡 Share on LAN…'; return; }
+		$('#shareDlg').showModal();
+	};
+	$('#shareDlg').addEventListener('close', () => {
+		if ($('#shareDlg').returnValue !== 'start') return;
+		const ips = $$('#shareDlg [name=ip]:checked').map(x => x.value); if (!ips.length) return alert('Pick at least one network.');
+		sharing = ips.map(ip => `http://${ip}:50001/#s=7f3a`);
+		$('#sharePill').className = 'pill ok'; $('#sharePill').innerHTML = `● Sharing · ${sharing.map(u => `<a href="#" title="Copy" onclick="navigator.clipboard?.writeText('${u}');return false">${u.replace('http://', '').replace('/#s=7f3a', '')}</a>`).join(' · ')} · 0 viewers`;
+		$('#shareBtn').textContent = 'Stop sharing';
+	});
+	$('#endBtn').onclick = () => {
+		const n = markCount();
+		$('#endMsg').innerHTML = n ? `This session has <b>${n} unsaved mark${n > 1 ? 's' : ''}</b>. They cannot be recovered after the presentation ends.` : 'No unsaved annotations.';
+		$('#endSave').hidden = !n; $('#endGo').textContent = n ? 'Discard and end' : 'End';
+		$('#endDlg').showModal();
+	};
+	$('#endDlg').addEventListener('close', () => {
+		const v = $('#endDlg').returnValue;
+		if (v === 'save') $('#exportBtn').click();
+		if (v === 'end') { audWin?.postMessage({ type: 'ended' }, '*'); marks = {}; $('#root').outerHTML = '<div class="ended"><div><h2>Presentation ended</h2><p class="muted">Unsaved marks were discarded. You can close this tab.</p></div></div>'; }
+	});
+	render();
+}
+observeScalers();
+</script>
+</body>
+</html>
