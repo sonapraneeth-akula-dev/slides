@@ -11,6 +11,7 @@
 	#out { padding: 18px 24px 60px; }
 	.doc-h { margin-bottom: 12px; color: var(--muted); }
 	.pdf { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 18px; }
+	.page .slide, .reading .slide { animation: none; }
 	.page { margin: 0; background: #2a2f36; padding: 8px; border-radius: 6px; }
 	.page figcaption { font-size: 12px; color: var(--muted); margin-top: 6px; }
 	.browser { border: 1px solid var(--line); border-radius: 10px; overflow: hidden; max-width: 1100px; margin: 0 auto; }
@@ -114,7 +115,7 @@ function update() {
 		const pages = deck.slides.flatMap(s => (final ? [s.reveals] : [...Array(s.reveals + 1).keys()]).map(st => ({ s, st })));
 		const firstPage = {}; pages.forEach((p, k) => firstPage[p.s.id] ??= k + 1 + (toc ? 1 : 0));
 		const canv = deck.slides.filter(s => marks['canvas:' + s.id]?.length).map(s => 'canvas:' + s.id);
-		const tocPage = toc ? `<figure class="page">${scaled(`<div class="slide" style="${themeStyle(deck.meta.theme)};gap:18px"><h2>Contents</h2>${deck.slides.map(s => `<div style="display:flex;padding-left:${s.depth * 44}px;font-size:30px"><span style="color:var(--s-accent);min-width:110px">${s.num}</span>${esc(s.title)}<span style="flex:1"></span>${firstPage[s.id]}</div>`).join('')}</div>`)}<figcaption>Page 1 · Contents</figcaption></figure>` : '';
+		const tocPage = toc ? `<figure class="page">${scaled(`<div class="slide" style="${themeStyle(deck.meta)};gap:18px"><h2>Contents</h2>${deck.slides.map(s => `<div style="display:flex;padding-left:${s.depth * 44}px;font-size:30px"><span style="color:var(--s-accent);min-width:110px">${s.num}</span>${esc(s.title)}<span style="flex:1"></span>${firstPage[s.id]}</div>`).join('')}</div>`)}<figcaption>Page 1 · Contents</figcaption></figure>` : '';
 		const total = pages.length + (toc ? 1 : 0) + canv.length;
 		out.innerHTML = `<div class="doc-h">PDF · <b>${total} pages</b> · ${final ? 'final state of each slide' : 'one page per reveal step'}${save ? ' · with annotations' : ''}</div><div class="pdf">${tocPage}` +
 			pages.map((p, k) => `<figure class="page">${stageWith(p.s, p.st)}<figcaption>Page ${k + 1 + (toc ? 1 : 0)} · ${p.s.num} ${esc(p.s.title)}${p.s.reveals && !final ? ` · step ${p.st}/${p.s.reveals}` : ''}</figcaption></figure>`).join('') +
@@ -127,7 +128,7 @@ function update() {
 			`<div class="browser"><div class="bar">📁 ${esc($('#dest').value)}index.html</div>` +
 			(fmt === 'private' ? `<div class="priv">${stage}<div class="side"><h4 style="margin-top:0">Notes</h4>${notesHTML(s)}<h4>Private comments</h4>${cmts.length ? cmts.map(c => `<p>💬 ${esc(c.text)}</p>`).join('') : '<p class="muted">None on this slide.</p>'}</div></div>` : stage) + '</div>';
 	} else if (fmt === 'continuous') {
-		out.innerHTML = `<div class="browser"><div class="bar">📁 ${esc($('#dest').value)}index.html</div><article class="reading" style="${themeStyle(deck.meta.theme)}">` +
+		out.innerHTML = `<div class="browser"><div class="bar">📁 ${esc($('#dest').value)}index.html</div><article class="reading" style="${themeStyle(deck.meta)}">` +
 			deck.slides.map(s => `<section><h2>${s.num} · ${esc(s.title)}</h2>${marks[s.id]?.length ? `<figure class="snap">${stageWith(s, Infinity)}<figcaption>Annotated slide (static snapshot)</figcaption></figure>` : ''}${toBlocks(s.items).filter(b => !(b.type === 'h' && b.text === s.title)).map(b => blockHTML(b)).join('')}</section>`).join('') +
 			deck.slides.filter(s => marks['canvas:' + s.id]?.length).map(s => `<section><h2>Canvas appendix · ${s.num} ${esc(s.title)}</h2><figure class="snap">${scaled('<div style="position:absolute;inset:0;background:#fff"></div>' + inkSVG(marks['canvas:' + s.id]))}</figure></section>`).join('') + '</article></div>';
 	} else if (fmt === 'source') {

@@ -42,18 +42,18 @@ kbd { background: var(--panel2); border: 1px solid var(--line); border-radius: 4
 .stage .ink { position: absolute; inset: 0; width: 1600px; height: 900px; pointer-events: none; }
 .slide {
 	width: 1600px; height: 900px; padding: 80px 100px 100px; display: flex; flex-direction: column; gap: 36px;
-	background: var(--s-bg); color: var(--s-fg); font-family: var(--s-body); font-size: 36px; line-height: 1.4; position: relative; overflow: hidden;
+	background: var(--s-bg); color: var(--s-fg); font-family: var(--s-body); font-size: var(--s-bsize, 36px); line-height: 1.4; position: relative; overflow: hidden;
 }
-.slide h1 { font: 700 92px/1.1 var(--s-head); margin: 0; }
-.slide h2 { font: 700 62px/1.15 var(--s-head); margin: 0; }
-.slide h3 { font: 600 42px/1.2 var(--s-head); margin: 0; color: var(--s-accent); }
+.slide h1 { font: 700 calc(var(--s-hsize, 62px) * 1.48)/1.1 var(--s-head); margin: 0; }
+.slide h2 { font: 700 var(--s-hsize, 62px)/1.15 var(--s-head); margin: 0; }
+.slide h3 { font: 600 calc(var(--s-hsize, 62px) * .68)/1.2 var(--s-head); margin: 0; color: var(--s-accent); }
 .slide p { margin: 0; }
 .slide ul { margin: 0; padding-left: 1.2em; }
 .slide li { margin: .2em 0; }
 .slide li::marker { color: var(--s-accent); }
 .slide blockquote { margin: 0; padding: 22px 30px; border-left: 10px solid var(--s-accent); background: color-mix(in srgb, var(--s-accent) 12%, transparent); border-radius: 10px; font-style: italic; }
-.slide pre { margin: 0; background: #0d1117; color: #e6edf3; padding: 28px 34px; border-radius: 14px; font: 28px/1.5 ui-monospace, Consolas, monospace; white-space: pre; }
-.slide code { font-family: ui-monospace, Consolas, monospace; font-size: .9em; }
+.slide pre { margin: 0; background: #0d1117; color: #e6edf3; padding: 28px 34px; border-radius: 14px; font: var(--s-csize, 28px)/1.5 var(--s-code, ui-monospace, monospace); white-space: pre; }
+.slide code { font-family: var(--s-code, ui-monospace, monospace); font-size: .9em; }
 .slide strong { color: var(--s-accent); }
 .slide .body { display: grid; gap: 48px; flex: 1; min-height: 0; align-content: start; }
 .slide .col { display: flex; flex-direction: column; gap: 26px; min-width: 0; }
@@ -61,10 +61,49 @@ kbd { background: var(--panel2); border: 1px solid var(--line); border-radius: 4
 .layout-three-columns .body { grid-template-columns: repeat(3, 1fr); }
 .layout-picture-text .body { grid-template-columns: 1fr 1fr; align-items: center; }
 .slide.is-title { justify-content: center; }
-.slide.is-title .body { flex: none; color: var(--s-muted); font-size: 44px; }
+.slide.is-title .body { flex: none; color: var(--s-muted); font-size: calc(var(--s-bsize, 36px) * 1.22); }
 .slide.is-title h1 { border-bottom: 10px solid var(--s-accent); padding-bottom: 24px; align-self: flex-start; }
 .slide .figure { background: color-mix(in srgb, var(--s-accent) 20%, var(--s-bg)); border-radius: 18px; aspect-ratio: 4 / 3; display: grid; place-items: center; color: var(--s-muted); font-size: 30px; }
+.slide figure { margin: 0; }
+.slide .body:has(.diagram, .chart) { align-content: center; }
+.diagram, .chart { display: flex; justify-content: center; }
+.diagram svg, .chart svg { width: 100%; height: auto; max-height: 590px; }
+.chart { --c0: var(--s-accent, #2563eb); --c1: #f59e0b; --c2: #8b5cf6; --c3: #f43f5e; --c4: #14b8a6; --c5: #64748b; }
+.chart text { fill: var(--s-fg, #222); font-family: var(--s-body, system-ui); }
+.chart .ch-tick { font-size: 22px; fill: var(--s-muted, #666); }
+.chart .ch-title { font-weight: 600; }
+.chart .ch-legend { font-size: 24px; }
+.chart .ch-pct { font-size: 26px; font-weight: 700; fill: #fff; paint-order: stroke; stroke: rgb(0 0 0 / .25); stroke-width: 3px; }
+.chart .ch-total { font-size: 48px; font-weight: 700; }
+.ch-grid { stroke: color-mix(in srgb, var(--s-muted, #666) 25%, transparent); stroke-width: 1.5; }
+.ch-axis { stroke: var(--s-muted, #666); stroke-width: 2; }
+.ch-line { fill: none; stroke-width: 5; stroke-linejoin: round; }
+.ch-area { fill-opacity: .22; }
+.ch-pt { stroke: var(--s-bg, #fff); stroke-width: 3; }
+.ch-dot { fill-opacity: .8; stroke: var(--s-bg, #fff); stroke-width: 2; }
+.ch-slice { stroke: var(--s-bg, #fff); stroke-width: 3; }
+.ch-mark { transition: opacity .15s; cursor: default; }
+.chart svg:has(.ch-mark:hover) .ch-mark:not(:hover) { opacity: .4; }
+.diagram text { fill: var(--s-fg, #222); font: 500 28px var(--s-body, system-ui); }
+.diagram .dg-elabel { font-size: 22px; fill: var(--s-muted, #666); }
+.diagram .dg-mtext, .diagram .dg-ntext { font-size: 24px; }
+.dg-node { fill: color-mix(in srgb, var(--s-accent, #2563eb) 14%, var(--s-bg, #fff)); stroke: var(--s-accent, #2563eb); stroke-width: 3; }
+.dg-decision { fill: color-mix(in srgb, var(--s-accent, #2563eb) 30%, var(--s-bg, #fff)); }
+.dg-edge { fill: none; stroke: var(--s-muted, #666); stroke-width: 3; }
+.dg-dashed { stroke-dasharray: 10 8; }
+.dg-thick { stroke-width: 6; }
+.dg-head { fill: var(--s-muted, #666); }
+.dg-lblbg { fill: var(--s-bg, #fff); }
+.dg-life { stroke: var(--s-muted, #666); stroke-width: 2; stroke-dasharray: 4 8; }
+.dg-note { fill: color-mix(in srgb, #facc15 24%, var(--s-bg, #fff)); stroke: color-mix(in srgb, #facc15 70%, var(--s-bg, #fff)); stroke-width: 2; }
+.diagram-error { padding: 20px 28px; border: 3px dashed #dc2626; border-radius: 12px; color: #dc2626; font-size: 26px; }
 .slide .footer { position: absolute; left: 100px; right: 100px; bottom: 36px; display: flex; justify-content: space-between; font-size: 22px; color: var(--s-muted); }
+.slide.bg-gradient { background: linear-gradient(135deg, var(--s-bg) 45%, color-mix(in srgb, var(--s-accent) 22%, var(--s-bg))); }
+.slide.bg-band { background: linear-gradient(var(--s-accent), var(--s-accent)) top / 100% 16px no-repeat, var(--s-bg); }
+.slide.backdrop-drift { background-size: 220% 220%; animation: drift 10s ease-in-out infinite alternate; }
+@keyframes drift { to { background-position: 100% 100%; } }
+@media (prefers-reduced-motion: reduce) { .slide.backdrop-drift { animation: none; } }
+.slide .logo { position: absolute; top: 34px; right: 100px; font: 700 26px var(--s-head); color: var(--s-accent); }
 .slide .rv-hidden { visibility: hidden; }
 .slide .rv-mark { outline: 4px dashed color-mix(in srgb, var(--s-accent) 55%, transparent); outline-offset: 8px; border-radius: 4px; position: relative; }
 .slide .rv-mark::after { content: "reveal " attr(data-step); position: absolute; top: -40px; right: 0; font: 600 20px system-ui; color: var(--s-accent); }

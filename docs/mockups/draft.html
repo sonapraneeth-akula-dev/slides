@@ -26,6 +26,19 @@
 	.pv .scaler { box-shadow: 0 0 0 1px var(--line); }
 	.pv.active .scaler { box-shadow: 0 0 0 2px var(--accent); }
 	.statusbar.err { color: var(--err); }
+	.statusbar.warn { color: var(--warn); }
+	.split[hidden], .master[hidden] { display: none; }
+	.master { flex: 1; display: grid; grid-template-columns: 360px 1fr; min-width: 0; min-height: 0; }
+	.mform { overflow: auto; padding: 10px 16px 40px; background: var(--panel); border-right: 1px solid var(--line); }
+	.mrow { display: grid; grid-template-columns: 118px 1fr 22px; gap: 8px; align-items: center; padding: 3px 0; font-size: 13px; }
+	.mrow input[type=color] { width: 100%; height: 28px; padding: 1px 3px; }
+	.mrow input, .mrow select { min-width: 0; }
+	.mrow.ov > label:first-child::after { content: " •"; color: var(--accent); }
+	.mrow .rst { visibility: hidden; padding: 0; border: 0; background: none; color: var(--accent); }
+	.mrow.ov .rst { visibility: visible; }
+	.mgrid { overflow: auto; padding: 16px 22px 60px; display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 18px; align-content: start; }
+	.mthumb.active .scaler { box-shadow: 0 0 0 2px var(--accent); }
+	.mthumb.over .scaler { box-shadow: 0 0 0 2px var(--warn); }
 </style>
 </head>
 <body>
@@ -45,16 +58,92 @@
 		<section class="pane src"><div class="pane-h" id="file"></div><textarea id="src" spellcheck="false"></textarea></section>
 		<section class="pane prev"><div class="pane-h">Preview <span>· exactly as presented · click text to edit it here</span></div><div id="preview" class="preview-list"></div></section>
 	</main>
+	<main class="master" id="masterView" hidden>
+		<section class="mform" id="mform"></section>
+		<section class="pane"><div class="pane-h"><span>Presentation master · whole-deck preview · every slide, template and child slide inherits these settings</span><span class="grow"></span><span id="mwarn"></span></div><div id="mgrid" class="mgrid"></div></section>
+	</main>
 </div>
 <footer class="statusbar" id="diag"></footer>
 <script src="mock.js"></script>
 <script>
 const d = getDeck(param('deck')), ta = $('#src');
-let deck = null, lastValid = null, active = null, saveTimer, renderTimer;
+let deck = null, lastValid = null, active = null, saveTimer, renderTimer, view = 'split', editView = 'split';
 ta.value = loadSource(d.id);
 $('#path').textContent = `${d.dir}/${d.file}`;
 $('#file').textContent = d.file;
-$('#theme').innerHTML = Object.entries(THEMES).map(([k, t]) => `<option value="${k}">${t.name}</option>`).join('') + '<option disabled>… 14 presets in v1</option>';
+const themeOptions = Object.entries(THEMES).map(([k, t]) => `<option value="${k}">${t.name}</option>`).join('') + '<option disabled>… 14 presets in v1</option>';
+$('#theme').innerHTML = themeOptions;
+
+// ---- Presentation master form (built once; values synced from the parsed source) ----
+const MASTER_GROUPS = [
+	['Palette', [['surface', 'Background'], ['text', 'Text'], ['accent', 'Accent'], ['muted', 'Muted text']]],
+	['Typography', [['headingFont', 'Heading font'], ['headingSize', 'Heading size'], ['bodyFont', 'Body font'], ['bodySize', 'Body size'], ['codeFont', 'Code font'], ['codeSize', 'Code size']]],
+	['Background', [['background', 'Style'], ['backdrop', 'Animated backdrop']]],
+	['Shared elements', [['logo', 'Logo'], ['footer', 'Footer text'], ['footerNumber', 'Slide number']]],
+];
+const OPTION_LABELS = { solid: 'Solid', gradient: 'Gradient', band: 'Accent band', off: 'Off', drift: 'Slow drift' };
+const MONO = /Consolas|Cascadia|Courier/;
+function masterControl(k) {
+	const f = MASTER_FIELDS[k];
+	if (f === 'color') return `<input type="color" data-k="${k}">`;
+	if (f === 'size') return `<input type="number" min="8" max="200" step="2" data-k="${k}" title="Pixels on the 1600×900 stage">`;
+	if (f === 'font') return `<select data-k="${k}">${Object.keys(FONTS).filter(n => (k === 'codeFont') === MONO.test(n)).map(n => `<option>${n}</option>`).join('')}</select>`;
+	if (f === 'bool') return `<label class="small"><input type="checkbox" data-k="${k}"> Show in footer</label>`;
+	if (Array.isArray(f)) return `<select data-k="${k}">${f.map(v => `<option value="${v}">${OPTION_LABELS[v]}</option>`).join('')}</select>`;
+	return `<input data-k="${k}" placeholder="${k === 'logo' ? 'e.g. ◆ Acme' : 'Uses the deck title'}">`;
+}
+$('#mform').innerHTML = `<div class="row" style="margin:2px 0 6px"><button data-back>← Back to editor</button></div>
+	<h4>Theme preset</h4><div class="row"><select id="mTheme" class="grow">${themeOptions}</select><button id="mReset" title="Remove all overrides">Reset</button></div>
+	<p class="small muted" id="mOv"></p>` +
+	MASTER_GROUPS.map(([h, rows]) => `<h4>${h}</h4>` + rows.map(([k, label]) => `<div class="mrow"><label>${label}</label>${masterControl(k)}<button class="rst" data-reset="${k}" title="Reset to preset">↺</button></div>`).join('')).join('') +
+	`<p class="small muted" style="margin-top:12px">Animated backdrops are off by default, pause under reduced motion, and export as a static frame.</p>
+	<p class="small muted">Saved in the deck's front matter (<code>master:</code>) as the theme plus only the settings you change. Applies to draft previews, draft exports and newly started presentations; running presentations keep their captured master.</p>`;
+
+function syncMasterForm(meta) {
+	const r = meta.master, ov = meta.overrides, n = Object.keys(ov).length, name = THEMES[meta.theme]?.name || meta.theme;
+	$('#mTheme').value = meta.theme; $('#mReset').disabled = !n;
+	$('#mOv').textContent = n ? `${n} override${n > 1 ? 's' : ''} on top of ${name} · switching presets keeps them` : `Using ${name} preset values.`;
+	$$('#mform [data-k]').forEach(el => {
+		const k = el.dataset.k; el.closest('.mrow').classList.toggle('ov', k in ov);
+		if (el === document.activeElement) return;
+		if (el.type === 'checkbox') { el.checked = r[k]; return; }
+		if (el.tagName === 'SELECT' && ![...el.options].some(o => o.value === String(r[k]))) el.add(new Option(`${r[k]} (not installed)`, r[k]));
+		el.value = r[k];
+	});
+	$('#mform [data-k=backdrop]').disabled = r.background !== 'gradient';
+}
+
+function renderMaster(show) {
+	syncMasterForm(show.meta);
+	$('#mgrid').innerHTML = show.slides.map(s => `<div class="thumb mthumb${s.id === active ? ' active' : ''}" data-id="${esc(s.id)}" data-num="${s.num}">${scaled(slideHTML(s, show.meta))}
+		<div class="cap"><span class="num">${s.num}</span><span>${esc(s.title)}</span><span class="grow"></span><span class="muted">${LAYOUTS[s.layout]}</span></div></div>`).join('');
+	observeScalers($('#mgrid'));
+	// Warn about overflow instead of silently clipping (FR-045).
+	const over = $$('#mgrid .mthumb').filter(t => $$('.slide, .body', t).some(b => b.scrollHeight > b.clientHeight + 2));
+	over.forEach(t => t.classList.add('over'));
+	$('#mwarn').innerHTML = over.length ? `<span style="color:var(--warn)">⚠ Content overflows on ${over.map(t => t.dataset.num).join(', ')}; reduce sizes or split the slide</span>` : '<span style="color:var(--ok)">✓ All slides fit</span>';
+}
+
+function applyMaster(k, v) { ta.value = k === 'reset' ? resetMaster(ta.value) : setMaster(ta.value, k, v); markDirty(); render(); }
+$('#mform').addEventListener('input', e => { const el = e.target; if (el.dataset.k && (el.type === 'color' || el.type === 'text')) applyMaster(el.dataset.k, el.value); });
+$('#mform').addEventListener('change', e => { const el = e.target; if (el.dataset.k) applyMaster(el.dataset.k, el.type === 'checkbox' ? el.checked : el.value); });
+$('#mform').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; if (b.dataset.reset) applyMaster(b.dataset.reset, undefined); if ('back' in b.dataset) setView(editView); });
+$('#mTheme').onchange = e => applyMaster('theme', e.target.value);
+$('#mReset').onclick = () => applyMaster('reset');
+$('#mgrid').onclick = e => { const t = e.target.closest('.mthumb'); if (!t) return; active = t.dataset.id; setView(editView); setActive(t.dataset.id, { scrollPreview: true, moveCaret: true }); };
+
+// Same draft document: master and editor are History API views, like /draft/:id/master.
+function setView(v, push = true) {
+	const m = v === 'master', changed = m !== (view === 'master');
+	view = v; if (!m) editView = v;
+	$('#split').hidden = m; $('#masterView').hidden = !m;
+	if (!m) $('#split').className = 'split ' + v;
+	$$('#view button').forEach(x => x.classList.toggle('on', x.dataset.v === v));
+	if (push && changed) history.pushState(null, '', `?deck=${d.id}${m ? '&view=master' : ''}`);
+	render();
+	$(m ? '.mthumb.active' : '.pv.active')?.scrollIntoView({ block: 'nearest' });
+}
+addEventListener('popstate', () => setView(param('view') === 'master' ? 'master' : editView, false));
 
 function markDirty() {
 	$('#save').className = 'pill warn'; $('#save').textContent = '● Saving…';
@@ -67,12 +156,15 @@ function render() {
 	const ok = !deck.errors.length;
 	if (ok) { lastValid = deck; localStorage.setItem('mock-valid-' + d.id, ta.value); }
 	const show = lastValid || deck;
-	$('#diag').className = 'statusbar' + (ok ? '' : ' err');
-	$('#diag').innerHTML = ok ? `✓ No problems · ${show.slides.length} slides · autosave on`
-		: deck.errors.map(e => `⚠ Line ${e.line}: ${esc(e.msg)}`).join(' &nbsp; ') + ' — showing last valid preview';
-	$('#title').textContent = show.meta.title; document.title = show.meta.title + ' · Draft';
+	const warns = ok ? deck.warnings : [];
+	$('#diag').className = 'statusbar' + (ok ? (warns.length ? ' warn' : '') : ' err');
+	$('#diag').innerHTML = !ok ? deck.errors.map(e => `⚠ Line ${e.line}: ${esc(e.msg)}`).join(' &nbsp; ') + ' — showing last valid preview'
+		: warns.length ? warns.map(e => `⚠ Line ${e.line}: ${esc(e.msg)}`).join(' &nbsp; ') + ` · ${show.slides.length} slides`
+		: `✓ No problems · ${show.slides.length} slides · autosave on`;
+	$('#title').textContent = show.meta.title; document.title = show.meta.title + (view === 'master' ? ' · Master' : ' · Draft');
 	$('#theme').value = show.meta.theme;
 	renderOutline(show);
+	if (view === 'master') renderMaster(show);
 	if (document.activeElement?.closest?.('#preview')) return; // do not rebuild while typing in preview
 	$('#preview').innerHTML = show.slides.map(s => `<div class="pv${s.id === active ? ' active' : ''}" id="pv-${esc(s.id)}" data-id="${esc(s.id)}">
 		<div class="pv-h"><span class="num">${s.num}</span><span>${esc(s.title)}</span><span class="grow"></span>
@@ -86,16 +178,16 @@ function renderOutline(show) {
 	const item = s => `<div class="item${s.depth ? '' : ' root'}${s.id === active ? ' active' : ''}" data-id="${esc(s.id)}" style="padding-left:${8 + s.depth * 16}px"><span class="num">${s.num}</span><span class="t">${esc(s.title)}</span></div>`;
 	const sub = s => item(s) + s.children.map(sub).join('');
 	$('#outline').innerHTML = `<h4 style="margin-top:4px">Slides</h4>` + show.roots.map(r => `<div class="sec">${sub(r)}</div>`).join('') +
-		`<h4>Deck</h4><div class="item" onclick="alert('Mock: master view — palette, heading/body/code fonts and sizes, background, logo, footer.')">🎨 Presentation master…</div>`;
+		`<h4>Deck</h4><div class="item${view === 'master' ? ' active' : ''}" data-view="master">🎨 Presentation master</div>`;
 }
 
 function setActive(id, { scrollPreview = false, moveCaret = false } = {}) {
 	active = id;
-	$$('.outline .item, .pv').forEach(el => el.classList.toggle('active', el.dataset.id === id));
+	$$('.outline .item[data-id], .pv, .mthumb').forEach(el => el.classList.toggle('active', el.dataset.id === id));
 	const s = (lastValid || deck).slides.find(x => x.id === id);
 	if (!s) return;
-	if (scrollPreview) $('#pv-' + CSS.escape(id))?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-	if (moveCaret) {
+	if (scrollPreview) (view === 'master' ? $(`.mthumb[data-id="${CSS.escape(id)}"]`) : $('#pv-' + CSS.escape(id)))?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+	if (moveCaret && view !== 'master') {
 		const pos = ta.value.split('\n').slice(0, s.line).join('\n').length + (s.line ? 1 : 0);
 		ta.focus({ preventScroll: true }); ta.setSelectionRange(pos, pos); ta.scrollTop = Math.max(0, s.line * 20 - 60);
 	}
@@ -123,15 +215,18 @@ $('#preview').addEventListener('change', e => { const id = e.target.dataset.layo
 $('#preview').addEventListener('click', e => { const pv = e.target.closest('.pv'); if (pv && !e.target.closest('select,[contenteditable]')) setActive(pv.dataset.id, { moveCaret: true }); });
 $('#theme').onchange = e => { ta.value = setTheme(ta.value, e.target.value); markDirty(); render(); };
 
-$('#outline').onclick = e => { const it = e.target.closest('.item[data-id]'); if (it) setActive(it.dataset.id, { scrollPreview: true, moveCaret: true }); };
-$('#view').onclick = e => { const b = e.target.closest('button'); if (!b) return; $$('#view button').forEach(x => x.classList.toggle('on', x === b)); $('#split').className = 'split ' + b.dataset.v; $('.pv.active')?.scrollIntoView({ block: 'nearest' }); };
+$('#outline').onclick = e => {
+	const it = e.target.closest('.item'); if (!it) return;
+	if (it.dataset.view) setView('master'); else setActive(it.dataset.id, { scrollPreview: true, moveCaret: true });
+};
+$('#view').onclick = e => { const b = e.target.closest('button'); if (b) setView(b.dataset.v); };
 $('#present').onclick = () => {
 	if (deck.errors.length && !confirm('The current draft has problems.\n\nPresent the last valid version instead? (It is older than your current edits.)')) return;
 	saveSource(d.id, ta.value); window.open(`present.html?deck=${d.id}`, '_blank');
 };
 $('#export').onclick = () => window.open(`export.html?deck=${d.id}&from=draft`, '_blank');
 
-render();
+setView(param('view') === 'master' ? 'master' : 'split', false);
 setActive(location.hash.slice(1) || deck.slides[0]?.id, { scrollPreview: true, moveCaret: !!location.hash });
 </script>
 </body>

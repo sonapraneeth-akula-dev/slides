@@ -30,6 +30,7 @@
 	<span class="brand">▦ Slides</span><span class="muted">My Decks</span>
 	<div class="grow"></div>
 	<input id="q" placeholder="Search decks…" style="width:240px">
+	<button onclick="if (confirm('Reset every demo deck to its original sample content? Mock edits are discarded.')) { resetMock(); localStorage.setItem('mock-version', MOCK_VERSION); location.reload(); }" title="Discard mock edits stored in this browser">↺ Reset demo</button>
 	<button onclick="alert('Mock: native file picker. The chosen file is authorized and added to the library.')">Open file…</button>
 	<button class="primary" onclick="alert('Mock: new deck is created in ~/Slides/Decks from a template.')">+ New deck</button>
 </header>
