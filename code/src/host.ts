@@ -126,7 +126,8 @@ export function privateRouter(port: number) {
           const talk = getTalk(talkMatch[1]);
           if (!talkMatch[2] && request.method === 'GET') return response(presenterSession(privateState(talk)));
           if (!talkMatch[2] && request.method === 'DELETE') {
-            endTalk(talk, true);
+            const data = await body(request);
+            endTalk(talk, data.discardMarks === true);
             return response({ ended: true });
           }
           if (talkMatch[2] === 'events' && request.method === 'POST') {

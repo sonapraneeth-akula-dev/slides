@@ -318,6 +318,15 @@ function setAppearance(host: HTMLElement, stage: Stage): void {
     const value = stage.master?.[key];
     host.style.setProperty(`--${key}`, typeof value === 'string' && fonts.has(value) ? `"${value}"` : 'system-ui');
   }
+  const size = (key: string, baseline: number): number => {
+    const value = stage.master?.[key];
+    return typeof value === 'number' && Number.isFinite(value) && value >= 12 && value <= 120
+      ? value / baseline : 1;
+  };
+  const bodyScale = size('bodySize', 32);
+  host.style.setProperty('--bodySize-scale', String(bodyScale));
+  host.style.setProperty('--headingSize-scale', String(size('headingSize', 80) / bodyScale));
+  host.style.setProperty('--codeSize-scale', String(size('codeSize', 32) / bodyScale));
 }
 
 export async function renderStage(host: HTMLElement, stage: Stage, slide: Slide | undefined, step: number): Promise<void> {

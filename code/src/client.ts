@@ -452,13 +452,13 @@ function openSettings(): void {
     input.type = field.type;
     input.value = String(compiled?.master?.[field.name] ?? field.fallback ?? '');
     if (field.type === 'checkbox') input.checked = compiled?.master?.[field.name] === true;
-    if (field.type === 'number') { input.min = '10'; input.max = '120'; }
+    if (field.type === 'number') { input.min = '12'; input.max = '120'; }
     input.addEventListener('change', () => {
       try {
         const value = field.type === 'checkbox' ? input.checked
           : field.type === 'number' ? Number(input.value) : input.value;
-        if (field.type === 'number' && (!Number.isFinite(Number(value)) || Number(value) < 10 || Number(value) > 120)) {
-          throw new Error('Font size must be between 10 and 120.');
+        if (field.type === 'number' && (!Number.isFinite(Number(value)) || Number(value) < 12 || Number(value) > 120)) {
+          throw new Error('Font size must be between 12 and 120.');
         }
         editSource(setMaster(sourceInput.value, field.name, value));
       } catch (error) { errorNotice(error); }
@@ -764,15 +764,13 @@ function wire(): void {
   });
   $('end').addEventListener('click', () => {
     if (!session) return;
-    text('end-warning', session.snapshot.overlay?.strokes?.length
-      ? 'Ink will be discarded. Saving annotations is not available yet.'
-      : 'Audience windows will stop receiving updates.');
+    text('end-warning', 'Audience windows will stop receiving updates. Any ink will be discarded; saving annotations is not available yet.');
     dialog('end-dialog').showModal();
   });
   $('confirm-end').addEventListener('click', async () => {
     if (!session) return;
     try {
-      await request(`/api/sessions/${encodeURIComponent(session.sessionId)}`, 'DELETE');
+      await request(`/api/sessions/${encodeURIComponent(session.sessionId)}`, 'DELETE', { discardMarks: true });
       session = null;
       sharing = false;
       shareUrl = '';

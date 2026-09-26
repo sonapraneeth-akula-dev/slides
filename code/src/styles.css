@@ -113,10 +113,12 @@ a { color: #1752ad; }
 }
 .stage h1, .stage h2, .stage h3 { font-family: var(--headingFont, system-ui); line-height: 1.16; }
 .stage h1, .stage h2 { color: var(--slide-accent); }
-.stage h1 { font-size: 2.5em; }
-.stage h2 { font-size: 1.8em; }
+.stage h1 { font-size: calc(2.5em * var(--headingSize-scale, 1)); }
+.stage h2 { font-size: calc(1.8em * var(--headingSize-scale, 1)); }
+.stage h3 { font-size: calc(1.17em * var(--headingSize-scale, 1)); }
 .stage pre { max-width: 100%; overflow: auto; background: #e5e9f0; padding: .7em; border-radius: 6px; color: #1c2733; }
-.stage pre code { font-family: var(--codeFont, monospace); }
+.stage pre code { font-family: var(--codeFont, monospace); font-size: calc(1em * var(--codeSize-scale, 1)); }
+.stage .slide-markdown { font-size: calc(1em * var(--bodySize-scale, 1)); }
 .stage a { color: var(--slide-accent); }
 .stage blockquote { margin-inline: 0; padding-left: 1em; border-left: 4px solid var(--slide-accent); }
 .stage table { border-collapse: collapse; width: 100%; }

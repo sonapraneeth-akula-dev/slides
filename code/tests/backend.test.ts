@@ -162,6 +162,33 @@ describe('persistent library and presentation', () => {
     expect((await route(request('/api/compile', { 'X-Slides-Token': bootstrap.token }, 'POST', { text: source }))).status).toBe(415);
   });
 
+  test('ending marked talk requires explicit discard over the private API', async () => {
+    const { privateRouter } = await import('../src/host');
+    const route = privateRouter(12345);
+    const bootstrap = await (await route(new Request('http://127.0.0.1:12345/api/bootstrap',
+      { headers: { host: '127.0.0.1:12345' } }))).json();
+    const opened = await library.openDeck(library.deckId('study.md'));
+    const talk = await session.createTalk(opened.id, opened.revision);
+    const headers = { host: '127.0.0.1:12345', 'X-Slides-Token': bootstrap.token, 'Content-Type': 'application/json' };
+    const end = (value: unknown) => route(new Request(`http://127.0.0.1:12345/api/sessions/${talk.id}`,
+      { method: 'DELETE', headers, body: JSON.stringify(value) }));
+    let ended = false;
+    try {
+      session.event(talk, { action: 'stroke', sequence: talk.sequence, stroke: {
+        slideId: talk.slideId, step: 0, tool: 'pen', color: '#ff00aa', width: 5,
+        points: [{ x: 0.1, y: 0.2 }, { x: 0.3, y: 0.4 }]
+      } });
+      expect((await end({})).status).toBe(409);
+      expect((await end({ discardMarks: 'true' })).status).toBe(409);
+      expect(session.getTalk(talk.id).marks).toHaveLength(1);
+      expect((await end({ discardMarks: true })).status).toBe(200);
+      ended = true;
+      expect(() => session.getTalk(talk.id)).toThrow();
+    } finally {
+      if (!ended) session.endTalk(talk, true);
+    }
+  });
+
   test('audience links and LAN server expose only public assets and state', async () => {
     const address = session.shareOptions()[0];
     if (!address) throw new Error('LAN interface required for audience integration test');
