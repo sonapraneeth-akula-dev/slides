@@ -1,0 +1,18 @@
+---
+import ChartGallery from '../components/ChartGallery';
+const rows = Array.from({ length: 1000 }, (_, index) => ({
+  name: `Point ${index}`,
+  value: index % 50,
+  x: index,
+  y: index % 30,
+}));
+const parts = [
+  { name: 'North', value: 40 },
+  { name: 'South', value: 60 },
+];
+---
+<!doctype html>
+<html lang="en">
+  <head><meta charset="utf-8" /><title>Dense chart fixture</title></head>
+  <body><main><h1>Thousand-point chart fixture</h1><ChartGallery rows={rows} parts={parts} colors={['#0f766e', '#b45309', '#1d4ed8']} client:load /></main></body>
+</html>

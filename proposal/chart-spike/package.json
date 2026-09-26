@@ -1,0 +1,29 @@
+{
+  "name": "slides-chart-spike",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "astro build",
+    "check": "astro check",
+    "test": "node --test tests/smoke.mjs"
+  },
+  "dependencies": {
+    "@nivo/bar": "0.99.0",
+    "@nivo/line": "0.99.0",
+    "@nivo/pie": "0.99.0",
+    "@nivo/scatterplot": "0.99.0",
+    "@astrojs/react": "6.0.6",
+    "astro": "7.3.3",
+    "papaparse": "5.7.0",
+    "react": "19.3.0",
+    "react-dom": "19.3.0"
+  },
+  "devDependencies": {
+    "@astrojs/check": "0.9.10",
+    "@types/papaparse": "^5.3.16",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "playwright-core": "1.63.0",
+    "typescript": "^5.9.3"
+  }
+}

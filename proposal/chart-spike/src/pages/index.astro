@@ -1,0 +1,51 @@
+---
+import Papa from 'papaparse';
+import ChartGallery from '../components/ChartGallery';
+import csv from '../data/sales.csv?raw';
+import breakdown from '../data/breakdown.json';
+
+type Row = { name: string; value: number; x: number; y: number };
+const parsed = Papa.parse<Record<string, string>>(csv, { header: true, skipEmptyLines: true });
+if (parsed.errors.length) throw new Error(`Invalid CSV: ${parsed.errors[0].message}`);
+if (csv.length > 1_000_000) throw new Error('CSV chart exceeds 1 MiB');
+if (parsed.data.length > 1000) throw new Error('CSV chart exceeds 1000 points');
+if (parsed.data.some((item) => !item.value?.trim() || !item.x?.trim() || !item.y?.trim())) {
+  throw new Error('CSV chart has an empty number');
+}
+const rows: Row[] = parsed.data.map((item) => ({
+  name: item.name,
+  value: Number(item.value),
+  x: Number(item.x),
+  y: Number(item.y),
+}));
+if (!rows.length || rows.some((row) =>
+  !row.name || !Number.isFinite(row.value) || !Number.isFinite(row.x) || !Number.isFinite(row.y)
+)) throw new Error('CSV rows require a name and finite numeric values');
+if (!breakdown.length || breakdown.some((item) => !item.name || !Number.isFinite(item.value))) {
+  throw new Error('JSON parts require a name and finite numeric value');
+}
+---
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Local chart spike</title>
+    <style>
+      body { font: 16px system-ui; margin: 1.5rem; color: #18202d; background: #fff; }
+      .gallery { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 540px), 1fr)); gap: 1rem; }
+      figure { margin: 0; padding: 1rem; border: 1px solid #bbb; break-inside: avoid; overflow-x: auto; }
+      figure svg { max-width: 100%; height: auto; }
+      figcaption { font-weight: 700; }
+      button { margin: .2rem; }
+      @media print { button, .interactions { display: none; } }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Chart spike: six types, local data, one React island</h1>
+      <p>CSV includes a quoted comma; pie/donut use local JSON. Built-in charts are trusted app code, not authored JSX.</p>
+      <ChartGallery rows={rows} parts={breakdown} colors={['#1d4ed8', '#b45309', '#047857', '#7c3aed']} client:load />
+    </main>
+  </body>
+</html>
