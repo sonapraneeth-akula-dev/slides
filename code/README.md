@@ -12,7 +12,7 @@ bun run build
 bun run start
 ```
 
-Open the loopback URL printed by the host on the same machine. Keep the Bun process running while editing or presenting. `bun run dev` serves the Astro frontend for UI work; it does not replace the Bun host or its APIs. For development checks, run `bun run check` and `bun test`. No cloud account, export pipeline, or CI is configured.
+Open the loopback URL printed by the host on the same machine. Keep the Bun process running while editing or presenting. `bun run dev` serves the Astro frontend for UI work; it does not replace the Bun host or its APIs. For development checks, run `bun run check`, `bun run test`, and `bun run test:e2e` (requires the Playwright Chromium browser; install it with `bunx playwright install chromium` if missing). No cloud account, export pipeline, or CI is configured.
 
 The library can create a starter deck, open an existing absolute `.md`/`.mdx` file path, hide an entry without deleting its file, or relink a moved file. The local library index is stored under `library/`; the deck source stays at its chosen filesystem location. Save edits before presenting. Invalid source remains editable and reports diagnostics; presentation requires a current valid compiled deck.
 

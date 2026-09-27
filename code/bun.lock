@@ -16,6 +16,7 @@
       },
       "devDependencies": {
         "@astrojs/check": "0.9.10",
+        "@playwright/test": "1.60.0",
         "@types/bun": "1.4.2",
         "@types/dompurify": "^3.2.0",
         "@types/highlight.js": "^10.1.0",
@@ -251,6 +252,8 @@
     "@oslojs/encoding": ["@oslojs/encoding@1.1.0", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/@oslojs/encoding/-/encoding-1.1.0.tgz", {}, "sha1-VfPZpZdDCgHype9jxrQvdp+c404="],
 
     "@oxc-project/types": ["@oxc-project/types@0.150.0", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/@oxc-project/types/-/types-0.150.0.tgz", {}, "sha512-rDS5/31E9HfPl/CIzGrn0DOlvBbXFseQ5URJ9sYMfstbKLD/c6Gm9vmRzRGDdAXyOIL4zmO37lc9RIwYqVruZw=="],
+
+    "@playwright/test": ["@playwright/test@1.60.0", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/@playwright/test/-/test-1.60.0.tgz", { "dependencies": { "playwright": "1.60.0" }, "bin": { "playwright": "cli.js" } }, "sha1-5pbDFCfoiChRI1zVVtwkkMMgbZc="],
 
     "@rolldown/binding-android-arm-eabi": ["@rolldown/binding-android-arm-eabi@1.2.9", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/@rolldown/binding-android-arm-eabi/-/binding-android-arm-eabi-1.2.9.tgz", { "os": "android", "cpu": "arm" }, "sha512-tNISae1QEf/vkb3xkRcjV5SEdzPE97We5IVaa2Z8jSszQPZ8U60B/YCYpw4QI7VidYsBtKavczXf+DyDs9WGxw=="],
 
@@ -626,7 +629,7 @@
 
     "fontkitten": ["fontkitten@1.0.3", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/fontkitten/-/fontkitten-1.0.3.tgz", { "dependencies": { "tiny-inflate": "^1.0.3" } }, "sha1-u6/e3bseBUln8IRv3HV6zKuIu2g="],
 
-    "fsevents": ["fsevents@2.3.3", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/fsevents/-/fsevents-2.3.3.tgz", { "os": "darwin" }, "sha1-ysZAd4XQNnWipeGlMFxpezR9kNY="],
+    "fsevents": ["fsevents@2.3.2", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/fsevents/-/fsevents-2.3.2.tgz", { "os": "darwin" }, "sha1-ilJveLj99GI7cJ4Ll1xSwkwC/Ro="],
 
     "get-caller-file": ["get-caller-file@2.0.5", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/get-caller-file/-/get-caller-file-2.0.5.tgz", {}, "sha1-T5RBKoLbMvNuOwuXQfipf+sDH34="],
 
@@ -779,6 +782,10 @@
     "picocolors": ["picocolors@1.1.1", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/picocolors/-/picocolors-1.1.1.tgz", {}, "sha1-PTIa8+q5ObCDyPkpodEs2oHCa2s="],
 
     "picomatch": ["picomatch@4.0.7", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/picomatch/-/picomatch-4.0.7.tgz", {}, "sha1-YxM2ADTMs2s9xh7L3/eBIfkP4h8="],
+
+    "playwright": ["playwright@1.60.0", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/playwright/-/playwright-1.60.0.tgz", { "dependencies": { "playwright-core": "1.60.0" }, "optionalDependencies": { "fsevents": "2.3.2" }, "bin": { "playwright": "cli.js" } }, "sha1-iXEIY6UfIREmM++LaxgllNO/17U="],
+
+    "playwright-core": ["playwright-core@1.60.0", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/playwright-core/-/playwright-core-1.60.0.tgz", { "bin": { "playwright-core": "cli.js" } }, "sha1-JODZzEcwcT213/ys4pteRpaxkHo="],
 
     "points-on-curve": ["points-on-curve@0.2.0", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/points-on-curve/-/points-on-curve-0.2.0.tgz", {}, "sha1-fbuYxDeRhZQ0KEdhMw+ok8uBtNE="],
 
@@ -1009,6 +1016,8 @@
     "svgo/commander": ["commander@11.1.0", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/commander/-/commander-11.1.0.tgz", {}, "sha1-Yv3OdgBqaOXBqzMU3JLoAOuD2QY="],
 
     "unstorage/chokidar": ["chokidar@5.0.0", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/chokidar/-/chokidar-5.0.0.tgz", { "dependencies": { "readdirp": "^5.0.0" } }, "sha1-lJwSapI4qAeSvpoCZZNPCYrzaaU="],
+
+    "vite/fsevents": ["fsevents@2.3.3", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/fsevents/-/fsevents-2.3.3.tgz", { "os": "darwin" }, "sha1-ysZAd4XQNnWipeGlMFxpezR9kNY="],
 
     "vscode-css-languageservice/vscode-languageserver-types": ["vscode-languageserver-types@3.17.5", "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/vscode-languageserver-types/-/vscode-languageserver-types-3.17.5.tgz", {}, "sha1-MnNnbwzy6rQLP0TQhay7fwijnYo="],
 

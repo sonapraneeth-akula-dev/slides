@@ -7,7 +7,8 @@
     "check": "astro check",
     "build": "astro build && bun ./scripts/audience-assets.ts && bun build ./src/host.ts --target=bun --outfile ./build/host.js",
     "start": "bun ./build/host.js",
-    "test": "bun test"
+    "test": "bun test ./tests",
+    "test:e2e": "bun run build && playwright test"
   },
   "dependencies": {
     "astro": "7.3.3",
@@ -26,6 +27,7 @@
     "@types/highlight.js": "^10.1.0",
     "@types/katex": "^0.16.8",
     "@types/markdown-it": "^14.2.0",
+    "@playwright/test": "1.60.0",
     "typescript": "5.9.3"
   }
 }
