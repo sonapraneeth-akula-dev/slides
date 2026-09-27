@@ -5,11 +5,12 @@ function content(items: SlideItem[], step: number, slot = ''): string {
   return items.filter(item => item.step === step && item.slot === slot).map(item => item.text).join('\n').trim();
 }
 
-function slide(source: Pick<SourceSlide, 'id' | 'parent' | 'index' | 'layout' | 'items' | 'reveals'>): Slide {
+function slide(source: Pick<SourceSlide, 'id' | 'parent' | 'index' | 'layout' | 'items' | 'reveals' | 'metadata'> & { section?: string }): Slide {
   const slots: Record<string, string> = {};
   for (const item of source.items) if (item.slot) slots[item.slot] = content(source.items, 0, item.slot);
   return {
     id: source.id, parent: source.parent ?? undefined, index: source.index, layout: source.layout,
+    section: source.section, metadata: source.metadata,
     body: content(source.items, 0),
     slots,
     reveals: Array.from({ length: source.reveals }, (_, index) => content(source.items, index + 1)),
@@ -54,7 +55,8 @@ export interface PublicState {
   stage: {
     title: string;
     master: Record<string, unknown>;
-    slide: Pick<SourceSlide, 'id' | 'index' | 'layout' | 'reveals'> & {
+    total: number;
+    slide: Pick<SourceSlide, 'id' | 'index' | 'layout' | 'reveals' | 'metadata'> & {
       items: Array<Pick<SlideItem, 'text' | 'step' | 'slot'>>;
     };
   };
@@ -90,7 +92,7 @@ export function publicSnapshot(state: PublicState): Snapshot {
     slideId: state.slideId, step: state.step,
     stage: {
       title: state.stage.title, master: state.stage.master,
-      theme: String(state.stage.master.theme ?? 'signal'), slides: [slideContent],
+      theme: String(state.stage.master.theme ?? 'signal'), total: state.stage.total, slides: [slideContent],
     },
     overlay: overlay(state), ended: false,
   };

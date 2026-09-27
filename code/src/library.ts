@@ -1,18 +1,23 @@
 import { createHash, randomUUID } from 'node:crypto';
-import { copyFile, link, mkdir, open, readFile, readdir, realpath, rename, stat, unlink } from 'node:fs/promises';
+import { copyFile, link, lstat, mkdir, open, readFile, readdir, realpath, rename, stat, unlink } from 'node:fs/promises';
 import { constants } from 'node:fs';
+import { homedir } from 'node:os';
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { compileDeck } from './deck';
 
 const extensions = new Set(['.md', '.mdx']);
-export const libraryRoot = resolve(process.env.SLIDES_LIBRARY ?? join(process.cwd(), 'library'));
+export const defaultLibraryRoot = join(homedir(), '.slides');
+const overriddenRoot = process.env.SLIDES_LIBRARY !== undefined;
+export const libraryRoot = resolve(process.env.SLIDES_LIBRARY ?? defaultLibraryRoot);
+export const presentationsRoot = overriddenRoot ? join(libraryRoot, 'presentations') : join(homedir(), 'Presentations');
+export const featureToursRoot = join(libraryRoot, 'feature-tours');
 const locks = new Map<string, Promise<unknown>>();
 const indexPath = join(libraryRoot, '.slides-library.json');
 type Catalog = { entries: Record<string, string>; hidden: string[] };
 let indexLock: Promise<unknown> = Promise.resolve();
-async function catalog(): Promise<Catalog> {
+async function catalogAt(path: string): Promise<Catalog> {
   let content: string;
-  try { content = await readFile(indexPath, 'utf8'); }
+  try { content = await readFile(path, 'utf8'); }
   catch (error) {
     if (error instanceof Error && 'code' in error && error.code === 'ENOENT') return { entries: {}, hidden: [] };
     throw error;
@@ -25,8 +30,174 @@ async function catalog(): Promise<Catalog> {
       !value.hidden.every(id => typeof id === 'string')) throw new LibraryError(500, 'Invalid library index');
   return value as Catalog;
 }
+async function catalog(): Promise<Catalog> { return catalogAt(indexPath); }
+
+export async function migrateLegacyLibrary(legacyRoot: string, destination: string): Promise<void> {
+  legacyRoot = resolve(legacyRoot);
+  destination = resolve(destination);
+  if (legacyRoot === destination) return;
+  const marker = join(destination, '.legacy-library-imported');
+  try { await stat(marker); return; }
+  catch (error) { if (!(error instanceof Error) || !('code' in error) || error.code !== 'ENOENT') throw error; }
+  let oldRoot: string;
+  try { oldRoot = await realpath(legacyRoot); }
+  catch (error) {
+    if (error instanceof Error && 'code' in error && error.code === 'ENOENT') return;
+    throw error;
+  }
+  if (oldRoot !== legacyRoot) throw new LibraryError(403, 'Legacy library is a symlink; import it manually');
+  const previous = await catalogAt(join(legacyRoot, '.slides-library.json'));
+  const current = await catalogAt(join(destination, '.slides-library.json'));
+  const files = new Map<string, string>();
+  async function walk(dir: string, depth: number): Promise<void> {
+    if (depth > 8) return;
+    for (const entry of await readdir(dir, { withFileTypes: true })) {
+      const path = join(dir, entry.name);
+      if (entry.isDirectory()) await walk(path, depth + 1);
+      else if (entry.isFile() && extensions.has(entry.name.slice(entry.name.lastIndexOf('.')).toLowerCase())) {
+        files.set(path, join(destination, relative(legacyRoot, path)));
+      }
+    }
+  }
+  await walk(legacyRoot, 0);
+  const merged: Catalog = { entries: { ...current.entries }, hidden: [...current.hidden] };
+  for (const [id, path] of Object.entries(previous.entries)) {
+    const target = files.get(path) ?? path;
+    if (merged.entries[id] && merged.entries[id] !== target) {
+      throw new LibraryError(409, `Library entry conflict during import: ${id}`);
+    }
+    if (!merged.entries[id]) {
+      merged.entries[id] = target;
+      if (previous.hidden.includes(id)) merged.hidden.push(id);
+    }
+  }
+  for (const [source, target] of files) {
+    try {
+      const existing = await readFile(target);
+      if (!(await readFile(source)).equals(existing)) throw new LibraryError(409, `Deck already exists with different contents: ${target}`);
+    } catch (error) {
+      if (error instanceof Error && 'code' in error && error.code === 'ENOENT') continue;
+      throw error;
+    }
+  }
+  await mkdir(destination, { recursive: true });
+  for (const [source, target] of files) {
+    await mkdir(dirname(target), { recursive: true });
+    try { await copyFile(source, target, constants.COPYFILE_EXCL); }
+    catch (error) {
+      if (!(error instanceof Error) || !('code' in error) || error.code !== 'EEXIST' ||
+          !(await readFile(source)).equals(await readFile(target))) throw error;
+    }
+  }
+  const temp = join(destination, `.slides-library.${randomUUID()}.tmp`);
+  try { await writeIndex(temp, JSON.stringify(merged)); await rename(temp, join(destination, '.slides-library.json')); }
+  catch (error) { await unlink(temp).catch(() => {}); throw error; }
+  await writeIndex(marker, legacyRoot);
+}
+
+function within(root: string, path: string): boolean {
+  const subpath = relative(root, path);
+  return !!subpath && subpath !== '..' && !subpath.startsWith(`..${sep}`) && !isAbsolute(subpath);
+}
+
+export function featureTourDeckId(name: string): string {
+  return deckId(join('feature-tours', name));
+}
+
+export async function organizeLibrary(
+  root = libraryRoot, userRoot = presentationsRoot, toursRoot = featureToursRoot
+): Promise<void> {
+  await mkdir(root, { recursive: true });
+  await mkdir(userRoot, { recursive: true });
+  await mkdir(toursRoot, { recursive: true });
+  if (await realpath(userRoot) !== userRoot || await realpath(toursRoot) !== toursRoot) {
+    throw new LibraryError(403, 'Presentation storage must not be a symlink');
+  }
+  const moves: Array<{ source: string; target: string; id: string }> = [];
+  async function walk(dir: string, depth: number): Promise<void> {
+    if (depth > 8) return;
+    for (const entry of await readdir(dir, { withFileTypes: true })) {
+      const path = join(dir, entry.name);
+      if (entry.isDirectory()) {
+        if (path !== userRoot && path !== toursRoot && path !== join(root, 'assets')) await walk(path, depth + 1);
+      } else if (entry.isFile() && extensions.has(entry.name.slice(entry.name.lastIndexOf('.')).toLowerCase())) {
+        const name = relative(root, path);
+        const tour = /^Slides-Feature-Tour(?:-\d+)?\.md$/.test(entry.name);
+        moves.push({
+          source: path,
+          target: join(tour ? toursRoot : userRoot, name),
+          id: tour ? featureTourDeckId(name) : deckId(name)
+        });
+      }
+    }
+  }
+  await walk(root, 0);
+  if (!moves.length) return;
+  const existing = await catalogAt(join(root, '.slides-library.json'));
+  for (const move of moves) {
+    try {
+      const file = await lstat(move.target);
+      if (!file.isFile() || !(await readFile(move.source)).equals(await readFile(move.target))) {
+        throw new LibraryError(409, `Presentation already exists with different contents: ${move.target}`);
+      }
+    } catch (error) {
+      if (!(error instanceof Error) || !('code' in error) || error.code !== 'ENOENT') throw error;
+    }
+    for (const [id, path] of Object.entries(existing.entries)) {
+      if (path !== move.source || id === move.id) continue;
+      if (existing.entries[move.id] && existing.entries[move.id] !== move.target) {
+        throw new LibraryError(409, `Library entry conflict during organization: ${move.id}`);
+      }
+    }
+  }
+  for (const move of moves) {
+    await mkdir(dirname(move.target), { recursive: true });
+    if (await realpath(dirname(move.target)) !== dirname(move.target)) {
+      throw new LibraryError(403, 'Presentation destination must not be a symlink');
+    }
+    try { await copyFile(move.source, move.target, constants.COPYFILE_EXCL); }
+    catch (error) {
+      if (!(error instanceof Error) || !('code' in error) || error.code !== 'EEXIST') throw error;
+      const file = await lstat(move.target);
+      if (!file.isFile() || !(await readFile(move.source)).equals(await readFile(move.target))) throw error;
+    }
+    if (!(await readFile(move.source)).equals(await readFile(move.target))) {
+      throw new LibraryError(409, `Presentation changed while being organized: ${move.source}`);
+    }
+  }
+  for (const move of moves) {
+    for (const [id, path] of Object.entries(existing.entries)) {
+      if (path !== move.source) continue;
+      delete existing.entries[id];
+      existing.entries[move.id] = move.target;
+      if (id !== move.id && existing.hidden.includes(id)) {
+        existing.hidden = existing.hidden.filter(item => item !== id);
+        existing.hidden.push(move.id);
+      }
+    }
+  }
+  const index = join(root, '.slides-library.json');
+  const temp = `${index}.${randomUUID()}.tmp`;
+  try { await writeIndex(temp, JSON.stringify(existing)); await rename(temp, index); }
+  catch (error) { await unlink(temp).catch(() => {}); throw error; }
+  for (const move of moves) {
+    if (!(await readFile(move.source)).equals(await readFile(move.target))) {
+      throw new LibraryError(409, `Presentation changed while being organized: ${move.source}`);
+    }
+    await unlink(move.source);
+  }
+}
+
+let migration: Promise<void> | undefined;
+function prepareLibrary(): Promise<void> {
+  return migration ??= (async () => {
+    if (!overriddenRoot) await migrateLegacyLibrary(join(process.cwd(), 'library'), libraryRoot);
+    await organizeLibrary();
+  })();
+}
 async function updateCatalog<T>(change: (value: Catalog) => T | Promise<T>): Promise<T> {
   const task = indexLock.catch(() => {}).then(async () => {
+    await prepareLibrary();
     await mkdir(libraryRoot, { recursive: true });
     const value = await catalog();
     const result = await change(value);
@@ -63,6 +234,7 @@ export class LibraryError extends Error {
 }
 
 async function pathFor(id: string, mustExist = true): Promise<string> {
+  await prepareLibrary();
   if (mustExist) {
     const value = await catalog();
     const path = value.entries[id];
@@ -73,13 +245,15 @@ async function pathFor(id: string, mustExist = true): Promise<string> {
     return canonical;
   }
   const name = decode(id);
-  if (!extensions.has(name.slice(name.lastIndexOf('.')).toLowerCase())) throw new LibraryError(400, 'Only .md and .mdx decks are supported');
-  const root = await realpath(libraryRoot);
-  const target = resolve(root, name);
-  if (!relative(root, target) || relative(root, target).startsWith(`..${sep}`) || relative(root, target) === '..' || isAbsolute(relative(root, target))) throw new LibraryError(403, 'Outside library');
-  const parent = await realpath(dirname(target));
-  if (parent !== root && (!relative(root, parent) || relative(root, parent).startsWith(`..${sep}`) || relative(root, parent) === '..')) throw new LibraryError(403, 'Outside library');
-  return target;
+  const tourPrefix = `feature-tours${sep}`;
+  const tour = name.startsWith(tourPrefix);
+  const filename = tour ? name.slice(tourPrefix.length) : name;
+  if (!validName(filename)) throw new LibraryError(400, 'Invalid deck name');
+  const root = tour ? featureToursRoot : presentationsRoot;
+  await mkdir(root, { recursive: true });
+  const canonical = await realpath(root);
+  if (canonical !== root) throw new LibraryError(403, 'Presentation storage must not be a symlink');
+  return join(root, filename);
 }
 
 async function read(id: string) {
@@ -92,32 +266,40 @@ async function read(id: string) {
   return { text, revision, path, info };
 }
 
+export async function filenameTitle(id: string): Promise<string> {
+  return basename(await pathFor(id)).replace(/\.(md|mdx)$/i, '');
+}
+
 export async function openDeck(id: string) {
   const { text, revision } = await read(id);
-  return { id, text, revision, ...compileDeck(text) };
+  return { id, text, revision, ...compileDeck(text, await filenameTitle(id)) };
 }
 
 export async function listDecks() {
-  await mkdir(libraryRoot, { recursive: true });
-  const root = await realpath(libraryRoot);
+  await prepareLibrary();
   const found: Record<string, string> = {};
-  async function walk(dir: string, depth: number) {
+  async function walk(dir: string, root: string, tour: boolean, depth: number) {
     if (depth > 8 || Object.keys(found).length >= 1000) return;
     for (const entry of await readdir(dir, { withFileTypes: true })) {
       const path = join(dir, entry.name);
-      if (entry.isDirectory()) await walk(path, depth + 1);
+      if (entry.isDirectory()) await walk(path, root, tour, depth + 1);
       else if (entry.isFile() && extensions.has(entry.name.slice(entry.name.lastIndexOf('.')).toLowerCase())) {
         const name = relative(root, path);
-        found[deckId(name)] = path;
+        found[tour ? featureTourDeckId(name) : deckId(name)] = path;
       }
     }
   }
-  await walk(root, 0);
+  await walk(presentationsRoot, presentationsRoot, false, 0);
+  await walk(featureToursRoot, featureToursRoot, true, 0);
   return updateCatalog(async value => {
+    const registered = new Set(Object.values(value.entries));
     for (const [id, path] of Object.entries(found)) {
-      if (!value.entries[id]) value.entries[id] = path;
+      if (registered.has(path)) continue;
+      if (value.entries[id] && value.entries[id] !== path) throw new LibraryError(409, `Library entry conflict: ${id}`);
+      value.entries[id] = path;
+      registered.add(path);
     }
-    const decks: { id: string; name: string; title: string; path: string; missing: boolean }[] = [];
+    const decks: { id: string; name: string; title: string; path: string; missing: boolean; kind: 'tour' | 'presentation' }[] = [];
     for (const [id, path] of Object.entries(value.entries)) {
       if (value.hidden.includes(id)) continue;
       let missing = false;
@@ -129,7 +311,8 @@ export async function listDecks() {
         else throw error;
       }
       const name = basename(path);
-      decks.push({ id, name, title: name.replace(/\.(md|mdx)$/i, ''), path, missing });
+      decks.push({ id, name, title: name.replace(/\.(md|mdx)$/i, ''), path, missing,
+        kind: within(featureToursRoot, path) ? 'tour' : 'presentation' });
     }
     return decks.sort((a, b) => a.name.localeCompare(b.name));
   });
@@ -142,10 +325,9 @@ export async function grantDeck(path: string, relinkId?: string) {
   const canonical = await realpath(path);
   if (canonical !== resolve(path) || !(await stat(canonical)).isFile()) throw new LibraryError(403, 'Select a regular file, not a symlink');
   if ((await stat(canonical)).size > 2_000_000) throw new LibraryError(400, 'Deck exceeds 2 MB');
-  const root = await realpath(libraryRoot);
-  const inside = relative(root, canonical);
-  const id = inside && !inside.startsWith(`..${sep}`) && inside !== '..' && !isAbsolute(inside) && !relinkId
-    ? deckId(inside) : relinkId || `ext-${randomUUID()}`;
+  await prepareLibrary();
+  const id = relinkId || (within(featureToursRoot, canonical) ? featureTourDeckId(relative(featureToursRoot, canonical))
+    : within(presentationsRoot, canonical) ? deckId(relative(presentationsRoot, canonical)) : `ext-${randomUUID()}`);
   await updateCatalog(value => {
     if (relinkId && !Object.hasOwn(value.entries, relinkId)) throw new LibraryError(404, 'Library entry not found');
     if (Object.entries(value.entries).some(([other, item]) => other !== id && item === canonical && !value.hidden.includes(other))) {
@@ -164,17 +346,18 @@ export async function removeDeck(id: string) {
   });
 }
 
-export async function createDeck(name: string, text: string) {
+export async function createDeck(name: string, text: string, kind: 'presentation' | 'tour' = 'presentation') {
   if (!validName(name) || typeof text !== 'string') throw new LibraryError(400, 'Invalid deck name or source');
   const compiled = compileDeck(text);
   if (!compiled.deck) throw new LibraryError(422, 'Invalid source', compiled.diagnostics);
-  await mkdir(libraryRoot, { recursive: true });
-  const path = await pathFor(deckId(name), false);
+  await prepareLibrary();
+  const id = kind === 'tour' ? featureTourDeckId(name) : deckId(name);
+  const path = await pathFor(id, false);
   const handle = await open(path, 'wx');
   try { await handle.writeFile(text); await handle.sync(); }
   finally { await handle.close(); }
-  await updateCatalog(value => { value.entries[deckId(name)] = path; value.hidden = value.hidden.filter(id => id !== deckId(name)); });
-  return openDeck(deckId(name));
+  await updateCatalog(value => { value.entries[id] = path; value.hidden = value.hidden.filter(item => item !== id); });
+  return openDeck(id);
 }
 
 export async function duplicateDeck(id: string, name: string) {
@@ -192,7 +375,8 @@ export async function renameDeck(id: string, name: string, baseRevision: string)
   if (source.revision !== baseRevision) throw new LibraryError(409, 'Deck changed on disk', {
     diskRevision: source.revision, diskText: source.text
   });
-  const destination = await pathFor(deckId(name), false);
+  const nextId = within(featureToursRoot, source.path) ? featureTourDeckId(name) : deckId(name);
+  const destination = await pathFor(nextId, false);
   if (destination.toLowerCase() === source.path.toLowerCase()) return openDeck(id);
   await link(source.path, destination);
   try { await unlink(source.path); }
@@ -202,9 +386,9 @@ export async function renameDeck(id: string, name: string, baseRevision: string)
   }
   await updateCatalog(value => {
     delete value.entries[id];
-    value.entries[deckId(name)] = destination;
+    value.entries[nextId] = destination;
   });
-  return openDeck(deckId(name));
+  return openDeck(nextId);
 }
 
 export async function deleteDeck(id: string, baseRevision: string, confirm: boolean) {
@@ -254,7 +438,7 @@ export async function saveDeck(id: string, baseRevision: string, text: string) {
     }
     const persisted = await read(id);
     if (persisted.text !== text) throw new LibraryError(500, 'Saved bytes differ from requested source');
-    return { revision: persisted.revision, ...compileDeck(text) };
+    return { revision: persisted.revision, ...compileDeck(text, await filenameTitle(id)) };
   });
   locks.set(id, task);
   try { return await task; }

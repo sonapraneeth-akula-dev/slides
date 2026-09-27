@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 540" role="img" aria-labelledby="title">
+  <title id="title">Illustrated mountain landscape</title>
+  <defs>
+    <linearGradient id="sky" x2="0" y2="1">
+      <stop stop-color="#8bcce8"/>
+      <stop offset="1" stop-color="#f7e4bb"/>
+    </linearGradient>
+  </defs>
+  <rect width="960" height="540" fill="url(#sky)"/>
+  <circle cx="733" cy="132" r="67" fill="#fff5cf"/>
+  <path d="M0 407 215 151 423 407Z" fill="#476887"/>
+  <path d="m135 247 80-96 79 96-80-35Z" fill="#eaf1ed"/>
+  <path d="M281 423 575 102 920 423Z" fill="#324c70"/>
+  <path d="m480 206 95-104 112 104-111-35Z" fill="#f3f6e8"/>
+  <path d="M0 439q205-109 444-23t516-22v146H0Z" fill="#6fa282"/>
+  <path d="M0 476q249-77 486-12t474-14v90H0Z" fill="#386b69"/>
+</svg>

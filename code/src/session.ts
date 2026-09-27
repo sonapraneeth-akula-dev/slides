@@ -1,8 +1,10 @@
 import { randomBytes, randomUUID } from 'node:crypto';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { networkInterfaces } from 'node:os';
 import { join } from 'node:path';
 import { publicAssetPath } from './asset-path';
+import { sampleImageResponse } from './sample-image';
+import { sampleImageUrl } from './sample-image-reference';
 import { audienceProjection, type Deck } from './deck';
 import { LibraryError, openDeck } from './library';
 import { publicSnapshot } from './presentation-model';
@@ -121,7 +123,9 @@ export function startShare(talk: Talk, address: string, start: number, end: numb
   if (talk.share) throw new LibraryError(409, 'Already sharing');
   if (!shareOptions().includes(address)) throw new LibraryError(400, 'Select an available LAN interface');
   if (!Number.isSafeInteger(start) || !Number.isSafeInteger(end) || start < 1024 || end > 65535 || end < start || end - start > 100) throw new LibraryError(400, 'Invalid port range');
-  const audienceAssets: string[] = JSON.parse(readFileSync(join(process.cwd(), 'build', 'audience-assets.json'), 'utf8'));
+  const manifest = join(process.cwd(), 'build', 'audience-assets.json');
+  if (!existsSync(manifest)) throw new LibraryError(409, 'Build audience assets with bun run build before sharing on LAN.');
+  const audienceAssets: string[] = JSON.parse(readFileSync(manifest, 'utf8'));
   const allowedAssets = new Set(audienceAssets);
   const key = randomBytes(32).toString('base64url');
   let server: ReturnType<typeof Bun.serve> | undefined;
@@ -136,6 +140,13 @@ export function startShare(talk: Talk, address: string, start: number, end: numb
           if (url.pathname === '/state') {
             if (request.headers.get('X-Slides-Public') !== key) return new Response('Forbidden', { status: 403 });
             return Response.json(publicSnapshot(publicState(talk)), { headers: { 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' } });
+          }
+          if (url.pathname === sampleImageUrl) {
+            try { return await sampleImageResponse(request.method); }
+            catch (error) {
+              if (error instanceof LibraryError) return new Response(error.message, { status: error.status });
+              throw error;
+            }
           }
           const asset = publicAssetPath(url.pathname);
           if (!asset || !allowedAssets.has(asset)) return new Response('Not found', { status: 404 });

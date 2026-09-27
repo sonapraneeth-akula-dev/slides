@@ -1,11 +1,15 @@
-import { addSlide, clearTheme, editableLine, layouts, replacePlainLine, setLayout, setMaster, setTheme, themeNames } from './source-edit';
-import { markdown, overlayMode, renderStage, type Deck, type Slide, type Snapshot, type Stroke } from './render';
+import { clearTheme, editableLines, hasUniqueSlideIds, insertSlide, layouts, propagateSlideIdChange, replacePlainLine, setDeckTitle, setLayout, setMaster, setSlideMetadata, setSlideSection, setTheme, themeNames } from './source-edit';
+import { markdown, overlayMode, renderStage, themePresets, type Deck, type Slide, type Snapshot, type Stage, type Stroke } from './render';
 import { drawStage } from './stage-view';
+import { masterSamples } from './master-samples';
+import { metadataPositions, metadataValues, type MetadataKey } from './slide-options';
+import { validFontFamily } from './font-family';
 
-type LibraryEntry = { id: string; name: string; path: string; missing?: boolean };
+type LibraryEntry = { id: string; name: string; path: string; kind: 'tour' | 'presentation'; missing?: boolean };
 type Diagnostic = { severity: string; message: string; code?: string; sourceSpan?: { start?: number; end?: number }; slideId?: string };
 type DeckResponse = { text: string; revision: string; deck: Deck | null; diagnostics: Diagnostic[] };
 type SessionResponse = { sessionId: string; localKey: string; snapshot: Snapshot; notes: Record<string, string> };
+type BootstrapResponse = { token: string; library: LibraryEntry[]; devMode: boolean };
 type Page = 'library' | 'editor' | 'presentation';
 type View = 'source' | 'split' | 'preview';
 
@@ -22,6 +26,8 @@ let library: LibraryEntry[] = [];
 let deckId = '';
 let revision = '';
 let savedText = '';
+let sourceNewline: '\n' | '\r\n' = '\n';
+let lastRenamableSource = '';
 let validText = '';
 let compiled: Deck | null = null;
 let selected = '';
@@ -40,18 +46,47 @@ let drawing: { points: Array<{ x: number; y: number }>; pointer: number } | null
 let eventPending = false;
 let sessionStart = 0;
 let toastTimer: ReturnType<typeof setTimeout> | undefined;
+const outlineCollapsed = new Set<string>();
+const previewCollapsed = new Set<string>();
 
 class ApiError extends Error {
   constructor(readonly status: number, message: string, readonly data: unknown) { super(message); }
 }
 
+async function loadBootstrap(): Promise<BootstrapResponse> {
+  const response = await fetch('/api/bootstrap', { cache: 'no-store' });
+  if (!response.ok) throw new Error(`Bootstrap failed (${response.status}). Start with bun run dev or bun run start.`);
+  const data: unknown = await response.json();
+  if (!data || typeof data !== 'object' || !('token' in data) || typeof data.token !== 'string' ||
+      !data.token || !('library' in data) || !Array.isArray(data.library) ||
+      !('devMode' in data) || typeof data.devMode !== 'boolean') {
+    throw new Error('Application bootstrap returned invalid data.');
+  }
+  return data as BootstrapResponse;
+}
+
 async function request<T>(path: string, method = 'GET', body?: object): Promise<T> {
-  const response = await fetch(path, {
+  const payload = body ? JSON.stringify(body) : undefined;
+  const send = () => fetch(path, {
     method,
     headers: { 'X-Slides-Token': token, ...(body ? { 'Content-Type': 'application/json' } : {}) },
-    ...(body ? { body: JSON.stringify(body) } : {}),
+    ...(payload ? { body: payload } : {}),
   });
-  const data: unknown = response.status === 204 ? null : await response.json();
+  const read = async (response: Response): Promise<unknown> => {
+    if (response.status === 204) return null;
+    if (!response.headers.get('content-type')?.includes('application/json')) {
+      throw new Error(`Application API returned a non-JSON response (${response.status}). Start the app with bun run dev or bun run start.`);
+    }
+    return response.json();
+  };
+  let response = await send();
+  let data = await read(response);
+  if (response.status === 403 && data && typeof data === 'object' && 'error' in data &&
+      data.error === 'Owner token required') {
+    token = (await loadBootstrap()).token;
+    response = await send();
+    data = await read(response);
+  }
   if (!response.ok) {
     const detail = data && typeof data === 'object' && 'error' in data && typeof data.error === 'string'
       ? data.error : `Request failed (${response.status}).`;
@@ -77,12 +112,20 @@ function show(next: Page): void {
   }
   $('editor-actions').hidden = next !== 'editor';
   $('presenter-actions').hidden = next !== 'presentation';
+  $('edit-title').hidden = next !== 'editor';
+  $('title-input').hidden = true;
+  $('page-title').hidden = next === 'library';
   $('app').setAttribute('aria-busy', 'false');
 }
 function errorNotice(error: unknown): void { notify(message(error)); }
 function dialog(id: string): HTMLDialogElement { return $<HTMLDialogElement>(id); }
-function selectedSlide(): Slide | undefined { return compiled?.slides.find(slide => slide.id === selected); }
 function isDirty(): boolean { return !!deckId && sourceInput.value !== savedText; }
+function updateSaveButton(): void {
+  $('save').toggleAttribute('disabled', page !== 'editor' || !isDirty() || !!saving);
+}
+function optionLabel(value: string): string {
+  return value.replace(/-/g, ' ').replace(/\b[a-z]/g, letter => letter.toUpperCase());
+}
 function status(value: string, warn = false): void {
   const pill = $('save-status');
   pill.hidden = false;
@@ -91,10 +134,16 @@ function status(value: string, warn = false): void {
 }
 
 function renderLibrary(): void {
-  text('library-count', `${library.length} deck${library.length === 1 ? '' : 's'}`);
+  const personal = library.filter(entry => entry.kind !== 'tour');
+  const tours = library.filter(entry => entry.kind === 'tour');
+  text('library-count', `${personal.length} presentation${personal.length === 1 ? '' : 's'}`);
+  text('tour-count', `${tours.length} tour${tours.length === 1 ? '' : 's'}`);
   const list = $('deck-list');
+  const tourList = $('tour-list');
   list.replaceChildren();
-  if (!library.length) list.textContent = 'No decks yet. Create or open a file to get started.';
+  tourList.replaceChildren();
+  if (!personal.length) list.textContent = 'No presentations yet. Create or open one to get started.';
+  if (!tours.length) tourList.textContent = 'No feature tours yet. Explore the latest tour above.';
   for (const entry of library) {
     const card = document.createElement('article');
     card.className = 'deck-card';
@@ -138,7 +187,7 @@ function renderLibrary(): void {
       card.append(missing);
     }
     card.append(actions);
-    list.append(card);
+    (entry.kind === 'tour' ? tourList : list).append(card);
   }
 }
 
@@ -148,7 +197,7 @@ async function libraryAction(payload: object): Promise<void> {
     library = result.library;
     renderLibrary();
     const entry = payload as { action: string; id?: string; name?: string; path?: string };
-    if (entry.action === 'create' || entry.action === 'open') {
+    if (entry.action === 'create' || entry.action === 'open' || entry.action === 'demo') {
       const added = library.find(item => item.id === result.id);
       if (added) await openDeck(added.id);
       else notify('Added to library. Select the deck to edit it.');
@@ -165,10 +214,15 @@ async function openDeck(id: string): Promise<void> {
     clearTimeout(compileTimer);
     ++compileGeneration;
     deckId = id;
-    sourceInput.value = savedText = result.text;
+    sourceNewline = result.text.includes('\r\n') ? '\r\n' : '\n';
+    sourceInput.value = result.text;
+    savedText = sourceInput.value;
+    lastRenamableSource = savedText;
     revision = result.revision;
     compiled = result.deck;
-    validText = result.deck ? result.text : '';
+    outlineCollapsed.clear();
+    previewCollapsed.clear();
+    validText = result.deck ? savedText : '';
     conflicted = false;
     diskConflict = null;
     selected = result.deck?.order[0] || result.deck?.slides[0]?.id || '';
@@ -178,6 +232,7 @@ async function openDeck(id: string): Promise<void> {
     show('editor');
     updateDiagnostics(result.diagnostics);
     updateEditor();
+    updateSaveButton();
     if (result.deck) status('Saved');
     else status('Source has errors — edit to preview', true);
   } catch (error) { errorNotice(error); }
@@ -188,8 +243,16 @@ function setView(next: View): void {
   $('master-pane').hidden = true;
   $('editor-panes').hidden = false;
   $('editor-panes').dataset.view = next;
-  for (const button of document.querySelectorAll<HTMLButtonElement>('[data-view]')) {
-    button.setAttribute('aria-pressed', String(button.dataset.view === next));
+  syncEditorNavigation();
+}
+function syncEditorNavigation(): void {
+  const settingsActive = !$('master-pane').hidden;
+  for (const button of document.querySelectorAll<HTMLButtonElement>('button[data-view]')) {
+    button.setAttribute('aria-pressed', String(!settingsActive && button.dataset.view === view));
+  }
+  document.querySelector('#settings-button')?.setAttribute('aria-current', settingsActive ? 'page' : 'false');
+  for (const button of document.querySelectorAll<HTMLButtonElement>('.outline-item')) {
+    button.setAttribute('aria-current', String(!settingsActive && button.dataset.slideId === selected));
   }
 }
 function updateDiagnostics(diagnostics: Diagnostic[] = []): void {
@@ -214,10 +277,55 @@ function updateDiagnostics(diagnostics: Diagnostic[] = []): void {
 }
 
 function selectSlide(id: string): void {
+  if (!$('master-pane').hidden) setView(view);
   selected = id;
+  const group = groupSlides(compiled?.slides || []).find(item => item.slides.some(slide => slide.id === id));
+  if (group) {
+    outlineCollapsed.delete(group.key);
+    previewCollapsed.delete(group.key);
+  }
   updateEditor();
   const card = [...document.querySelectorAll<HTMLElement>('.preview-card')].find(item => item.dataset.slideId === id);
   card?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+}
+
+function sectionName(slide: Slide): string {
+  if (slide.section) return slide.section;
+  if (slide.layout === 'blank') return 'Blank slides';
+  if (slide.layout.startsWith('title-image-')) return 'Title slides';
+  if (slide.body.includes('```chart')) return 'Chart slides';
+  if (slide.body.includes('```mermaid')) return 'Diagram slides';
+  if (slide.layout === 'image-full' || slide.layout === 'picture-text' ||
+      slide.body.includes('![') || Object.values(slide.slots).some(value => value.includes('!['))) return 'Image slides';
+  if (slide.body.includes('```')) return 'Code slides';
+  if (!Object.keys(slide.slots).length && !slide.reveals.length &&
+      /^# [^\n]+(?:\n+\S[^\n]*)?\s*$/.test(slide.body.trim())) return 'Title slides';
+  return 'Content slides';
+}
+
+function groupSlides(slides: Slide[]): Array<{ key: string; name: string; slides: Slide[] }> {
+  const groups: Array<{ key: string; name: string; slides: Slide[] }> = [];
+  for (const slide of slides) {
+    const name = sectionName(slide);
+    const previous = groups.at(-1);
+    if (previous?.name === name) previous.slides.push(slide);
+    else groups.push({ key: slide.id, name, slides: [slide] });
+  }
+  return groups;
+}
+
+function sectionGroup(name: string, count: number, key: string, collapsed: Set<string>): HTMLDetailsElement {
+  const group = document.createElement('details');
+  group.className = 'slide-group';
+  group.open = !collapsed.has(key);
+  const summary = document.createElement('summary');
+  summary.textContent = `${name} · ${count} ${count === 1 ? 'slide' : 'slides'}`;
+  group.append(summary);
+  group.addEventListener('toggle', () => {
+    if (group.open) collapsed.delete(key);
+    else collapsed.add(key);
+  });
+  return group;
 }
 
 function updateOutline(): void {
@@ -235,100 +343,196 @@ function updateOutline(): void {
     else setView(view);
   });
   outline.append(settings);
+  const list = document.createElement('div');
+  list.className = 'outline-slides';
+  outline.append(list);
   const slides = compiled?.slides || [];
   const byId = new Map(slides.map(slide => [slide.id, slide]));
-  for (const slide of slides) {
-    let depth = 0;
-    let parent = slide.parent;
-    const seen = new Set<string>();
-    while (parent && byId.has(parent) && !seen.has(parent)) {
-      seen.add(parent);
-      depth++;
-      parent = byId.get(parent)?.parent;
+  for (const { key, name, slides: members } of groupSlides(slides)) {
+    const group = sectionGroup(name, members.length, key, outlineCollapsed);
+    list.append(group);
+    for (const slide of members) {
+      let depth = 0;
+      let parent = slide.parent;
+      const seen = new Set<string>();
+      while (parent && byId.has(parent) && !seen.has(parent)) {
+        seen.add(parent);
+        depth++;
+        parent = byId.get(parent)?.parent;
+      }
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'outline-item';
+      button.dataset.slideId = slide.id;
+      button.style.paddingInlineStart = `${12 + Math.min(depth, 5) * 16}px`;
+      button.textContent = `${slide.index + 1}. ${slide.body.match(/^#{1,3}\s+(.+)$/m)?.[1] || slide.id}`;
+      button.addEventListener('click', () => selectSlide(slide.id));
+      group.append(button);
     }
+  }
+  const actions = document.createElement('div');
+  actions.className = 'outline-actions';
+  const addButton = (label: string, parent?: string): HTMLButtonElement => {
     const button = document.createElement('button');
     button.type = 'button';
-    button.className = 'outline-item';
-    button.style.paddingInlineStart = `${12 + Math.min(depth, 5) * 16}px`;
-    button.setAttribute('aria-current', slide.id === selected ? 'true' : 'false');
-    button.textContent = `${slide.index + 1}. ${slide.body.match(/^#{1,3}\s+(.+)$/m)?.[1] || slide.id}`;
-    button.addEventListener('click', () => selectSlide(slide.id));
-    outline.append(button);
-  }
-  const add = document.createElement('button');
-  add.type = 'button';
-  add.className = 'add-slide';
-  add.textContent = '+ Add slide';
-  add.addEventListener('click', () => editSource(addSlide(sourceInput.value)));
-  outline.append(add);
-  if (selected) {
-    const child = document.createElement('button');
-    child.type = 'button';
-    child.className = 'add-slide';
-    child.textContent = '+ Add child slide';
-    child.addEventListener('click', () => editSource(addSlide(sourceInput.value, selected)));
-    outline.append(child);
-  }
+    button.className = 'add-slide';
+    const icon = document.createElement('span');
+    icon.className = 'add-slide-icon';
+    icon.setAttribute('aria-hidden', 'true');
+    icon.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 6v12M6 12h12"/></svg>';
+    button.append(icon, document.createTextNode(label));
+    button.addEventListener('click', () => {
+      try {
+        const added = insertSlide(sourceInput.value, parent, parent ? undefined : selected || undefined);
+        if (!$('master-pane').hidden) setView(view);
+        editSource(added.text);
+        selected = added.id;
+        sourceInput.focus();
+        sourceInput.setSelectionRange(added.start, added.start);
+      }
+      catch (error) { errorNotice(error); }
+    });
+    return button;
+  };
+  actions.append(addButton('Add slide'));
+  if (selected) actions.append(addButton('Add child slide', selected));
+  outline.append(actions);
+  syncEditorNavigation();
 }
 
 async function updatePreview(): Promise<void> {
   const list = $('preview');
+  if (document.activeElement instanceof HTMLElement &&
+      document.activeElement.closest('#preview [contenteditable="plaintext-only"]')) return;
+  const openOptions = new Set([...list.querySelectorAll<HTMLDetailsElement>('.slide-options[open]')]
+    .map(item => item.dataset.slideId));
   list.replaceChildren();
   const deck = compiled;
   if (!deck) {
     list.textContent = 'Fix source diagnostics to restore preview.';
     return;
   }
-  for (const slide of deck.slides) {
-    const card = document.createElement('article');
-    card.className = 'preview-card';
-    card.dataset.slideId = slide.id;
-    if (slide.id === selected) card.classList.add('selected');
-    const heading = document.createElement('div');
-    heading.className = 'preview-heading';
-    const label = document.createElement('strong');
-    label.textContent = `${slide.index + 1} · ${slide.id}`;
-    const layout = document.createElement('select');
-    layout.setAttribute('aria-label', `Layout for slide ${slide.index + 1}`);
-    for (const name of layouts) layout.add(new Option(name.replace(/-/g, ' '), name));
-    layout.value = slide.layout;
-    layout.disabled = !canEditPreview();
-    layout.addEventListener('change', () => {
-      try { editSource(setLayout(sourceInput.value, slide.id, layout.value)); }
-      catch (error) { errorNotice(error); }
-    });
-    heading.append(label, layout);
-    const stage = document.createElement('div');
-    stage.className = 'stage preview-stage';
-    stage.addEventListener('click', () => { selected = slide.id; updateOutline(); });
-    card.append(heading, stage);
-    list.append(card);
-    void renderStage(stage, deck, slide, slide.reveals.length).then(() => {
-      if (!card.isConnected || compiled !== deck || !canEditPreview()) return;
-      const line = editableLine(sourceInput.value, slide.id, slide.body);
-      const paragraph = stage.querySelector<HTMLElement>('.slide-markdown > p');
-      if (!line || !paragraph || paragraph.textContent !== line.display) return;
-      paragraph.contentEditable = 'plaintext-only';
-      paragraph.setAttribute('role', 'textbox');
-      paragraph.setAttribute('aria-label', `Edit plain text on slide ${slide.index + 1}`);
-      paragraph.setAttribute('aria-multiline', 'false');
-      paragraph.title = 'Click to edit this plain-text paragraph';
-      let canceled = false;
-      paragraph.addEventListener('keydown', event => {
-        if (event.key === 'Escape') { canceled = true; paragraph.textContent = line.display; paragraph.blur(); }
-        if (event.key === 'Enter') { event.preventDefault(); paragraph.blur(); }
-        event.stopPropagation();
-      });
-      paragraph.addEventListener('blur', () => {
-        if (canceled || paragraph.textContent === line.display) return;
-        if (!canEditPreview() || sourceInput.value.slice(line.start, line.end) !== line.text) {
-          notify('Preview changed while editing; draft was not modified.');
-          return;
-        }
-        try { editSource(replacePlainLine(sourceInput.value, line, paragraph.textContent || '')); }
+  for (const { key, name, slides } of groupSlides(deck.slides)) {
+    const group = sectionGroup(name, slides.length, key, previewCollapsed);
+    const deferred: Array<() => void> = [];
+    list.append(group);
+    for (const slide of slides) {
+      const card = document.createElement('article');
+      card.className = 'preview-card';
+      card.dataset.slideId = slide.id;
+      if (slide.id === selected) card.classList.add('selected');
+      const heading = document.createElement('div');
+      heading.className = 'preview-heading';
+      const label = document.createElement('strong');
+      label.textContent = `${slide.index + 1} · ${slide.id}`;
+      const type = document.createElement('span');
+      type.className = 'layout-type';
+      type.textContent = optionLabel(slide.layout);
+      const layout = document.createElement('select');
+      layout.setAttribute('aria-label', `Layout for slide ${slide.index + 1}`);
+      for (const name of layouts) layout.add(new Option(optionLabel(name), name));
+      layout.value = slide.layout;
+      layout.disabled = !canEditPreview();
+      layout.addEventListener('change', () => {
+        try { editSource(setLayout(sourceInput.value, slide.id, layout.value)); }
         catch (error) { errorNotice(error); }
       });
-    }).catch(errorNotice);
+      heading.append(label, type, layout);
+      const options = document.createElement('details');
+      options.className = 'slide-options';
+      options.dataset.slideId = slide.id;
+      options.open = openOptions.has(slide.id);
+      const summary = document.createElement('summary');
+      summary.textContent = 'Section and slide metadata';
+      const fields = document.createElement('div');
+      fields.className = 'slide-options-fields';
+      const sectionLabel = document.createElement('label');
+      sectionLabel.textContent = 'Section';
+      const sectionInput = document.createElement('input');
+      sectionInput.type = 'text';
+      sectionInput.maxLength = 60;
+      sectionInput.value = slide.section || '';
+      sectionInput.placeholder = `Automatic: ${sectionName({ ...slide, section: undefined })}`;
+      sectionInput.disabled = !canEditPreview();
+      sectionInput.setAttribute('aria-label', `Section for slide ${slide.index + 1}`);
+      sectionInput.addEventListener('change', () => {
+        try { editSource(setSlideSection(sourceInput.value, slide.id, sectionInput.value || undefined)); }
+        catch (error) { errorNotice(error); }
+      });
+      sectionLabel.append(sectionInput);
+      fields.append(sectionLabel);
+      for (const position of metadataPositions) {
+        const field = `metadata${position}` as MetadataKey;
+        const fieldLabel = document.createElement('label');
+        fieldLabel.textContent = position.replace(/(Top|Bottom)(Left|Center|Right)/, '$1 $2');
+        const select = document.createElement('select');
+        select.setAttribute('aria-label', `Slide ${slide.index + 1} ${position.replace(/([a-z])([A-Z])/, '$1-$2').toLowerCase()} metadata override`);
+        select.add(new Option('Inherit master setting', ''));
+        for (const value of metadataValues) select.add(new Option(optionLabel(value), value));
+        select.value = slide.metadata?.[field] || '';
+        select.disabled = !canEditPreview();
+        select.addEventListener('change', () => {
+          try { editSource(setSlideMetadata(sourceInput.value, slide.id, field, select.value || undefined)); }
+          catch (error) { errorNotice(error); }
+        });
+        fieldLabel.append(select);
+        fields.append(fieldLabel);
+      }
+      options.append(summary, fields);
+      const stage = document.createElement('div');
+      stage.className = 'stage preview-stage';
+      stage.addEventListener('click', () => { selected = slide.id; updateOutline(); });
+      card.append(heading, options, stage);
+      group.append(card);
+      const draw = () => {
+        if (stage.dataset.rendered) return;
+        stage.dataset.rendered = 'true';
+        void renderStage(stage, deck, slide, slide.reveals.length).then(() => {
+          if (!card.isConnected || compiled !== deck || !canEditPreview()) return;
+          const sourceLines = editableLines(sourceInput.value, slide.id, slide.body);
+          const rendered = stage.querySelector('.slide-content > .slide-markdown');
+          if (!rendered?.classList.contains('slide-markdown')) return;
+          const paragraphs = new Map<string, HTMLElement[]>();
+          for (const element of rendered.children) {
+            if (!(element instanceof HTMLParagraphElement)) continue;
+            const value = element.textContent || '';
+            paragraphs.set(value, [...paragraphs.get(value) || [], element]);
+          }
+          const byText = new Map<string, typeof sourceLines>();
+          for (const line of sourceLines) byText.set(line.display, [...byText.get(line.display) || [], line]);
+          for (const [value, lines] of byText) {
+            const matches = paragraphs.get(value);
+            if (!matches || matches.length !== lines.length) continue;
+            matches.forEach((paragraph, index) => {
+              const line = lines[index];
+              paragraph.contentEditable = 'plaintext-only';
+              paragraph.setAttribute('role', 'textbox');
+              paragraph.setAttribute('aria-label', `Edit plain text on slide ${slide.index + 1}, paragraph ${sourceLines.indexOf(line) + 1}`);
+              paragraph.setAttribute('aria-multiline', 'false');
+              paragraph.title = 'Click to edit this plain-text paragraph';
+              let canceled = false;
+              paragraph.addEventListener('keydown', event => {
+                if (event.key === 'Escape') { canceled = true; paragraph.textContent = line.display; paragraph.blur(); }
+                if (event.key === 'Enter') { event.preventDefault(); paragraph.blur(); }
+                event.stopPropagation();
+              });
+              paragraph.addEventListener('blur', () => {
+                if (canceled || paragraph.textContent === line.display) return;
+                if (!canEditPreview() || sourceInput.value.slice(line.start, line.end) !== line.text) {
+                  notify('Preview changed while editing; draft was not modified.');
+                  return;
+                }
+                try { editSource(replacePlainLine(sourceInput.value, line, paragraph.textContent || '')); }
+                catch (error) { errorNotice(error); }
+              });
+            });
+          }
+        }).catch(errorNotice);
+      };
+      deferred.push(draw);
+      if (group.open) draw();
+    }
+    group.addEventListener('toggle', () => { if (group.open) deferred.forEach(draw => draw()); });
   }
 }
 
@@ -351,13 +555,21 @@ function editSource(value: string): void {
 function scheduleCompile(): void {
   const generation = ++compileGeneration;
   validText = '';
+  for (const paragraph of $('preview').querySelectorAll<HTMLElement>('[contenteditable="plaintext-only"]')) {
+    paragraph.removeAttribute('contenteditable');
+    paragraph.removeAttribute('role');
+    paragraph.removeAttribute('aria-label');
+    paragraph.removeAttribute('aria-multiline');
+    paragraph.removeAttribute('title');
+  }
+  $('preview-label').textContent = 'Preview edits paused until source is valid and current';
   status('Compiling draft…', true);
   $('present').setAttribute('disabled', '');
   clearTimeout(compileTimer);
   compileTimer = setTimeout(async () => {
     const draft = sourceInput.value;
     try {
-      const result = await request<{ deck: Deck | null; diagnostics: Diagnostic[] }>('/api/compile', 'POST', { text: draft });
+      const result = await request<{ deck: Deck | null; diagnostics: Diagnostic[] }>('/api/compile', 'POST', { text: draft, deckId });
       if (generation !== compileGeneration || draft !== sourceInput.value || page !== 'editor') return;
       updateDiagnostics(result.diagnostics);
       if (result.deck && !result.diagnostics.some(item => item.severity === 'error')) {
@@ -391,7 +603,8 @@ async function save(): Promise<boolean> {
   saving = (async () => {
     try {
       const result = await request<{ revision: string; deck: Deck | null; diagnostics: Diagnostic[] }>(
-        `/api/decks/${encodeURIComponent(deckId)}`, 'PUT', { baseRevision, text: draft });
+        `/api/decks/${encodeURIComponent(deckId)}`, 'PUT',
+        { baseRevision, text: draft.replace(/\r?\n/g, sourceNewline) });
       revision = result.revision;
       savedText = draft;
       if (sourceInput.value === draft) {
@@ -417,8 +630,12 @@ async function save(): Promise<boolean> {
         status('Disk conflict — draft retained', true);
       } else status(`Save failed — draft retained: ${message(error)}`, true);
       return false;
-    } finally { saving = undefined; }
+    } finally {
+      saving = undefined;
+      updateSaveButton();
+    }
   })();
+  updateSaveButton();
   return saving;
 }
 function scheduleSave(): void {
@@ -426,50 +643,203 @@ function scheduleSave(): void {
   saveTimer = setTimeout(() => { if (page === 'editor' && !conflicted) void save(); }, 1500);
 }
 
-const masterFields: Array<{ name: string; label: string; type: 'color' | 'text' | 'number' | 'checkbox'; fallback?: string }> = [
-  { name: 'surface', label: 'Surface', type: 'color', fallback: '#ffffff' },
-  { name: 'text', label: 'Text color', type: 'color', fallback: '#1b1f24' },
-  { name: 'accent', label: 'Accent', type: 'color', fallback: '#2563eb' },
-  { name: 'muted', label: 'Muted text', type: 'color', fallback: '#5b6470' },
-  { name: 'headingFont', label: 'Heading font', type: 'text' },
-  { name: 'bodyFont', label: 'Body font', type: 'text' },
-  { name: 'codeFont', label: 'Code font', type: 'text' },
-  { name: 'headingSize', label: 'Heading size', type: 'number' },
-  { name: 'bodySize', label: 'Body size', type: 'number' },
-  { name: 'codeSize', label: 'Code size', type: 'number' },
-  { name: 'footer', label: 'Footer text', type: 'text' },
-  { name: 'footerNumber', label: 'Slide number in footer', type: 'checkbox' },
+const masterSections = ['Theme', 'Heading', 'Body', 'Code', 'Placements', 'Margins', 'Padding'] as const;
+let selectedMasterSample = 4;
+type MasterField = {
+  section: typeof masterSections[number]; name: string; label: string;
+  type: 'color' | 'text' | 'font' | 'number' | 'select'; fallback?: string; min?: number; max?: number;
+};
+type LocalFontWindow = Window & { queryLocalFonts?: () => Promise<Array<{ family: string }>> };
+let installedFontFamilies: string[] | null = null;
+function fontOptions(select: HTMLSelectElement, current: string, code: boolean): void {
+  select.replaceChildren();
+  select.add(new Option(code ? 'System monospace (default)' : 'System font (default)', ''));
+  for (const family of installedFontFamilies ?? []) select.add(new Option(family, family));
+  if (current && ![...select.options].some(option => option.value === current)) {
+    select.add(new Option(`${current} (saved font)`, current));
+  }
+  select.value = current;
+}
+const masterFields: MasterField[] = [
+  { section: 'Theme', name: 'theme', label: 'Theme', type: 'select' },
+  { section: 'Theme', name: 'surface', label: 'Surface', type: 'color' },
+  { section: 'Theme', name: 'text', label: 'Text color', type: 'color' },
+  { section: 'Theme', name: 'accent', label: 'Accent', type: 'color' },
+  { section: 'Theme', name: 'muted', label: 'Muted text', type: 'color' },
+  { section: 'Heading', name: 'headingPlacement', label: 'Heading placement', type: 'select', fallback: 'left' },
+  { section: 'Heading', name: 'headingFont', label: 'Heading font', type: 'font' },
+  { section: 'Heading', name: 'headingSize', label: 'Heading size', type: 'number', min: 12, max: 120, fallback: '80' },
+  { section: 'Body', name: 'bodyFont', label: 'Body font', type: 'font' },
+  { section: 'Body', name: 'bodySize', label: 'Body size', type: 'number', min: 12, max: 120, fallback: '32' },
+  { section: 'Code', name: 'codeFont', label: 'Code font', type: 'font' },
+  { section: 'Code', name: 'codeSize', label: 'Code size', type: 'number', min: 12, max: 120, fallback: '32' },
+  { section: 'Placements', name: 'footer', label: 'Footer text', type: 'text' },
+  { section: 'Placements', name: 'logo', label: 'Logo text', type: 'text' },
+  ...(['TopLeft', 'TopCenter', 'TopRight', 'BottomLeft', 'BottomCenter', 'BottomRight'] as const)
+    .map(position => ({
+      section: 'Placements' as const, name: `metadata${position}`, label: position.replace(/(Top|Bottom)(Left|Center|Right)/, '$1 $2'),
+      type: 'select' as const
+    })),
+  ...(['Top', 'Right', 'Bottom', 'Left'] as const).flatMap(direction => [
+    { section: 'Margins' as const, name: `margin${direction}`, label: `${direction} margin (%)`, type: 'number' as const, min: 0, max: 20, fallback: '5' },
+    { section: 'Padding' as const, name: `padding${direction}`, label: `${direction} padding (%)`, type: 'number' as const, min: 0, max: 20, fallback: '0' }
+  ]),
 ];
 function openSettings(): void {
   $('editor-panes').hidden = true;
   $('master-pane').hidden = false;
+  syncEditorNavigation();
   const fields = $('settings-fields');
   fields.replaceChildren();
+  const sections = new Map(masterSections.map(section => {
+    const fieldset = document.createElement('fieldset');
+    fieldset.className = 'settings-section';
+    const legend = document.createElement('legend');
+    legend.textContent = section;
+    fieldset.append(legend);
+    fields.append(fieldset);
+    return [section, fieldset] as const;
+  }));
+  const master = compiled?.master || {};
+  const preset = themePresets[compiled?.theme || 'signal'] || themePresets.signal;
+  const fontSelects = new Map<string, HTMLSelectElement>();
   for (const field of masterFields) {
     const label = document.createElement('label');
     label.textContent = field.label;
-    const input = document.createElement('input');
-    input.type = field.type;
-    input.value = String(compiled?.master?.[field.name] ?? field.fallback ?? '');
-    if (field.type === 'checkbox') input.checked = compiled?.master?.[field.name] === true;
-    if (field.type === 'number') { input.min = '12'; input.max = '120'; }
+    const input = ['select', 'number', 'font'].includes(field.type)
+      ? document.createElement('select') : document.createElement('input');
+    const current = String(master[field.name] ?? (
+      field.name === 'theme' ? compiled?.theme || 'signal'
+        : field.name === 'metadataBottomLeft' && master.footer &&
+          !Object.entries(master).some(([key, value]) => key.startsWith('metadata') && value === 'footer') ? 'footer'
+          : field.name === 'metadataBottomRight' && master.footerNumber &&
+            !Object.entries(master).some(([key, value]) => key.startsWith('metadata') && value === 'slideNumber') ? 'slideNumber'
+            : preset[field.name] ?? field.fallback ?? (field.type === 'select' ? 'none' : '')));
+    if (input instanceof HTMLSelectElement) {
+      if (field.type === 'font') {
+        fontOptions(input, current, field.name === 'codeFont');
+        fontSelects.set(field.name, input);
+      } else if (field.type === 'number') {
+        for (let number = field.min!; number <= field.max!; number++) {
+          input.add(new Option(String(number), String(number)));
+        }
+        if (current && ![...input.options].some(option => option.value === current)) {
+          input.add(new Option(`${current} (saved value)`, current));
+        }
+      } else {
+        const options = field.name === 'theme' ? themeNames.map(name => [name, name])
+          : field.name === 'headingPlacement' ? [['left', 'Left'], ['center', 'Center'], ['right', 'Right']]
+          : [
+            ['none', 'None'], ['slideNumber', 'Slide number / total'], ['deckTitle', 'Presentation title'],
+            ['slideTitle', 'Slide title'], ['footer', 'Footer text'], ['logo', 'Logo text']
+          ];
+        for (const [name, caption] of options) input.add(new Option(optionLabel(caption), name));
+      }
+    }
+    if (input instanceof HTMLInputElement) input.type = field.type;
+    input.value = current;
     input.addEventListener('change', () => {
       try {
-        const value = field.type === 'checkbox' ? input.checked
-          : field.type === 'number' ? Number(input.value) : input.value;
-        if (field.type === 'number' && (!Number.isFinite(Number(value)) || Number(value) < 12 || Number(value) > 120)) {
-          throw new Error('Font size must be between 12 and 120.');
+        const value = field.type === 'number' ? Number(input.value) : input.value;
+        if (field.type === 'number' && (!input.value.trim() || !Number.isFinite(value as number) ||
+          Number(value) < field.min! || Number(value) > field.max!)) {
+          throw new Error(`${field.label} must be between ${field.min} and ${field.max}.`);
         }
-        editSource(setMaster(sourceInput.value, field.name, value));
+        if (field.type === 'font' && input.value && !validFontFamily(input.value)) {
+          throw new Error(`${field.label} is not a valid font family.`);
+        }
+        editSource(field.name === 'theme' ? setTheme(sourceInput.value, String(value))
+          : setMaster(sourceInput.value, field.name, field.type === 'font' && !input.value ? undefined : value));
       } catch (error) { errorNotice(error); }
     });
     label.append(input);
-    fields.append(label);
+    sections.get(field.section)!.append(label);
   }
+  const fontPicker = document.createElement('div');
+  fontPicker.className = 'font-picker';
+  const browseFonts = document.createElement('button');
+  browseFonts.type = 'button';
+  browseFonts.textContent = 'Browse installed fonts';
+  const fontStatus = document.createElement('p');
+  fontStatus.setAttribute('role', 'status');
+  const fontWindow = window as LocalFontWindow;
+  if (!fontWindow.queryLocalFonts) {
+    browseFonts.disabled = true;
+    fontStatus.textContent = 'This browser cannot list installed fonts. System defaults and saved fonts remain available.';
+  } else {
+    fontStatus.textContent = installedFontFamilies
+      ? `${installedFontFamilies.length} installed font families available.`
+      : 'Choose Browse to allow access to installed fonts for the heading, body, and code lists.';
+    browseFonts.addEventListener('click', async () => {
+      browseFonts.disabled = true;
+      try {
+        const families = [...new Set((await fontWindow.queryLocalFonts!())
+          .map(font => font.family).filter(validFontFamily))].sort((a, b) => a.localeCompare(b));
+        if (!families.length) throw new Error('No installed font families were shared by the browser.');
+        installedFontFamilies = families;
+        if (!browseFonts.isConnected) return;
+        for (const [name, select] of fontSelects) fontOptions(select, select.value, name === 'codeFont');
+        fontStatus.textContent = `${families.length} installed font families available.`;
+      } catch (error) {
+        if (browseFonts.isConnected) fontStatus.textContent = `Unable to list installed fonts: ${message(error)}`;
+      } finally { browseFonts.disabled = false; }
+    });
+  }
+  fontPicker.append(browseFonts, fontStatus);
+  sections.get('Heading')!.append(fontPicker);
   const preview = $('master-preview');
   preview.replaceChildren();
-  const slide = selectedSlide();
-  if (compiled) void renderStage(preview, compiled, slide, slide?.reveals.length || 0).catch(errorNotice);
+  const heading = document.createElement('h2');
+  heading.textContent = 'Live layout samples';
+  const caption = document.createElement('p');
+  caption.textContent = 'Select a sample to see how master settings affect it. Samples do not change your deck.';
+  preview.append(heading, caption);
+  if (!compiled) {
+    preview.append(document.createTextNode('Fix source diagnostics to see the preview.'));
+    return;
+  }
+  const stage: Stage = { title: compiled.title, theme: compiled.theme, master, slides: masterSamples.map(sample => sample.slide) };
+  const area = document.createElement('div');
+  area.className = 'master-preview-body';
+  const viewer = document.createElement('section');
+  viewer.className = 'sample-viewer';
+  viewer.setAttribute('aria-label', 'Selected layout sample');
+  const list = document.createElement('nav');
+  list.className = 'sample-list';
+  list.setAttribute('aria-label', 'Sample slide layouts');
+  let currentSection = '';
+  let section: HTMLDetailsElement | undefined;
+  const buttons = masterSamples.map(({ section: category, title }, index) => {
+    if (category !== currentSection) {
+      currentSection = category;
+      const count = masterSamples.filter((sample, position) => position >= index && sample.section === category).length;
+      section = sectionGroup(category, count, `sample-${index}`, new Set());
+      list.append(section);
+    }
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.textContent = `${index + 1}. ${title}`;
+    button.addEventListener('click', () => selectSample(index));
+    section!.append(button);
+    return button;
+  });
+  const selectSample = (index: number): void => {
+    selectedMasterSample = index;
+    const { title: sampleTitle, slide } = masterSamples[index];
+    const title = document.createElement('h3');
+    title.textContent = sampleTitle;
+    const layout = document.createElement('span');
+    layout.className = 'layout-type';
+    layout.textContent = optionLabel(slide.layout);
+    const surface = document.createElement('div');
+    surface.className = 'stage';
+    viewer.replaceChildren(title, layout, surface);
+    buttons.forEach((button, position) => button.setAttribute('aria-current', String(position === index)));
+    void renderStage(surface, stage, slide, 0).catch(errorNotice);
+  };
+  area.append(viewer, list);
+  preview.append(area);
+  selectSample(selectedMasterSample);
 }
 
 function currentSlide(snapshot: Snapshot): Slide | undefined {
@@ -493,7 +863,7 @@ function drawPresenter(): void {
   $('speaker-notes').replaceChildren(markdown(notes));
   const jump = $<HTMLSelectElement>('jump');
   jump.replaceChildren();
-  slides.forEach((item, position) => jump.add(new Option(`${position + 1}. ${item.body.match(/^#{1,3}\s+(.+)$/m)?.[1] || item.id}`, item.id)));
+  slides.forEach((item, position) => jump.add(new Option(`${position + 1}. ${optionLabel(item.body.match(/^#{1,3}\s+(.+)$/m)?.[1] || item.id)}`, item.id)));
   jump.value = snapshot.slideId;
   const byId = new Map(slides.map(item => [item.id, item]));
   const children = slides.filter(item => item.parent === snapshot.slideId);
@@ -593,12 +963,17 @@ function presenterKeys(event: KeyboardEvent): void {
 }
 
 function wire(): void {
-  $<HTMLSelectElement>('theme').replaceChildren(...themeNames.map(name => new Option(name, name)));
+  $<HTMLSelectElement>('theme').replaceChildren(...themeNames.map(name => new Option(optionLabel(name), name)));
   $('create').addEventListener('click', () => {
     const name = $<HTMLInputElement>('deck-name').value.trim();
     if (!name) { notify('Enter a deck name.'); return; }
+    if (/\.[A-Za-z0-9]+$/.test(name) && !/\.(?:md|mdx)$/i.test(name)) {
+      notify('Deck filenames must end in .md or .mdx.');
+      return;
+    }
     void libraryAction({ action: 'create', name });
   });
+  $('open-demo').addEventListener('click', () => void libraryAction({ action: 'demo' }));
   $('open').addEventListener('click', () => {
     const input = $<HTMLInputElement>('deck-path');
     const path = input.value.trim();
@@ -616,18 +991,59 @@ function wire(): void {
     if (isDirty() && !confirm('Leave without saving your draft?')) return;
     clearTimeout(saveTimer);
     deckId = '';
+    lastRenamableSource = '';
     show('library');
-    text('page-title', 'Local presentations');
+    updateSaveButton();
+    text('page-title', '');
     $('save-status').hidden = true;
   });
-  for (const button of document.querySelectorAll<HTMLButtonElement>('[data-view]')) {
+  $('edit-title').addEventListener('click', () => {
+    const input = $<HTMLInputElement>('title-input');
+    input.value = compiled?.title || '';
+    $('edit-title').hidden = true;
+    $('page-title').hidden = true;
+    input.hidden = false;
+    input.focus();
+    input.select();
+  });
+  $<HTMLInputElement>('title-input').addEventListener('keydown', event => {
+    if (event.key === 'Escape') { $('title-input').hidden = true; $('page-title').hidden = false; $('edit-title').hidden = false; }
+    if (event.key === 'Enter') {
+      try {
+        editSource(setDeckTitle(sourceInput.value, $<HTMLInputElement>('title-input').value));
+        $('title-input').hidden = true;
+        $('page-title').hidden = false;
+        $('edit-title').hidden = false;
+      } catch (error) { errorNotice(error); }
+    }
+  });
+  for (const button of document.querySelectorAll<HTMLButtonElement>('button[data-view]')) {
     button.addEventListener('click', () => setView(button.dataset.view as View));
   }
   $<HTMLSelectElement>('theme').addEventListener('change', event => {
     try { editSource(setTheme(sourceInput.value, (event.target as HTMLSelectElement).value)); }
     catch (error) { errorNotice(error); }
   });
-  sourceInput.addEventListener('input', () => { scheduleCompile(); scheduleSave(); });
+  sourceInput.addEventListener('input', () => {
+    try {
+      const change = propagateSlideIdChange(lastRenamableSource, sourceInput.value);
+      if (change) {
+        if (change.text !== sourceInput.value) {
+          const start = sourceInput.selectionStart;
+          const end = sourceInput.selectionEnd;
+          const shifted = (position: number) => position + change.replacements
+            .filter(replacement => replacement.end <= position).length * (change.newId.length - change.oldId.length);
+          sourceInput.value = change.text;
+          if (document.activeElement === sourceInput) sourceInput.setSelectionRange(shifted(start), shifted(end));
+        }
+        if (selected === change.oldId) selected = change.newId;
+      }
+    } catch (error) { errorNotice(error); }
+    if (hasUniqueSlideIds(sourceInput.value)) lastRenamableSource = sourceInput.value;
+    updateSaveButton();
+    scheduleCompile();
+    scheduleSave();
+  });
   sourceInput.addEventListener('keydown', event => {
     if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's') {
       event.preventDefault();
@@ -646,8 +1062,11 @@ function wire(): void {
   $('use-disk').addEventListener('click', () => {
     if (!diskConflict) return;
     revision = diskConflict.diskRevision;
-    savedText = diskConflict.diskText;
-    sourceInput.value = savedText;
+    sourceNewline = diskConflict.diskText.includes('\r\n') ? '\r\n' : '\n';
+    sourceInput.value = diskConflict.diskText;
+    savedText = sourceInput.value;
+    lastRenamableSource = savedText;
+    updateSaveButton();
     conflicted = false;
     diskConflict = null;
     dialog('conflict-dialog').close();
@@ -656,7 +1075,8 @@ function wire(): void {
   $('keep-draft').addEventListener('click', () => {
     if (!diskConflict) return;
     revision = diskConflict.diskRevision;
-    savedText = diskConflict.diskText;
+    sourceNewline = diskConflict.diskText.includes('\r\n') ? '\r\n' : '\n';
+    savedText = diskConflict.diskText.replace(/\r\n/g, '\n');
     conflicted = false;
     diskConflict = null;
     dialog('conflict-dialog').close();
@@ -666,7 +1086,10 @@ function wire(): void {
     if (!confirm('Remove presentation master overrides from the source?')) return;
     try {
       let source = sourceInput.value;
-      for (const field of masterFields) source = setMaster(source, field.name);
+      for (const field of masterFields) if (field.name !== 'theme') source = setMaster(source, field.name);
+      source = setMaster(source, 'background');
+      source = setMaster(source, 'backdrop');
+      source = setMaster(source, 'footerNumber');
       source = clearTheme(source);
       editSource(source);
       openSettings();
@@ -769,17 +1192,23 @@ function wire(): void {
   });
   $('confirm-end').addEventListener('click', async () => {
     if (!session) return;
+    let alreadyStopped = false;
     try {
       await request(`/api/sessions/${encodeURIComponent(session.sessionId)}`, 'DELETE', { discardMarks: true });
-      session = null;
-      sharing = false;
-      shareUrl = '';
-      tool = null;
-      dialog('end-dialog').close();
-      show('editor');
-      text('page-title', compiled?.title || 'Editor');
-      updateEditor();
-    } catch (error) { errorNotice(error); }
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 404 && error.message === 'Presentation not found') {
+        alreadyStopped = true;
+      } else { errorNotice(error); return; }
+    }
+    session = null;
+    sharing = false;
+    shareUrl = '';
+    tool = null;
+    dialog('end-dialog').close();
+    show('editor');
+    text('page-title', compiled?.title || 'Editor');
+    updateEditor();
+    if (alreadyStopped) notify('Presentation is no longer active. Returned to the editor.');
   });
   document.addEventListener('keydown', presenterKeys);
   window.addEventListener('beforeunload', event => {
@@ -795,15 +1224,16 @@ function wire(): void {
 async function init(): Promise<void> {
   wire();
   try {
-    const bootstrap = await fetch('/api/bootstrap', { cache: 'no-store' });
-    if (!bootstrap.ok) throw new Error(`Bootstrap failed (${bootstrap.status}).`);
-    const response = await bootstrap.json() as { token: string; library: LibraryEntry[] };
+    const response = await loadBootstrap();
     token = response.token;
     library = response.library;
+    $('dev-mode').hidden = response.devMode !== true;
     renderLibrary();
     show('library');
   } catch (error) {
     show('library');
+    $<HTMLButtonElement>('create').disabled = true;
+    $<HTMLButtonElement>('open').disabled = true;
     status(`Unable to load library: ${message(error)}`, true);
   }
 }

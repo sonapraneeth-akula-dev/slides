@@ -1,0 +1,165 @@
+import { expect, test } from '@playwright/test';
+import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
+import { createServer } from 'node:net';
+import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
+let directory: string;
+let server: ChildProcessWithoutNullStreams;
+let origin: string;
+
+async function availablePort(): Promise<number> {
+  const listener = createServer();
+  const port = await new Promise<number>((resolve, reject) => {
+    listener.once('error', reject);
+    listener.listen(0, '127.0.0.1', () => {
+      const address = listener.address();
+      if (!address || typeof address === 'string') reject(new Error('No UI port available'));
+      else resolve(address.port);
+    });
+  });
+  await new Promise<void>(resolve => listener.close(() => resolve()));
+  return port;
+}
+
+test.beforeAll(async () => {
+  test.setTimeout(60_000);
+  directory = await mkdtemp(join(tmpdir(), 'slides-dev-browser-'));
+  const port = await availablePort();
+  server = spawn('bun', ['run', 'dev'], {
+    cwd: process.cwd(),
+    env: { ...process.env, SLIDES_LIBRARY: directory, SLIDES_DEV_PORT: String(port) },
+  });
+  origin = await new Promise<string>((resolve, reject) => {
+    const timeout = setTimeout(() => reject(new Error(`Development server did not start: ${output}`)), 55_000);
+    let output = '';
+    const fail = (error: Error) => { clearTimeout(timeout); reject(error); };
+    server.once('error', fail);
+    server.once('exit', code => fail(new Error(`Development server exited (${code}): ${output}`)));
+    server.stdout.on('data', (chunk: Buffer) => {
+      output += chunk.toString();
+      const url = /Slides development: (http:\/\/127\.0\.0\.1:\d+)/.exec(output)?.[1];
+      if (url) { clearTimeout(timeout); resolve(url); }
+    });
+    server.stderr.on('data', (chunk: Buffer) => { output += chunk.toString(); });
+  });
+});
+
+test.afterAll(async () => {
+  if (server && server.exitCode === null) {
+    const stopped = new Promise<void>(resolve => server.once('exit', () => resolve()));
+    server.kill();
+    await stopped;
+  }
+  if (directory) await rm(directory, { recursive: true, force: true });
+});
+
+test('integrated dev mode serves live UI and API, creates a deck from its title', async ({ page, request }) => {
+  await page.goto(origin);
+  await expect(page.locator('#dev-mode')).toBeVisible();
+  const sampleImage = await request.get(`${origin}/api/sample-image`);
+  expect(sampleImage.status()).toBe(200);
+  expect(sampleImage.headers()['content-type']).toBe('image/svg+xml');
+  expect(await readFile(join(directory, 'assets', 'sample-landscape.svg'), 'utf8')).toContain('<svg');
+  await expect(page.locator('#dev-mode')).toHaveCSS('background-color', 'rgb(169, 37, 53)');
+  expect(await page.locator('script[src*="/@vite/client"]').count()).toBeGreaterThan(0);
+  expect((await request.get(`${origin}/api/bootstrap`, { headers: { Origin: 'http://untrusted.test' } })).status()).toBe(403);
+  await page.setViewportSize({ width: 2000, height: 1250 });
+  await page.evaluate(() => { document.documentElement.style.zoom = '1.25'; });
+  await page.locator('#open-demo').click();
+  await page.locator('button[data-view="preview"]').click();
+  await expect(page.locator('.preview-card[data-slide-id="diagram"] .special-fence svg')).toBeVisible();
+  const previewDiagram = await page.locator('.preview-card[data-slide-id="diagram"] .preview-stage').evaluate(stage => {
+    const svg = stage.querySelector('.special-fence svg')!;
+    const surface = stage.getBoundingClientRect();
+    const bounds = svg.getBoundingClientRect();
+    const nodes = [...svg.querySelectorAll('.node')].map(node => node.getBoundingClientRect());
+    return { svgWidth: bounds.width, stageWidth: surface.width,
+      nodes: nodes.length,
+      centered: nodes.every(node => Math.abs((node.left + node.right) / 2 - (surface.left + surface.right) / 2) < surface.width * .12),
+      contained: nodes.every(node => node.left >= bounds.left && node.right <= bounds.right &&
+        node.top >= bounds.top && node.bottom <= bounds.bottom) };
+  });
+  expect(previewDiagram.svgWidth).toBeGreaterThan(previewDiagram.stageWidth * .7);
+  expect(previewDiagram.nodes).toBe(4);
+  expect(previewDiagram.centered).toBe(true);
+  expect(previewDiagram.contained).toBe(true);
+  await page.evaluate(() => { document.documentElement.style.zoom = ''; });
+  await page.locator('#home').click();
+  await page.locator('#deck-name').fill('example.txt');
+  await page.locator('#create').click();
+  await expect(page.locator('#toast')).toContainText('must end in .md or .mdx');
+  await page.locator('#deck-name').fill('Test Presentation');
+  await page.locator('#create').click();
+  await expect(page.locator('#editor-page')).toBeVisible();
+  await expect(page.locator('#source-file')).toContainText('Test-Presentation.md');
+  await expect(page.locator('#page-title')).toHaveText('Test Presentation');
+  await page.locator('#settings-button').click();
+  const samples = page.locator('#master-preview .sample-list button');
+  const viewer = page.locator('#master-preview .sample-viewer');
+  for (const width of [1280, 1920]) {
+    await page.setViewportSize({ width, height: width === 1280 ? 720 : 1080 });
+    for (const index of [2, 7, 8, 9, 10, 11, 14, 15, 16, 17]) {
+      await samples.nth(index).click();
+      const visuals = viewer.locator(index < 14 ? 'img.slide-image'
+        : index < 17 ? '.chart-visual canvas' : '.special-fence[data-kind="mermaid"] svg');
+      const count = index === 7 ? 2 : 1;
+      await expect(visuals).toHaveCount(count);
+      for (let item = 0; item < count; item++) {
+        const visual = visuals.nth(item);
+        await expect(visual).toBeVisible();
+        const measurement = await visual.evaluate(element => {
+          const stage = element.closest('.stage')!.getBoundingClientRect();
+          const rect = element.getBoundingClientRect();
+          return { top: rect.top - stage.top, bottom: stage.bottom - rect.bottom, width: rect.width, height: rect.height };
+        });
+        expect(measurement.top).toBeGreaterThanOrEqual(0);
+        expect(measurement.bottom).toBeGreaterThanOrEqual(0);
+        expect(measurement.width).toBeGreaterThan(0);
+        expect(measurement.height).toBeGreaterThan(0);
+        if (index < 14) {
+          await expect.poll(() => visual.evaluate(image => (image as HTMLImageElement).naturalWidth)).toBeGreaterThan(0);
+        } else if (index < 17) {
+          await expect.poll(() => visual.evaluate(element => {
+            const canvas = element as HTMLCanvasElement;
+            const pixels = canvas.getContext('2d')?.getImageData(0, 0, canvas.width, canvas.height).data;
+            return !!pixels && pixels.some((channel, offset) => offset % 4 === 3 && channel > 0);
+          })).toBe(true);
+        } else {
+          await expect(visual.locator('path')).not.toHaveCount(0);
+        }
+      }
+    }
+  }
+  await page.locator('button[data-view="split"]').click();
+  await expect(page.locator('.editor-buttons > button, .view-buttons > button')).toHaveCount(5);
+  expect(await page.locator('.editor-buttons > button svg, .view-buttons > button svg').count()).toBe(5);
+  await expect(page.locator('#save')).toBeDisabled();
+  await expect(page.locator('#source')).toHaveValue(/title: "Test Presentation"/);
+  const file = join(directory, 'presentations', 'Test-Presentation.md');
+  await expect.poll(async () => readFile(file, 'utf8')).toContain('title: "Test Presentation"');
+  await page.locator('#source').fill('::slide{id="welcome"}\n# Updated in development\n');
+  await expect.poll(async () => readFile(file, 'utf8')).toContain('Updated in development');
+  await expect(page.locator('#save-status')).toHaveText('Saved');
+
+  await page.locator('#source').fill(`::slide{id="welcome"}
+# Welcome
+
+::slide{id="child" parent="welcome"}
+# Child
+
+::slide{id="sibling" parent="welcome"}
+# Sibling
+
+::slide{id="late" parent="child"}
+# Late
+`);
+  await expect(page.locator('.preview-card')).toHaveCount(4);
+  await page.getByRole('button', { name: '2. Child', exact: true }).click();
+  await page.getByRole('button', { name: 'Add child slide', exact: true }).click();
+  const reordered = await page.locator('#source').inputValue();
+  expect([...reordered.matchAll(/^::slide\{id="([^"]+)"/gm)].map(match => match[1]))
+    .toEqual(['welcome', 'child', 'late', expect.stringMatching(/^slide-[\da-f]{8}$/), 'sibling']);
+  await expect.poll(async () => readFile(file, 'utf8')).toBe(reordered);
+});

@@ -13,18 +13,27 @@ import '../styles.css';
     <div id="app" aria-busy="true">
       <header class="topbar">
         <a class="brand" href="/" id="home">Slides<span class="brand-dot">.</span></a>
-        <span id="page-title" class="page-title">Local presentations</span>
+        <span id="page-title" class="page-title" hidden></span>
+        <input id="title-input" aria-label="Presentation title" title="Press Enter to save, Escape to cancel" maxlength="120" hidden />
+        <button type="button" id="edit-title" class="title-edit" aria-label="Edit presentation title" title="Edit presentation title" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20l4.5-1 12-12a2 2 0 0 0-2.8-2.8l-12 12L4 20Z M15.7 6.3l2.8 2.8"/></svg></button>
+        <span id="dev-mode" class="pill dev-mode" hidden>DEV MODE</span>
         <span id="save-status" class="pill" role="status" aria-live="polite" hidden></span>
         <span class="spacer"></span>
         <div id="editor-actions" class="actions" hidden>
-          <label>Theme <select id="theme" aria-label="Deck theme"></select></label>
-          <div class="segmented" role="group" aria-label="Editor view">
-            <button type="button" data-view="source">Source</button>
-            <button type="button" data-view="split">Split</button>
-            <button type="button" data-view="preview">Preview</button>
+          <div class="editor-buttons" role="toolbar" aria-label="Editor actions">
+            <label>Theme <select id="theme" aria-label="Deck theme"></select></label>
+            <div class="view-buttons" role="group" aria-label="Editor view">
+              <button type="button" data-view="source"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m8 5-6 7 6 7m8-14 6 7-6 7m-3-18-3 24"/></svg>Source</button>
+              <button type="button" data-view="split"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="3" width="20" height="18" rx="2"/><path d="M12 3v18"/></svg>Split</button>
+              <button type="button" data-view="preview"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg>Preview</button>
+            </div>
+            <button type="button" id="save" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 2h15l3 3v17H3zM7 2v7h10V2M6 22v-9h12v9"/></svg>Save</button>
+            <button type="button" id="present" class="primary"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="m10 7 5 4-5 4zm2 10v5m-5 0h10"/></svg>Present</button>
+            <details class="export-menu"><summary>Export</summary><div class="export-options">
+              <button type="button" disabled title="PDF export is coming later">Export To PDF (Coming Later)</button>
+              <button type="button" disabled title="HTML export is coming later">Export To HTML (Coming Later)</button>
+            </div></details>
           </div>
-          <button type="button" id="save">Save</button>
-          <button type="button" id="present" class="primary">Present</button>
         </div>
         <div id="presenter-actions" class="actions" hidden>
           <span class="pill live">Live</span>
@@ -35,24 +44,38 @@ import '../styles.css';
       </header>
 
       <main id="library-page" class="library-page" hidden>
-        <div class="library-intro">
-          <p class="eyebrow">YOUR LIBRARY</p>
-          <h1>Make room for the story.</h1>
-          <p>Write in Markdown. Present locally. Share with your audience only when you choose.</p>
-          <div class="library-create">
-            <label for="deck-name">New presentation</label>
-            <div class="actions"><input id="deck-name" placeholder="Presentation name" maxlength="120" />
-              <button type="button" id="create" class="primary">Create deck</button></div>
+        <div class="library-hero">
+          <div class="library-intro">
+            <p class="eyebrow">YOUR LIBRARY</p>
+            <h1>Make room for the story.</h1>
+            <p>Write in Markdown. Present and share when you choose.</p>
+            <div class="library-demo">
+              <strong>New to Slides?</strong>
+              <span>See layouts, charts, diagrams, speaker notes, and more in an editable tour.</span>
+              <button type="button" id="open-demo">Explore latest feature tour</button>
+            </div>
           </div>
-          <div class="library-open">
-            <label for="deck-path">Open an existing .md or .mdx file</label>
-            <div class="actions"><input id="deck-path" placeholder="Absolute path to a deck" />
-              <button type="button" id="open">Open file</button></div>
+          <div class="library-start">
+            <div class="library-create">
+              <label for="deck-name">Create a presentation</label>
+              <div class="actions"><input id="deck-name" placeholder="Presentation name or filename.mdx" maxlength="120" />
+                <button type="button" id="create" class="primary">Create deck</button></div>
+              <p>Spaces become hyphens in the filename.</p>
+            </div>
+            <div class="library-open">
+              <label for="deck-path">Open an existing .md or .mdx file</label>
+              <div class="actions"><input id="deck-path" placeholder="Absolute path to a deck" />
+                <button type="button" id="open">Open file</button></div>
+            </div>
           </div>
         </div>
         <section class="library-list" aria-labelledby="library-heading">
-          <div class="section-heading"><h2 id="library-heading">Your decks</h2><span id="library-count"></span></div>
+          <div class="section-heading"><h2 id="library-heading">Your presentations</h2><span id="library-count"></span></div>
           <div id="deck-list" class="deck-grid"></div>
+        </section>
+        <section class="tour-library" aria-labelledby="tour-heading">
+          <div class="section-heading"><h2 id="tour-heading">Feature tours</h2><span id="tour-count"></span></div>
+          <div id="tour-list" class="deck-grid"></div>
         </section>
       </main>
 
@@ -107,7 +130,7 @@ import '../styles.css';
         </section>
         <aside id="presenter-side" class="presenter-side">
           <div class="progress"><strong id="slide-progress"></strong><span id="reveal-progress"></span><time id="timer">00:00</time></div>
-          <div class="navigation">
+          <div class="navigation" role="group" aria-label="Previous and next slide">
             <button type="button" id="previous">← Previous</button>
             <button type="button" id="next" class="primary">Next →</button>
           </div>
@@ -123,7 +146,10 @@ import '../styles.css';
           <h2>Speaker notes <span class="private-tag">Private</span></h2>
           <div id="speaker-notes" class="speaker-notes"></div>
           <p id="share-info" class="share-info">Local only. Sharing is off.</p>
-          <button type="button" class="inert" disabled title="Export is not available yet">Export (coming later)</button>
+          <details class="export-menu presenter-export"><summary>Export</summary><div class="export-options">
+            <button type="button" disabled title="PDF export is coming later">Export To PDF (Coming Later)</button>
+            <button type="button" disabled title="HTML export is coming later">Export To HTML (Coming Later)</button>
+          </div></details>
           <button type="button" class="inert" disabled title="Annotation saving is not available yet">Save annotations (coming later)</button>
         </aside>
       </main>

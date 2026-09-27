@@ -1,10 +1,12 @@
-import { randomBytes } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
 import { join } from 'node:path';
 import { publicAssetPath } from './asset-path';
 import { compileDeck } from './deck';
-import { createDeck, deleteDeck, duplicateDeck, grantDeck, LibraryError, listDecks, openDeck, removeDeck, renameDeck, saveDeck } from './library';
+import { createDeck, deleteDeck, duplicateDeck, featureToursRoot, filenameTitle, grantDeck, LibraryError, libraryRoot, listDecks, openDeck, removeDeck, renameDeck, saveDeck } from './library';
 import { createTalk, endTalk, event, getTalk, privateState, publicState, shareOptions, startShare, stopShare } from './session';
 import { presenterSession, publicSnapshot, renderCompilation } from './presentation-model';
+import { ensureSampleImage, sampleImageResponse } from './sample-image';
+import { sampleImageUrl } from './sample-image-reference';
 
 const dist = join(process.cwd(), 'dist');
 const ownerToken = randomBytes(32).toString('base64url');
@@ -29,6 +31,60 @@ async function body(request: Request): Promise<Record<string, unknown>> {
   return data as Record<string, unknown>;
 }
 
+async function featureTour(): Promise<{ id: string }> {
+  const filename = 'Slides-Feature-Tour.md';
+  const source = Bun.file(join(process.cwd(), 'public', 'feature-tour.md'));
+  const bundled = await source.exists() ? source : Bun.file(join(dist, 'feature-tour.md'));
+  if (!(await bundled.exists())) throw new LibraryError(500, 'Feature tour is missing from the application');
+  const text = await bundled.text();
+  const normalize = (value: string) => value.replace(/\r\n/g, '\n');
+  const hash = (value: string) => createHash('sha256').update(value).digest('hex');
+  const current = normalize(text);
+  const bundleHash = hash(current);
+  const marker = `  # Bundled feature tour: ${bundleHash}`;
+  const installText = text.replace(/^(slides:\r?\n)/m, `$1${marker}${text.includes('\r\n') ? '\r\n' : '\n'}`);
+  if (installText === text || !compileDeck(installText).deck) {
+    throw new LibraryError(500, 'Bundled feature tour is invalid');
+  }
+  const markerLine = /^(---\nslides:\n)  # Bundled feature tour: ([a-f0-9]{64})\n/;
+  // The pre-marker tour shipped in the first bundled edition.
+  const legacyBundleHash = '2ff5e8455502b2ab1611339d59f442f51888ba74fa687e25543ffb9d8bdd5a4b';
+  const edition = (value: string) => markerLine.exec(value)?.[2];
+  const unchanged = (value: string) => {
+    const originalHash = edition(value);
+    return originalHash ? hash(value.replace(markerLine, '$1')) === originalHash
+      : value === current || hash(value) === legacyBundleHash;
+  };
+  const tours = (await listDecks())
+    .filter(entry => entry.kind === 'tour' && !entry.missing &&
+      /^Slides-Feature-Tour(?:-\d+)?\.md$/.test(entry.name) &&
+      entry.path === join(featureToursRoot, entry.name))
+    .sort((a, b) => Number(/-(\d+)\.md$/.exec(b.name)?.[1] ?? 1) -
+      Number(/-(\d+)\.md$/.exec(a.name)?.[1] ?? 1));
+  const installed = await Promise.all(tours.map(async tour => {
+    const opened = await openDeck(tour.id);
+    return { id: tour.id, revision: opened.revision, text: normalize(opened.text) };
+  }));
+  const currentTour = installed.find(tour => edition(tour.text) === bundleHash || tour.text === current);
+  const reusable = currentTour ?? installed.find(tour => unchanged(tour.text));
+  await ensureSampleImage();
+  if (reusable) {
+    if (!currentTour) await saveDeck(reusable.id, reusable.revision, installText);
+    for (const tour of installed) {
+      if (tour.id !== reusable.id && unchanged(tour.text)) {
+        await deleteDeck(tour.id, tour.revision, true);
+      }
+    }
+    return { id: reusable.id };
+  }
+  let candidate = filename;
+  for (let number = 2; await Bun.file(join(featureToursRoot, candidate)).exists(); number++) {
+    candidate = `Slides-Feature-Tour-${number}.md`;
+  }
+  const created = await createDeck(candidate, installText, 'tour');
+  return { id: created.id };
+}
+
 function requireString(data: Record<string, unknown>, key: string): string {
   if (typeof data[key] !== 'string') throw new LibraryError(400, `${key} must be text`);
   return data[key];
@@ -38,10 +94,22 @@ function response(data: unknown, status = 200): Response {
   return Response.json(data, { status, headers: { 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' } });
 }
 
-const starter = `---
+function creationName(input: string): { title: string; filename: string } {
+  const name = input.trim();
+  const extension = /\.(md|mdx)$/i.exec(name)?.[0];
+  if (!extension && /\.[A-Za-z0-9]+$/.test(name)) throw new LibraryError(400, 'Deck filenames must end in .md or .mdx');
+  const title = extension ? name.slice(0, -extension.length).trim() : name;
+  if (!title || title.length > 120 || !/^[\w][\w .-]*$/.test(title)) {
+    throw new LibraryError(400, 'Enter a title using letters, numbers, spaces, hyphens, underscores or dots');
+  }
+  return { title, filename: `${title.replace(/ +/g, '-')}${extension ?? '.md'}` };
+}
+
+function starter(title: string): string {
+  return `---
 slides:
   formatVersion: 1
-  title: Untitled presentation
+  title: ${JSON.stringify(title)}
   master:
     theme: signal
 ---
@@ -50,6 +118,7 @@ slides:
 
 Edit this slide in Markdown.
 `;
+}
 
 export function privateRouter(port: number) {
   return async (request: Request): Promise<Response> => {
@@ -60,9 +129,14 @@ export function privateRouter(port: number) {
         throw new LibraryError(403, 'Invalid host or origin');
       }
       const path = url.pathname;
+      if (path === sampleImageUrl && (request.method === 'GET' || request.method === 'HEAD')) {
+        return await sampleImageResponse(request.method);
+      }
       if (path.startsWith('/api/')) {
         if (path === '/api/bootstrap' && request.method === 'GET') {
-          return response({ token: ownerToken, library: await listDecks(), interfaces: shareOptions() });
+          const library = await listDecks();
+          await ensureSampleImage();
+          return response({ token: ownerToken, library, interfaces: shareOptions(), devMode: process.env.SLIDES_DEV_MODE === '1' });
         }
         const audienceMatch = /^\/api\/public\/([a-f0-9-]+)$/.exec(path);
         if (audienceMatch && request.method === 'GET') {
@@ -75,7 +149,12 @@ export function privateRouter(port: number) {
         if (path === '/api/library' && request.method === 'POST') {
           const data = await body(request);
           if (data.action === 'create') {
-            const created = await createDeck(requireString(data, 'name'), starter);
+            const { title, filename } = creationName(requireString(data, 'name'));
+            const created = await createDeck(filename, starter(title));
+            return response({ library: await listDecks(), id: created.id }, 201);
+          }
+          if (data.action === 'demo') {
+            const created = await featureTour();
             return response({ library: await listDecks(), id: created.id }, 201);
           }
           if (data.action === 'open' || data.action === 'relink') {
@@ -115,7 +194,8 @@ export function privateRouter(port: number) {
         if (path === '/api/compile' && request.method === 'POST') {
           const data = await body(request);
           const text = requireString(data, 'text');
-          return response(renderCompilation(text, compileDeck(text)));
+          const title = data.deckId === undefined ? undefined : await filenameTitle(requireString(data, 'deckId'));
+          return response(renderCompilation(text, compileDeck(text, title)));
         }
         if (path === '/api/sessions' && request.method === 'POST') {
           const data = await body(request);
@@ -172,7 +252,15 @@ export function startHost(port = 0) {
 }
 
 if (import.meta.main) {
-  if (!(await Bun.file(join(dist, 'index.html')).exists())) throw new Error('Static UI missing; run bun run build from the code directory first.');
-  const server = startHost();
+  if (process.env.SLIDES_DEV_MODE !== '1' && !(await Bun.file(join(dist, 'index.html')).exists())) {
+    throw new Error('Static UI missing; run bun run build from the code directory first.');
+  }
+  const port = process.env.SLIDES_DEV_MODE === '1' ? Number(process.env.SLIDES_DEV_API_PORT) : 0;
+  if (process.env.SLIDES_DEV_MODE === '1' && (!Number.isInteger(port) || port < 1024 || port > 65535)) {
+    throw new Error('Invalid development API port.');
+  }
+  await listDecks();
+  await ensureSampleImage(libraryRoot);
+  const server = startHost(port);
   console.log(`Local Slides: http://127.0.0.1:${server.port}`);
 }

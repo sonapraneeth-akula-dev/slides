@@ -4,12 +4,17 @@ import hljs from 'highlight.js';
 import DOMPurify from 'dompurify';
 import 'katex/dist/katex.min.css';
 import 'highlight.js/styles/github.css';
+import { sampleImageReference, sampleImageUrl } from './sample-image-reference';
+import { metadataPositions } from './slide-options';
+import { validFontFamily } from './font-family';
 
 export interface Slide {
   id: string;
   parent?: string;
   index: number;
   layout: string;
+  section?: string;
+  metadata?: Record<string, string>;
   body: string;
   reveals: string[];
   slots: Record<string, string>;
@@ -21,6 +26,7 @@ export interface Stage {
   theme: string;
   master: Record<string, unknown>;
   slides: Slide[];
+  total?: number;
 }
 
 export interface Deck extends Stage {
@@ -53,6 +59,9 @@ const md = new MarkdownIt({ html: false, linkify: false, breaks: true });
 md.renderer.rules.image = (tokens, index) => {
   const token = tokens[index];
   const alt = token.content || 'Unlabelled image';
+  if (token.attrGet('src') === sampleImageReference) {
+    return `<img class="slide-image" src="${sampleImageUrl}" alt="${md.utils.escapeHtml(alt)}" loading="lazy">`;
+  }
   return `<span class="asset-fallback" role="img" aria-label="${md.utils.escapeHtml(alt)}">Image unavailable: ${md.utils.escapeHtml(alt)}</span>`;
 };
 md.renderer.rules.fence = (tokens, index) => {
@@ -122,7 +131,7 @@ export function markdown(source: string): HTMLElement {
   const element = document.createElement('div');
   element.className = 'slide-markdown';
   element.innerHTML = DOMPurify.sanitize(md.render(source), {
-    FORBID_TAGS: ['iframe', 'object', 'form', 'script', 'style', 'img'],
+    FORBID_TAGS: ['iframe', 'object', 'form', 'script', 'style'],
   });
   return element;
 }
@@ -223,6 +232,7 @@ async function renderFences(root: HTMLElement): Promise<void> {
           startOnLoad: false,
           securityLevel: 'strict',
           theme: 'neutral',
+          htmlLabels: false,
           flowchart: { htmlLabels: false },
           maxTextSize: 4000,
         });
@@ -238,6 +248,9 @@ async function renderFences(root: HTMLElement): Promise<void> {
       try {
         const chart = parseChart(source);
         const table = document.createElement('table');
+        const accessibleData = document.createElement('div');
+        accessibleData.className = 'chart-data';
+        accessibleData.append(table);
         const caption = document.createElement('caption');
         caption.textContent = `${chart.type} chart data${chart.unit ? ` (${chart.unit})` : ''}`;
         table.append(caption);
@@ -259,7 +272,7 @@ async function renderFences(root: HTMLElement): Promise<void> {
         const canvas = document.createElement('div');
         canvas.className = 'chart-visual';
         canvas.setAttribute('aria-hidden', 'true');
-        fence.replaceChildren(canvas, table);
+        fence.replaceChildren(canvas, accessibleData);
         const echarts = await import('echarts');
         if (!fence.isConnected) continue;
         const instance = echarts.init(canvas, undefined, { renderer: 'canvas' });
@@ -298,25 +311,26 @@ async function renderFences(root: HTMLElement): Promise<void> {
   }
 }
 
-const presets: Record<string, Record<string, string>> = {
+export const themePresets: Record<string, Record<string, string>> = {
   signal: { surface: '#ffffff', text: '#1b1f24', accent: '#2563eb', muted: '#5b6470' },
   paper: { surface: '#fbf7ef', text: '#2b2620', accent: '#b4532a', muted: '#7a6f60' },
   midnight: { surface: '#0f172a', text: '#e2e8f0', accent: '#38bdf8', muted: '#94a3b8' },
   forest: { surface: '#f1f6f0', text: '#1d2b1f', accent: '#2f7d4a', muted: '#5d6f60' },
 };
-const fonts = new Set(['Segoe UI', 'Georgia', 'Trebuchet MS', 'Verdana', 'Palatino', 'Consolas', 'Cascadia Code', 'Courier New']);
 
 function setAppearance(host: HTMLElement, stage: Stage): void {
-  const preset = presets[stage.theme] || presets.signal;
-  host.style.backgroundColor = preset.surface;
-  host.style.color = preset.text;
+  const preset = themePresets[stage.theme] || themePresets.signal;
+  host.style.backgroundColor = 'var(--slide-surface)';
+  host.style.color = 'var(--slide-text)';
   for (const key of ['surface', 'text', 'accent', 'muted'] as const) {
     const value = stage.master?.[key];
     host.style.setProperty(`--slide-${key}`, typeof value === 'string' && /^#[0-9a-f]{6}$/i.test(value) ? value : preset[key]);
   }
   for (const key of ['headingFont', 'bodyFont', 'codeFont'] as const) {
     const value = stage.master?.[key];
-    host.style.setProperty(`--${key}`, typeof value === 'string' && fonts.has(value) ? `"${value}"` : 'system-ui');
+    host.style.setProperty(`--${key}`, validFontFamily(value)
+      ? ['system-ui', 'ui-monospace'].includes(value) ? value : JSON.stringify(value)
+      : key === 'codeFont' ? 'ui-monospace' : 'system-ui');
   }
   const size = (key: string, baseline: number): number => {
     const value = stage.master?.[key];
@@ -327,6 +341,15 @@ function setAppearance(host: HTMLElement, stage: Stage): void {
   host.style.setProperty('--bodySize-scale', String(bodyScale));
   host.style.setProperty('--headingSize-scale', String(size('headingSize', 80) / bodyScale));
   host.style.setProperty('--codeSize-scale', String(size('codeSize', 32) / bodyScale));
+  host.style.setProperty('--heading-align', ['left', 'center', 'right'].includes(String(stage.master?.headingPlacement))
+    ? String(stage.master.headingPlacement) : 'left');
+  for (const direction of ['Top', 'Right', 'Bottom', 'Left']) {
+    for (const kind of ['margin', 'padding'] as const) {
+      const value = stage.master?.[`${kind}${direction}`];
+      host.style.setProperty(`--slide-${kind}-${direction.toLowerCase()}`,
+        `${typeof value === 'number' && Number.isFinite(value) && value >= 0 && value <= 20 ? value : kind === 'margin' ? 5 : 0}%`);
+    }
+  }
 }
 
 export async function renderStage(host: HTMLElement, stage: Stage, slide: Slide | undefined, step: number): Promise<void> {
@@ -338,7 +361,20 @@ export async function renderStage(host: HTMLElement, stage: Stage, slide: Slide 
   }
   host.dataset.layout = slide.layout;
   if (slide.layout !== 'blank') {
-    host.append(markdown(slide.body));
+    const content = document.createElement('div');
+    content.className = 'slide-content';
+    if (slide.layout === 'title-image-left' || slide.layout === 'title-image-right') {
+      const text = markdown(slide.body);
+      text.classList.add('slide-cover-text');
+      const image = markdown(slide.slots?.image || '');
+      image.classList.add('slide-cover-image');
+      image.setAttribute('aria-label', 'Cover image');
+      content.append(text, image);
+    } else {
+      const body = markdown(slide.body);
+      if (slide.layout === 'image-full') body.classList.add('slide-full-image');
+      content.append(body);
+    }
     const names = slide.layout === 'three-columns' ? ['left', 'center', 'right']
       : slide.layout === 'two-columns' ? ['left', 'right'] : slide.layout === 'picture-text' ? ['image', 'text'] : [];
     if (names.length) {
@@ -350,25 +386,33 @@ export async function renderStage(host: HTMLElement, stage: Stage, slide: Slide 
         column.setAttribute('aria-label', `${name} column`);
         columns.append(column);
       }
-      host.append(columns);
+      content.append(columns);
     }
     for (const [index, reveal] of (slide.reveals || []).entries()) {
       if (index >= step) break;
       const element = markdown(reveal);
       element.classList.add('slide-reveal');
-      host.append(element);
+      content.append(element);
     }
+    host.append(content);
   }
-  const footer = stage.master?.footer;
-  if (typeof footer === 'string' && footer) {
-    const element = document.createElement('footer');
-    element.textContent = footer;
-    host.append(element);
-  }
-  if (stage.master?.footerNumber === true) {
+  const master = stage.master || {};
+  const assigned = metadataPositions.map(position => slide.metadata?.[`metadata${position}`] ?? master[`metadata${position}`]);
+  for (const position of metadataPositions) {
+    const configured = slide.metadata?.[`metadata${position}`] ?? master[`metadata${position}`];
+    const kind = configured === undefined
+      ? position === 'BottomLeft' && master.footer && !assigned.includes('footer') ? 'footer'
+        : position === 'BottomRight' && master.footerNumber === true && !assigned.includes('slideNumber') ? 'slideNumber' : 'none'
+      : configured;
+    const value = kind === 'slideNumber' ? `${slide.index + 1} / ${stage.total ?? stage.slides.length}`
+      : kind === 'deckTitle' ? stage.title
+      : kind === 'slideTitle' ? slide.body.match(/^#{1,3}\s+(.+)$/m)?.[1] || slide.id
+      : kind === 'footer' || kind === 'logo' ? master[kind] : '';
+    if (typeof value !== 'string' || !value) continue;
     const element = document.createElement('span');
-    element.className = 'slide-number';
-    element.textContent = String(slide.index + 1);
+    element.className = 'slide-meta';
+    element.dataset.position = position;
+    element.textContent = value;
     host.append(element);
   }
   await renderFences(host);
