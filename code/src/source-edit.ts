@@ -59,6 +59,7 @@ function changeMapping(source: string, mapping: 'master' | 'layouts', key: strin
       const position = existing.findIndex(line => new RegExp(`^    ${key}:`).test(line));
       if (position >= 0) existing.splice(position, 1);
       if (value !== undefined) existing.push(`    ${key}: ${formatted}`);
+      if (!existing.some(line => line.trim())) lines[index] = `  ${mapping}: {}`;
       lines.splice(index + 1, end - index - 1, ...existing);
     } else {
       throw new Error(`Cannot change ${mapping}: unsupported front matter shape.`);
@@ -81,7 +82,7 @@ export function clearTheme(source: string): string {
 }
 
 export function setMaster(source: string, field: string, value?: MasterValue): string {
-  if (!/^(surface|text|accent|muted|headingFont|bodyFont|codeFont|headingSize|bodySize|codeSize|background|backdrop|logo|footer|footerNumber|metadata(Top|Bottom)(Left|Center|Right))$/.test(field)) {
+  if (!/^(surface|text|accent|muted|headingFont|headingPlacement|bodyFont|codeFont|headingSize|bodySize|codeSize|background|backdrop|logo|footer|footerNumber|(margin|padding)(Top|Right|Bottom|Left)|metadata(Top|Bottom)(Left|Center|Right))$/.test(field)) {
     throw new Error(`Unknown master field: ${field}`);
   }
   return changeMapping(source, 'master', field, value);

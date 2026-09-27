@@ -135,11 +135,20 @@ a { color: #1752ad; }
 .preview-stage [contenteditable="plaintext-only"]:hover { outline: 1px dashed var(--slide-accent); outline-offset: 2px; }
 .diagnostics { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; min-height: 40px; padding: 5px 16px; background: #fff; border-top: 1px solid #dbe1e9; font-size: 13px; }
 .diagnostic.error { color: #a21d32; }
-.master-pane { display: grid; grid-template-columns: minmax(260px, 380px) minmax(0, 1fr); gap: 24px; padding: 24px; }
+.master-pane { display: grid; grid-template-columns: minmax(280px, 380px) minmax(0, 1fr); align-items: start; gap: 24px; padding: 24px; }
 .settings { border: 1px solid #dbe1e9; border-radius: 10px; background: #fff; padding: 20px; }
 .settings label { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px; padding: 8px 0; }
 .settings input[type="number"], .settings input[type="text"] { max-width: 170px; }
-.master-preview { align-self: start; aspect-ratio: 16 / 9; border: 1px solid #dbe1e9; }
+.settings-section { min-width: 0; margin: 16px 0; padding: 10px 14px; border: 1px solid #dbe1e9; border-radius: 8px; }
+.settings-section legend { padding: 0 6px; color: #153c86; font-weight: 700; }
+.settings-section select { max-width: 175px; }
+.settings-section input[type="number"] { width: 90px; }
+.master-preview { min-width: 0; }
+.master-preview h2 { margin: 0 0 6px; }
+.master-preview > p { margin: 0 0 18px; color: #536275; }
+.master-preview .preview-card { max-width: 720px; }
+.master-preview .stage { aspect-ratio: 16 / 9; height: auto; font-size: clamp(11px, 1.2vw, 19px); }
+@media (max-width: 950px) { .master-pane { grid-template-columns: 1fr; } }
 .stage {
   --slide-surface: #fff;
   --slide-text: #1b1f24;
@@ -149,7 +158,7 @@ a { color: #1752ad; }
   width: 100%;
   height: 100%;
   overflow: auto;
-  padding: 5%;
+  padding: var(--slide-margin-top, 5%) var(--slide-margin-right, 5%) var(--slide-margin-bottom, 5%) var(--slide-margin-left, 5%);
   background: var(--slide-surface);
   color: var(--slide-text);
   font-family: var(--bodyFont, system-ui);
@@ -163,6 +172,8 @@ a { color: #1752ad; }
 .stage pre { max-width: 100%; overflow: auto; background: #e5e9f0; padding: .7em; border-radius: 6px; color: #1c2733; }
 .stage pre code { font-family: var(--codeFont, monospace); font-size: calc(1em * var(--codeSize-scale, 1)); }
 .stage .slide-markdown { font-size: calc(1em * var(--bodySize-scale, 1)); }
+.stage .slide-content { padding: var(--slide-padding-top, 0%) var(--slide-padding-right, 0%) var(--slide-padding-bottom, 0%) var(--slide-padding-left, 0%); }
+.stage .slide-markdown > :is(h1, h2, h3) { text-align: var(--heading-align, left); }
 .stage a { color: var(--slide-accent); }
 .stage blockquote { margin-inline: 0; padding-left: 1em; border-left: 4px solid var(--slide-accent); }
 .stage table { border-collapse: collapse; width: 100%; }

@@ -19,6 +19,7 @@ const fonts = new Set(['headingFont', 'bodyFont', 'codeFont']);
 const sizes = new Set(['headingSize', 'bodySize', 'codeSize']);
 const metadataPositions = new Set(['metadataTopLeft', 'metadataTopCenter', 'metadataTopRight', 'metadataBottomLeft', 'metadataBottomCenter', 'metadataBottomRight']);
 const metadataValues = new Set(['none', 'slideNumber', 'deckTitle', 'slideTitle', 'footer', 'logo']);
+const insets = new Set(['marginTop', 'marginRight', 'marginBottom', 'marginLeft', 'paddingTop', 'paddingRight', 'paddingBottom', 'paddingLeft']);
 const allowedFonts = new Set(['Segoe UI', 'Georgia', 'Trebuchet MS', 'Verdana', 'Palatino', 'Consolas', 'Cascadia Code', 'Courier New']);
 
 function attributes(raw: string): Record<string, string> | null {
@@ -88,12 +89,14 @@ export function compileDeck(source: string, filenameTitle?: string): Compilation
     if (colors.has(key) && (typeof value !== 'string' || !/^#[\da-fA-F]{6}$/.test(value))) fail(2, `${key} must be a hex color`);
     else if (fonts.has(key) && !allowedFonts.has(String(value))) fail(2, `${key} must be an available font`);
     else if (sizes.has(key) && (typeof value !== 'number' || value < 12 || value > 120)) fail(2, `${key} must be between 12 and 120`);
+    else if (insets.has(key) && (typeof value !== 'number' || !Number.isFinite(value) || value < 0 || value > 20)) fail(2, `${key} must be between 0 and 20 percent`);
+    else if (key === 'headingPlacement' && !['left', 'center', 'right'].includes(String(value))) fail(2, 'Unknown heading placement');
     else if (key === 'footerNumber' && typeof value !== 'boolean') fail(2, 'footerNumber must be boolean');
     else if (metadataPositions.has(key) && (typeof value !== 'string' || !metadataValues.has(value))) fail(2, `Invalid metadata for ${key}`);
     else if (key === 'background' && !['solid', 'gradient', 'band'].includes(String(value))) fail(2, 'Unknown background');
     else if (key === 'backdrop' && !['off', 'drift'].includes(String(value))) fail(2, 'Unknown backdrop');
     else if (['logo', 'footer'].includes(key) && typeof value !== 'string') fail(2, `${key} must be text`);
-    else if (!['logo', 'footer', 'footerNumber', 'background', 'backdrop'].includes(key) && !metadataPositions.has(key) && !colors.has(key) && !fonts.has(key) && !sizes.has(key)) fail(2, `Unknown master setting: ${key}`);
+    else if (!['logo', 'footer', 'footerNumber', 'background', 'backdrop', 'headingPlacement'].includes(key) && !insets.has(key) && !metadataPositions.has(key) && !colors.has(key) && !fonts.has(key) && !sizes.has(key)) fail(2, `Unknown master setting: ${key}`);
   }
   const configuredLayouts = record(options.layouts) ? options.layouts : {};
   if (options.layouts !== undefined && !record(options.layouts)) fail(2, 'slides.layouts must be a mapping');

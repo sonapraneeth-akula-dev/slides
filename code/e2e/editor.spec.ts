@@ -131,22 +131,44 @@ Audience sees this.
   await expect(page.locator('#source')).toHaveValue(/layout="two-columns"/);
   await page.locator('#settings-button').click();
   await expect(page.locator('#master-pane')).toBeVisible();
-  await expect(page.locator('#settings-fields select')).toHaveCount(6);
+  await expect(page.locator('#settings-fields legend')).toHaveText([
+    'Theme', 'Heading', 'Body', 'Code', 'Placements', 'Margins', 'Padding'
+  ]);
+  await expect(page.locator('#settings-fields select')).toHaveCount(8);
+  await expect(page.getByLabel('Slide number in footer')).toHaveCount(0);
+  await expect(page.locator('#master-preview .preview-card')).toHaveCount(3);
+  await expect(page.locator('#master-preview .preview-card').nth(0)).toContainText('Body text shows theme');
+  await expect(page.locator('#master-preview .preview-card').nth(1).locator('pre code')).toContainText('const answer = 42');
+  await expect(page.locator('#master-preview .preview-card').nth(2).locator('.slide-column')).toHaveCount(2);
+  await expect(page.locator('#source')).not.toHaveValue(/sample-heading/);
   await expect(page.getByLabel('Top Left').locator('option')).toHaveText([
     'None', 'Slide Number / Total', 'Presentation Title', 'Slide Title', 'Footer Text', 'Logo Text'
   ]);
-  await page.locator('#theme').selectOption('forest');
+  await page.locator('#settings-fields select').first().selectOption('forest');
   await expect(page.locator('#source')).toHaveValue(/theme: "forest"/);
-  await page.getByLabel('Slide number in footer').check();
-  await expect(page.locator('#master-preview .slide-meta[data-position="BottomRight"]')).toHaveText('1 / 2');
-  await page.getByLabel('Top Left').selectOption('slideNumber');
-  await expect(page.locator('#master-preview .slide-meta[data-position="TopLeft"]')).toHaveText('1 / 2');
-  await expect(page.locator('#master-preview .slide-meta[data-position="BottomRight"]')).toHaveCount(0);
+  await expect(page.locator('#master-preview .stage').first()).toHaveCSS('background-color', 'rgb(241, 246, 240)');
+  await page.getByLabel('Surface', { exact: true }).fill('#e6e8ff');
+  await expect(page.locator('#master-preview .stage').first()).toHaveCSS('background-color', 'rgb(230, 232, 255)');
+  await page.getByLabel('Heading placement').selectOption('center');
+  await page.getByLabel('Left margin (%)').fill('8');
+  await page.getByLabel('Left margin (%)').press('Tab');
+  await page.getByLabel('Left padding (%)').fill('3');
+  await page.getByLabel('Left padding (%)').press('Tab');
+  await page.getByLabel('Code font').fill('Consolas');
+  await page.getByLabel('Code font').press('Tab');
+  await expect(page.locator('#master-preview .stage').first()).toHaveCSS('--slide-margin-left', '8%');
+  await expect(page.locator('#master-preview .slide-content').first()).toHaveCSS('padding-left', /px/);
+  await expect(page.locator('#master-preview .stage h1').first()).toHaveCSS('text-align', 'center');
+  await expect(page.locator('#master-preview pre code').first()).toHaveCSS('font-family', 'Consolas');
   await page.getByLabel('Bottom Right').selectOption('slideNumber');
+  await expect(page.locator('#master-preview .slide-meta[data-position="BottomRight"]').first()).toHaveText('1 / 3');
+  await page.getByLabel('Top Left').selectOption('slideNumber');
+  await expect(page.locator('#master-preview .slide-meta[data-position="TopLeft"]').first()).toHaveText('1 / 3');
   await expect(page.locator('#source')).toHaveValue(/metadataBottomRight: "slideNumber"/);
   await page.getByLabel('Top Center').selectOption('deckTitle');
   await expect(page.locator('#source')).toHaveValue(/metadataTopCenter: "deckTitle"/);
-  await expect(page.locator('#master-preview .slide-meta[data-position="BottomRight"]')).toHaveText('1 / 2');
+  await expect(page.locator('#master-preview .slide-meta[data-position="TopCenter"]').first()).toHaveText('Browser acceptance');
+  await expect(page.locator('#master-preview .slide-meta[data-position="BottomRight"]').first()).toHaveText('1 / 3');
   await page.locator('[data-view="source"]').click();
   await expect(page.locator('#editor-panes')).toHaveAttribute('data-view', 'source');
   await page.locator('#save').click();
@@ -154,12 +176,19 @@ Audience sees this.
   await expect(page.locator('#save')).toBeDisabled();
   await expect.poll(async () => readFile(join(directory, name), 'utf8')).toContain('Updated audience paragraph');
   expect(await readFile(join(directory, name), 'utf8')).toContain('theme: "forest"');
+  expect(await readFile(join(directory, name), 'utf8')).toContain('headingPlacement: "center"');
+  expect(await readFile(join(directory, name), 'utf8')).toContain('marginLeft: 8');
+  expect(await readFile(join(directory, name), 'utf8')).toContain('paddingLeft: 3');
 
   await expect(page.locator('#present')).toBeEnabled();
   await page.locator('#present').click();
   await expect(page.locator('#presentation-page')).toBeVisible();
   await expect(page.locator('#speaker-notes')).toContainText('PRIVATE SPEAKER NOTES');
   await expect(page.locator('#stage .slide-meta[data-position="BottomRight"]')).toHaveText('1 / 2');
+  await expect(page.locator('#stage h1')).toHaveCSS('text-align', 'center');
+  await expect(page.locator('#stage')).toHaveCSS('--slide-margin-left', '8%');
+  await expect(page.locator('#stage .slide-content')).toHaveCSS('padding-left', /px/);
+  await expect(page.locator('#stage')).toHaveCSS('background-color', 'rgb(230, 232, 255)');
   await expect(page.locator('#jump option')).toHaveText(['1. Browser Acceptance', '2. Second Slide']);
   await page.locator('.presenter-export summary').click();
   await expect(page.locator('.presenter-export .export-options button')).toHaveCount(2);
@@ -172,6 +201,10 @@ Audience sees this.
   await audience.waitForLoadState('domcontentloaded');
   await expect(audience.locator('#audience-stage')).toContainText('Original paragraph');
   await expect(audience.locator('#audience-stage .slide-meta[data-position="BottomRight"]')).toHaveText('1 / 2');
+  await expect(audience.locator('#audience-stage h1')).toHaveCSS('text-align', 'center');
+  await expect(audience.locator('#audience-stage')).toHaveCSS('--slide-margin-left', '8%');
+  await expect(audience.locator('#audience-stage .slide-content')).toHaveCSS('padding-left', /px/);
+  await expect(audience.locator('#audience-stage')).toHaveCSS('background-color', 'rgb(230, 232, 255)');
   await expect(audience.locator('body')).not.toContainText('PRIVATE SPEAKER NOTES');
   await expect(audience.locator('.audience-page')).toBeVisible();
 
@@ -210,6 +243,40 @@ Audience sees this.
   expect((await request.get(`${origin}/api/public/${sessionId}`, {
     headers: { 'X-Slides-Public': key },
   })).status()).toBe(404);
+});
+
+test('legacy slide-number setting can be overridden and reset without invalid source', async ({ page }) => {
+  await page.goto(origin);
+  await page.locator('#deck-name').fill('Legacy settings');
+  await page.locator('#create').click();
+  await expect(page.locator('#editor-page')).toBeVisible();
+  await page.locator('#source').fill(`---
+slides:
+  title: Legacy settings
+  master:
+    theme: midnight
+    footerNumber: true
+    background: solid
+    backdrop: off
+---
+::slide{id="first"}
+# First
+`);
+  await expect(page.locator('#diagnostics')).toHaveText('No diagnostics');
+  await page.locator('#settings-button').click();
+  await expect(page.getByLabel('Slide number in footer')).toHaveCount(0);
+  await expect(page.getByLabel('Bottom Right')).toHaveValue('slideNumber');
+  await expect(page.locator('#master-preview .slide-meta[data-position="BottomRight"]').first()).toHaveText('1 / 3');
+  await page.getByLabel('Bottom Right').selectOption('none');
+  await expect(page.locator('#master-preview .slide-meta[data-position="BottomRight"]')).toHaveCount(0);
+  await expect(page.locator('#source')).toHaveValue(/footerNumber: true/);
+  page.once('dialog', dialog => { void dialog.accept(); });
+  await page.locator('#reset-master').click();
+  await expect(page.locator('#source')).toHaveValue(/master: \{\}/);
+  await expect(page.locator('#source')).not.toHaveValue(/footerNumber:|metadataBottomRight:|background:|backdrop:/);
+  await expect(page.locator('#diagnostics')).toHaveText('No diagnostics');
+  await expect(page.getByLabel('Bottom Right')).toHaveValue('none');
+  await expect.poll(async () => readFile(join(directory, 'Legacy-settings.md'), 'utf8')).toContain('master: {}');
 });
 
 test('external edit opens conflict dialog without overwriting either version', async ({ page }) => {
@@ -273,7 +340,7 @@ test('title pencil, slide buttons and multiple plain preview paragraphs work tog
 
   const original = await readFile(join(directory, 'Preview-editing.md'), 'utf8');
   await page.locator('#source').fill(original.replace('Edit this slide in Markdown.', 'Edit this slide in Markdown.\n\nTests'));
-  const paragraphs = page.locator('.preview-card').first().locator('.stage > .slide-markdown > p[contenteditable="plaintext-only"]');
+  const paragraphs = page.locator('.preview-card').first().locator('.stage > .slide-content > .slide-markdown > p[contenteditable="plaintext-only"]');
   await expect(paragraphs).toHaveCount(0);
   await expect(paragraphs).toHaveCount(2);
   await paragraphs.nth(1).fill('Updated tests');

@@ -299,7 +299,7 @@ async function renderFences(root: HTMLElement): Promise<void> {
   }
 }
 
-const presets: Record<string, Record<string, string>> = {
+export const themePresets: Record<string, Record<string, string>> = {
   signal: { surface: '#ffffff', text: '#1b1f24', accent: '#2563eb', muted: '#5b6470' },
   paper: { surface: '#fbf7ef', text: '#2b2620', accent: '#b4532a', muted: '#7a6f60' },
   midnight: { surface: '#0f172a', text: '#e2e8f0', accent: '#38bdf8', muted: '#94a3b8' },
@@ -308,16 +308,16 @@ const presets: Record<string, Record<string, string>> = {
 const fonts = new Set(['Segoe UI', 'Georgia', 'Trebuchet MS', 'Verdana', 'Palatino', 'Consolas', 'Cascadia Code', 'Courier New']);
 
 function setAppearance(host: HTMLElement, stage: Stage): void {
-  const preset = presets[stage.theme] || presets.signal;
-  host.style.backgroundColor = preset.surface;
-  host.style.color = preset.text;
+  const preset = themePresets[stage.theme] || themePresets.signal;
+  host.style.backgroundColor = 'var(--slide-surface)';
+  host.style.color = 'var(--slide-text)';
   for (const key of ['surface', 'text', 'accent', 'muted'] as const) {
     const value = stage.master?.[key];
     host.style.setProperty(`--slide-${key}`, typeof value === 'string' && /^#[0-9a-f]{6}$/i.test(value) ? value : preset[key]);
   }
   for (const key of ['headingFont', 'bodyFont', 'codeFont'] as const) {
     const value = stage.master?.[key];
-    host.style.setProperty(`--${key}`, typeof value === 'string' && fonts.has(value) ? `"${value}"` : 'system-ui');
+    host.style.setProperty(`--${key}`, typeof value === 'string' && fonts.has(value) ? `"${value}"` : key === 'codeFont' ? 'monospace' : 'system-ui');
   }
   const size = (key: string, baseline: number): number => {
     const value = stage.master?.[key];
@@ -328,6 +328,15 @@ function setAppearance(host: HTMLElement, stage: Stage): void {
   host.style.setProperty('--bodySize-scale', String(bodyScale));
   host.style.setProperty('--headingSize-scale', String(size('headingSize', 80) / bodyScale));
   host.style.setProperty('--codeSize-scale', String(size('codeSize', 32) / bodyScale));
+  host.style.setProperty('--heading-align', ['left', 'center', 'right'].includes(String(stage.master?.headingPlacement))
+    ? String(stage.master.headingPlacement) : 'left');
+  for (const direction of ['Top', 'Right', 'Bottom', 'Left']) {
+    for (const kind of ['margin', 'padding'] as const) {
+      const value = stage.master?.[`${kind}${direction}`];
+      host.style.setProperty(`--slide-${kind}-${direction.toLowerCase()}`,
+        `${typeof value === 'number' && Number.isFinite(value) && value >= 0 && value <= 20 ? value : kind === 'margin' ? 5 : 0}%`);
+    }
+  }
 }
 
 export async function renderStage(host: HTMLElement, stage: Stage, slide: Slide | undefined, step: number): Promise<void> {
@@ -339,7 +348,9 @@ export async function renderStage(host: HTMLElement, stage: Stage, slide: Slide 
   }
   host.dataset.layout = slide.layout;
   if (slide.layout !== 'blank') {
-    host.append(markdown(slide.body));
+    const content = document.createElement('div');
+    content.className = 'slide-content';
+    content.append(markdown(slide.body));
     const names = slide.layout === 'three-columns' ? ['left', 'center', 'right']
       : slide.layout === 'two-columns' ? ['left', 'right'] : slide.layout === 'picture-text' ? ['image', 'text'] : [];
     if (names.length) {
@@ -351,14 +362,15 @@ export async function renderStage(host: HTMLElement, stage: Stage, slide: Slide 
         column.setAttribute('aria-label', `${name} column`);
         columns.append(column);
       }
-      host.append(columns);
+      content.append(columns);
     }
     for (const [index, reveal] of (slide.reveals || []).entries()) {
       if (index >= step) break;
       const element = markdown(reveal);
       element.classList.add('slide-reveal');
-      host.append(element);
+      content.append(element);
     }
+    host.append(content);
   }
   const master = stage.master || {};
   const positions = ['TopLeft', 'TopCenter', 'TopRight', 'BottomLeft', 'BottomCenter', 'BottomRight'] as const;

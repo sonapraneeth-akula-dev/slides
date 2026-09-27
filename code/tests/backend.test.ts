@@ -78,6 +78,33 @@ slides:
     expect(compileDeck(input.replace('Untitled presentation', 'My custom title'), 'Quarterly report').deck?.title).toBe('My custom title');
     expect(compileDeck(input.replace('metadataTopCenter: slideTitle', 'metadataTopCenter: arbitrary'), 'Quarterly report').deck).toBeNull();
   });
+
+  test('validates heading alignment and bounded slide spacing while retaining legacy footer numbers', () => {
+    const input = `---
+slides:
+  master:
+    headingPlacement: center
+    marginLeft: 0
+    marginRight: 20
+    paddingTop: 3.5
+    footerNumber: true
+---
+::slide{id="one"}
+# First`;
+    expect(compileDeck(input).diagnostics).toEqual([]);
+    for (const [original, invalid] of [
+      ['headingPlacement: center', 'headingPlacement: bottom'],
+      ['headingPlacement: center', 'headingPlacement: 42'],
+      ['marginLeft: 0', 'marginLeft: -1'],
+      ['marginLeft: 0', 'marginLeft: 21'],
+      ['marginLeft: 0', 'marginLeft: "5"'],
+      ['paddingTop: 3.5', 'paddingTop: 21'],
+      ['footerNumber: true', 'footerNumber: yes']
+    ]) {
+      expect(compileDeck(input.replace(original, invalid)).deck).toBeNull();
+    }
+    expect(compileDeck(input.replace('    footerNumber: true\n', '')).deck).not.toBeNull();
+  });
 });
 
 let dir: string;

@@ -53,6 +53,20 @@ describe('source-backed editing', () => {
     expect(updated).toContain('theme: "paper"');
   });
 
+  test('persists heading and spacing independently and keeps a valid empty master on reset', () => {
+    const heading = setMaster(source, 'headingPlacement', 'right');
+    const spaced = setMaster(setMaster(heading, 'marginTop', 8), 'paddingLeft', 2.5);
+    expect(spaced).toContain('    headingPlacement: "right"');
+    expect(spaced).toContain('    marginTop: 8');
+    expect(spaced).toContain('    paddingLeft: 2.5');
+    expect(spaced).toContain('    accent: "#123456"');
+    expect(setMaster(spaced, 'marginTop')).not.toContain('    marginTop:');
+    expect(() => setMaster(source, 'marginDiagonal', 4)).toThrow('Unknown master field');
+    const reset = clearTheme('---\nslides:\n  master:\n    theme: "signal"\n---\n::slide{id="intro"}\n# Intro');
+    expect(reset).toContain('  master: {}');
+    expect(reset).not.toContain('    theme:');
+  });
+
   test('edits only the matching slide layout and rejects unknown IDs', () => {
     const updated = setLayout(source, 'detail', 'two-columns');
     expect(updated).toContain('::slide{id="detail" parent="intro" layout="two-columns"}');

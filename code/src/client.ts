@@ -1,5 +1,5 @@
 import { clearTheme, editableLines, hasUniqueSlideIds, insertSlide, layouts, propagateSlideIdChange, replacePlainLine, setDeckTitle, setLayout, setMaster, setTheme, themeNames } from './source-edit';
-import { markdown, overlayMode, renderStage, type Deck, type Slide, type Snapshot, type Stroke } from './render';
+import { markdown, overlayMode, renderStage, themePresets, type Deck, type Slide, type Snapshot, type Stage, type Stroke } from './render';
 import { drawStage } from './stage-view';
 
 type LibraryEntry = { id: string; name: string; path: string; missing?: boolean };
@@ -88,7 +88,6 @@ function show(next: Page): void {
 }
 function errorNotice(error: unknown): void { notify(message(error)); }
 function dialog(id: string): HTMLDialogElement { return $<HTMLDialogElement>(id); }
-function selectedSlide(): Slide | undefined { return compiled?.slides.find(slide => slide.id === selected); }
 function isDirty(): boolean { return !!deckId && sourceInput.value !== savedText; }
 function updateSaveButton(): void {
   $('save').toggleAttribute('disabled', page !== 'editor' || !isDirty() || !!saving);
@@ -338,7 +337,7 @@ async function updatePreview(): Promise<void> {
     void renderStage(stage, deck, slide, slide.reveals.length).then(() => {
       if (!card.isConnected || compiled !== deck || !canEditPreview()) return;
       const sourceLines = editableLines(sourceInput.value, slide.id, slide.body);
-      const rendered = stage.firstElementChild;
+      const rendered = stage.querySelector('.slide-content > .slide-markdown');
       if (!rendered?.classList.contains('slide-markdown')) return;
       const paragraphs = new Map<string, HTMLElement[]>();
       for (const element of rendered.children) {
@@ -485,69 +484,121 @@ function scheduleSave(): void {
   saveTimer = setTimeout(() => { if (page === 'editor' && !conflicted) void save(); }, 1500);
 }
 
-const masterFields: Array<{ name: string; label: string; type: 'color' | 'text' | 'number' | 'checkbox' | 'select'; fallback?: string }> = [
-  { name: 'surface', label: 'Surface', type: 'color', fallback: '#ffffff' },
-  { name: 'text', label: 'Text color', type: 'color', fallback: '#1b1f24' },
-  { name: 'accent', label: 'Accent', type: 'color', fallback: '#2563eb' },
-  { name: 'muted', label: 'Muted text', type: 'color', fallback: '#5b6470' },
-  { name: 'headingFont', label: 'Heading font', type: 'text' },
-  { name: 'bodyFont', label: 'Body font', type: 'text' },
-  { name: 'codeFont', label: 'Code font', type: 'text' },
-  { name: 'headingSize', label: 'Heading size', type: 'number' },
-  { name: 'bodySize', label: 'Body size', type: 'number' },
-  { name: 'codeSize', label: 'Code size', type: 'number' },
-  { name: 'footer', label: 'Footer text', type: 'text' },
-  { name: 'logo', label: 'Logo text', type: 'text' },
-  { name: 'footerNumber', label: 'Slide number in footer', type: 'checkbox' },
+const masterSections = ['Theme', 'Heading', 'Body', 'Code', 'Placements', 'Margins', 'Padding'] as const;
+type MasterField = {
+  section: typeof masterSections[number]; name: string; label: string;
+  type: 'color' | 'text' | 'number' | 'select'; fallback?: string; min?: number; max?: number;
+};
+const masterFields: MasterField[] = [
+  { section: 'Theme', name: 'theme', label: 'Theme', type: 'select' },
+  { section: 'Theme', name: 'surface', label: 'Surface', type: 'color' },
+  { section: 'Theme', name: 'text', label: 'Text color', type: 'color' },
+  { section: 'Theme', name: 'accent', label: 'Accent', type: 'color' },
+  { section: 'Theme', name: 'muted', label: 'Muted text', type: 'color' },
+  { section: 'Heading', name: 'headingPlacement', label: 'Heading placement', type: 'select', fallback: 'left' },
+  { section: 'Heading', name: 'headingFont', label: 'Heading font', type: 'text' },
+  { section: 'Heading', name: 'headingSize', label: 'Heading size', type: 'number', min: 12, max: 120 },
+  { section: 'Body', name: 'bodyFont', label: 'Body font', type: 'text' },
+  { section: 'Body', name: 'bodySize', label: 'Body size', type: 'number', min: 12, max: 120 },
+  { section: 'Code', name: 'codeFont', label: 'Code font', type: 'text' },
+  { section: 'Code', name: 'codeSize', label: 'Code size', type: 'number', min: 12, max: 120 },
+  { section: 'Placements', name: 'footer', label: 'Footer text', type: 'text' },
+  { section: 'Placements', name: 'logo', label: 'Logo text', type: 'text' },
   ...(['TopLeft', 'TopCenter', 'TopRight', 'BottomLeft', 'BottomCenter', 'BottomRight'] as const)
     .map(position => ({
-      name: `metadata${position}`, label: position.replace(/(Top|Bottom)(Left|Center|Right)/, '$1 $2'),
+      section: 'Placements' as const, name: `metadata${position}`, label: position.replace(/(Top|Bottom)(Left|Center|Right)/, '$1 $2'),
       type: 'select' as const
     })),
+  ...(['Top', 'Right', 'Bottom', 'Left'] as const).flatMap(direction => [
+    { section: 'Margins' as const, name: `margin${direction}`, label: `${direction} margin (%)`, type: 'number' as const, min: 0, max: 20, fallback: '5' },
+    { section: 'Padding' as const, name: `padding${direction}`, label: `${direction} padding (%)`, type: 'number' as const, min: 0, max: 20, fallback: '0' }
+  ]),
 ];
 function openSettings(): void {
   $('editor-panes').hidden = true;
   $('master-pane').hidden = false;
   const fields = $('settings-fields');
   fields.replaceChildren();
+  const sections = new Map(masterSections.map(section => {
+    const fieldset = document.createElement('fieldset');
+    fieldset.className = 'settings-section';
+    const legend = document.createElement('legend');
+    legend.textContent = section;
+    fieldset.append(legend);
+    fields.append(fieldset);
+    return [section, fieldset] as const;
+  }));
+  const master = compiled?.master || {};
+  const preset = themePresets[compiled?.theme || 'signal'] || themePresets.signal;
   for (const field of masterFields) {
     const label = document.createElement('label');
     label.textContent = field.label;
     const input = field.type === 'select' ? document.createElement('select') : document.createElement('input');
     if (input instanceof HTMLSelectElement) {
-      for (const [name, caption] of [
-        ['none', 'None'], ['slideNumber', 'Slide number / total'], ['deckTitle', 'Presentation title'],
-        ['slideTitle', 'Slide title'], ['footer', 'Footer text'], ['logo', 'Logo text']
-      ]) input.add(new Option(optionLabel(caption), name));
+      const options = field.name === 'theme' ? themeNames.map(name => [name, name])
+        : field.name === 'headingPlacement' ? [['left', 'Left'], ['center', 'Center'], ['right', 'Right']]
+        : [
+          ['none', 'None'], ['slideNumber', 'Slide number / total'], ['deckTitle', 'Presentation title'],
+          ['slideTitle', 'Slide title'], ['footer', 'Footer text'], ['logo', 'Logo text']
+        ];
+      for (const [name, caption] of options) input.add(new Option(optionLabel(caption), name));
     }
     if (input instanceof HTMLInputElement) {
       input.type = field.type;
-      if (field.type === 'checkbox') input.checked = compiled?.master?.[field.name] === true;
-      if (field.type === 'number') { input.min = '12'; input.max = '120'; }
+      if (field.type === 'number') {
+        input.min = String(field.min);
+        input.max = String(field.max);
+      }
     }
-    input.value = String(compiled?.master?.[field.name] ?? (
-      field.name === 'metadataBottomLeft' && compiled?.master?.footer &&
-        !Object.entries(compiled.master).some(([key, value]) => key.startsWith('metadata') && value === 'footer') ? 'footer'
-        : field.name === 'metadataBottomRight' && compiled?.master?.footerNumber &&
-          !Object.entries(compiled.master).some(([key, value]) => key.startsWith('metadata') && value === 'slideNumber') ? 'slideNumber'
-          : field.fallback ?? (field.type === 'select' ? 'none' : '')));
+    input.value = String(master[field.name] ?? (
+      field.name === 'theme' ? compiled?.theme || 'signal'
+        : field.name === 'metadataBottomLeft' && master.footer &&
+          !Object.entries(master).some(([key, value]) => key.startsWith('metadata') && value === 'footer') ? 'footer'
+          : field.name === 'metadataBottomRight' && master.footerNumber &&
+            !Object.entries(master).some(([key, value]) => key.startsWith('metadata') && value === 'slideNumber') ? 'slideNumber'
+            : preset[field.name] ?? field.fallback ?? (field.type === 'select' ? 'none' : '')));
     input.addEventListener('change', () => {
       try {
-        const value = field.type === 'checkbox' && input instanceof HTMLInputElement ? input.checked
-          : field.type === 'number' ? Number(input.value) : input.value;
-        if (field.type === 'number' && (!Number.isFinite(Number(value)) || Number(value) < 12 || Number(value) > 120)) {
-          throw new Error('Font size must be between 12 and 120.');
+        const value = field.type === 'number' ? Number(input.value) : input.value;
+        if (field.type === 'number' && (!input.value.trim() || !Number.isFinite(value as number) ||
+          Number(value) < field.min! || Number(value) > field.max!)) {
+          throw new Error(`${field.label} must be between ${field.min} and ${field.max}.`);
         }
-        editSource(setMaster(sourceInput.value, field.name, value));
+        editSource(field.name === 'theme' ? setTheme(sourceInput.value, String(value))
+          : setMaster(sourceInput.value, field.name, value));
       } catch (error) { errorNotice(error); }
     });
     label.append(input);
-    fields.append(label);
+    sections.get(field.section)!.append(label);
   }
   const preview = $('master-preview');
   preview.replaceChildren();
-  const slide = selectedSlide();
-  if (compiled) void renderStage(preview, compiled, slide, slide?.reveals.length || 0).catch(errorNotice);
+  const heading = document.createElement('h2');
+  heading.textContent = 'Live master preview';
+  const caption = document.createElement('p');
+  caption.textContent = 'Sample slides only; they are not added to your deck.';
+  preview.append(heading, caption);
+  if (!compiled) {
+    preview.append(document.createTextNode('Fix source diagnostics to see the preview.'));
+    return;
+  }
+  const samples: Slide[] = [
+    { id: 'sample-heading', index: 0, layout: 'title-content', body: '# Heading placement\n\nBody text shows theme, font, margins, and padding.', slots: {}, reveals: [] },
+    { id: 'sample-code', index: 1, layout: 'title-content', body: '# Code sample\n\n```typescript\nconst answer = 42;\n```', slots: {}, reveals: [] },
+    { id: 'sample-layout', index: 2, layout: 'two-columns', body: '# Placement sample', slots: { left: 'Left column', right: 'Right column' }, reveals: [] }
+  ];
+  const stage: Stage = { title: compiled.title, theme: compiled.theme, master, slides: samples };
+  for (const sample of samples) {
+    const card = document.createElement('article');
+    card.className = 'preview-card';
+    const title = document.createElement('h3');
+    title.textContent = `${sample.index + 1}. ${sample.id.replace('sample-', '')}`;
+    const surface = document.createElement('div');
+    surface.className = 'stage';
+    card.append(title, surface);
+    preview.append(card);
+    void renderStage(surface, stage, sample, 0).catch(errorNotice);
+  }
 }
 
 function currentSlide(snapshot: Snapshot): Slide | undefined {
@@ -791,7 +842,10 @@ function wire(): void {
     if (!confirm('Remove presentation master overrides from the source?')) return;
     try {
       let source = sourceInput.value;
-      for (const field of masterFields) source = setMaster(source, field.name);
+      for (const field of masterFields) if (field.name !== 'theme') source = setMaster(source, field.name);
+      source = setMaster(source, 'background');
+      source = setMaster(source, 'backdrop');
+      source = setMaster(source, 'footerNumber');
       source = clearTheme(source);
       editSource(source);
       openSettings();
