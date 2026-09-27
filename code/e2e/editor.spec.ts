@@ -136,11 +136,33 @@ Audience sees this.
   ]);
   await expect(page.locator('#settings-fields select')).toHaveCount(8);
   await expect(page.getByLabel('Slide number in footer')).toHaveCount(0);
-  await expect(page.locator('#master-preview .preview-card')).toHaveCount(3);
-  await expect(page.locator('#master-preview .preview-card').nth(0)).toContainText('Body text shows theme');
-  await expect(page.locator('#master-preview .preview-card').nth(1).locator('pre code')).toContainText('const answer = 42');
-  await expect(page.locator('#master-preview .preview-card').nth(2).locator('.slide-column')).toHaveCount(2);
-  await expect(page.locator('#source')).not.toHaveValue(/sample-heading/);
+  const samples = page.locator('#master-preview .preview-card');
+  await expect(samples).toHaveCount(17);
+  await expect(samples.locator(':scope > h3')).toHaveText([
+    'Blank', 'Title and subtitle', 'Title, subtitle and image', 'Heading only',
+    'Heading and content', 'Heading and two text columns', 'Heading and three columns',
+    'Heading and two images', 'Heading, image and text', 'Heading, text and image',
+    'Image only', 'Picture with caption', 'Heading and table', 'Heading and code',
+    'Heading and chart', 'Heading and diagram', 'Heading and equation'
+  ]);
+  await expect(samples.nth(0).locator('.stage')).toHaveAttribute('data-layout', 'blank');
+  await expect(samples.nth(0).locator('.slide-content')).toHaveCount(0);
+  await expect(samples.nth(1).locator('.slide-content')).toContainText('A short subtitle');
+  await expect(samples.nth(2).locator('.asset-fallback')).toHaveCount(1);
+  await expect(samples.nth(4).locator('li')).toHaveCount(3);
+  await expect(samples.nth(5).locator('.slide-column')).toHaveCount(2);
+  await expect(samples.nth(6).locator('.slide-column')).toHaveCount(3);
+  await expect(samples.nth(7).locator('.asset-fallback')).toHaveCount(2);
+  await expect(samples.nth(8).locator('.slide-column')).toHaveCount(2);
+  await expect(samples.nth(9).locator('.asset-fallback')).toHaveCount(1);
+  await expect(samples.nth(10).locator('.asset-fallback')).toHaveCount(1);
+  await expect(samples.nth(12).locator('table')).toHaveCount(1);
+  await expect(samples.nth(13).locator('pre code')).toContainText('const answer = 42');
+  await expect(samples.nth(14).locator('.chart-visual canvas')).toHaveCount(1);
+  await expect(samples.nth(15).locator('.special-fence[data-kind="mermaid"] svg')).toHaveCount(1);
+  await expect(samples.nth(16).locator('.katex')).toHaveCount(1);
+  await expect(page.locator('#master-preview')).toContainText('Image areas show unavailable-image placeholders');
+  await expect(page.locator('#source')).not.toHaveValue(/master-sample/);
   await expect(page.getByLabel('Top Left').locator('option')).toHaveText([
     'None', 'Slide Number / Total', 'Presentation Title', 'Slide Title', 'Footer Text', 'Logo Text'
   ]);
@@ -159,16 +181,16 @@ Audience sees this.
   await expect(page.locator('#master-preview .stage').first()).toHaveCSS('--slide-margin-left', '8%');
   await expect(page.locator('#master-preview .slide-content').first()).toHaveCSS('padding-left', /px/);
   await expect(page.locator('#master-preview .stage h1').first()).toHaveCSS('text-align', 'center');
-  await expect(page.locator('#master-preview pre code').first()).toHaveCSS('font-family', 'Consolas');
+  await expect(samples.nth(13).locator('pre code')).toHaveCSS('font-family', 'Consolas');
   await page.getByLabel('Bottom Right').selectOption('slideNumber');
-  await expect(page.locator('#master-preview .slide-meta[data-position="BottomRight"]').first()).toHaveText('1 / 3');
+  await expect(page.locator('#master-preview .slide-meta[data-position="BottomRight"]').first()).toHaveText('1 / 17');
   await page.getByLabel('Top Left').selectOption('slideNumber');
-  await expect(page.locator('#master-preview .slide-meta[data-position="TopLeft"]').first()).toHaveText('1 / 3');
+  await expect(page.locator('#master-preview .slide-meta[data-position="TopLeft"]').first()).toHaveText('1 / 17');
   await expect(page.locator('#source')).toHaveValue(/metadataBottomRight: "slideNumber"/);
   await page.getByLabel('Top Center').selectOption('deckTitle');
   await expect(page.locator('#source')).toHaveValue(/metadataTopCenter: "deckTitle"/);
   await expect(page.locator('#master-preview .slide-meta[data-position="TopCenter"]').first()).toHaveText('Browser acceptance');
-  await expect(page.locator('#master-preview .slide-meta[data-position="BottomRight"]').first()).toHaveText('1 / 3');
+  await expect(page.locator('#master-preview .slide-meta[data-position="BottomRight"]').first()).toHaveText('1 / 17');
   await page.locator('[data-view="source"]').click();
   await expect(page.locator('#editor-panes')).toHaveAttribute('data-view', 'source');
   await page.locator('#save').click();
@@ -266,7 +288,7 @@ slides:
   await page.locator('#settings-button').click();
   await expect(page.getByLabel('Slide number in footer')).toHaveCount(0);
   await expect(page.getByLabel('Bottom Right')).toHaveValue('slideNumber');
-  await expect(page.locator('#master-preview .slide-meta[data-position="BottomRight"]').first()).toHaveText('1 / 3');
+  await expect(page.locator('#master-preview .slide-meta[data-position="BottomRight"]').first()).toHaveText('1 / 17');
   await page.getByLabel('Bottom Right').selectOption('none');
   await expect(page.locator('#master-preview .slide-meta[data-position="BottomRight"]')).toHaveCount(0);
   await expect(page.locator('#source')).toHaveValue(/footerNumber: true/);

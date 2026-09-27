@@ -1,6 +1,7 @@
 import { clearTheme, editableLines, hasUniqueSlideIds, insertSlide, layouts, propagateSlideIdChange, replacePlainLine, setDeckTitle, setLayout, setMaster, setTheme, themeNames } from './source-edit';
 import { markdown, overlayMode, renderStage, themePresets, type Deck, type Slide, type Snapshot, type Stage, type Stroke } from './render';
 import { drawStage } from './stage-view';
+import { masterSamples } from './master-samples';
 
 type LibraryEntry = { id: string; name: string; path: string; missing?: boolean };
 type Diagnostic = { severity: string; message: string; code?: string; sourceSpan?: { start?: number; end?: number }; slideId?: string };
@@ -574,30 +575,31 @@ function openSettings(): void {
   const preview = $('master-preview');
   preview.replaceChildren();
   const heading = document.createElement('h2');
-  heading.textContent = 'Live master preview';
+  heading.textContent = 'Live layout samples';
   const caption = document.createElement('p');
-  caption.textContent = 'Sample slides only; they are not added to your deck.';
+  caption.textContent = 'Representative compositions using supported slide layouts. Image areas show unavailable-image placeholders; local image assets are not supported yet. These samples are not added to your deck.';
   preview.append(heading, caption);
   if (!compiled) {
     preview.append(document.createTextNode('Fix source diagnostics to see the preview.'));
     return;
   }
-  const samples: Slide[] = [
-    { id: 'sample-heading', index: 0, layout: 'title-content', body: '# Heading placement\n\nBody text shows theme, font, margins, and padding.', slots: {}, reveals: [] },
-    { id: 'sample-code', index: 1, layout: 'title-content', body: '# Code sample\n\n```typescript\nconst answer = 42;\n```', slots: {}, reveals: [] },
-    { id: 'sample-layout', index: 2, layout: 'two-columns', body: '# Placement sample', slots: { left: 'Left column', right: 'Right column' }, reveals: [] }
-  ];
-  const stage: Stage = { title: compiled.title, theme: compiled.theme, master, slides: samples };
-  for (const sample of samples) {
+  const stage: Stage = { title: compiled.title, theme: compiled.theme, master, slides: masterSamples.map(sample => sample.slide) };
+  const grid = document.createElement('div');
+  grid.className = 'master-samples-grid';
+  preview.append(grid);
+  for (const { title: sampleTitle, slide } of masterSamples) {
     const card = document.createElement('article');
     card.className = 'preview-card';
     const title = document.createElement('h3');
-    title.textContent = `${sample.index + 1}. ${sample.id.replace('sample-', '')}`;
+    title.textContent = sampleTitle;
+    const layout = document.createElement('span');
+    layout.className = 'sample-layout';
+    layout.textContent = optionLabel(slide.layout);
     const surface = document.createElement('div');
     surface.className = 'stage';
-    card.append(title, surface);
-    preview.append(card);
-    void renderStage(surface, stage, sample, 0).catch(errorNotice);
+    card.append(title, layout, surface);
+    grid.append(card);
+    void renderStage(surface, stage, slide, 0).catch(errorNotice);
   }
 }
 

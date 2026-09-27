@@ -144,10 +144,14 @@ a { color: #1752ad; }
 .settings-section select { max-width: 175px; }
 .settings-section input[type="number"] { width: 90px; }
 .master-preview { min-width: 0; }
-.master-preview h2 { margin: 0 0 6px; }
+.master-preview > h2 { margin: 0 0 6px; }
 .master-preview > p { margin: 0 0 18px; color: #536275; }
-.master-preview .preview-card { max-width: 720px; }
+.master-samples-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 330px), 1fr)); gap: 16px; }
+.master-preview .preview-card { min-width: 0; width: 100%; max-width: none; margin: 0; }
+.master-preview .preview-card > h3 { margin: 0; }
+.sample-layout { display: block; margin-bottom: 10px; color: #536275; font-size: 12px; }
 .master-preview .stage { aspect-ratio: 16 / 9; height: auto; font-size: clamp(11px, 1.2vw, 19px); }
+.master-preview .asset-fallback { display: grid; place-items: center; min-height: 6em; border: 2px dashed var(--slide-muted); border-radius: 6px; background: color-mix(in srgb, var(--slide-accent) 8%, var(--slide-surface)); text-align: center; }
 @media (max-width: 950px) { .master-pane { grid-template-columns: 1fr; } }
 .stage {
   --slide-surface: #fff;
