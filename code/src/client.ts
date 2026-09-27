@@ -203,8 +203,16 @@ function setView(next: View): void {
   $('master-pane').hidden = true;
   $('editor-panes').hidden = false;
   $('editor-panes').dataset.view = next;
-  for (const button of document.querySelectorAll<HTMLButtonElement>('[data-view]')) {
-    button.setAttribute('aria-pressed', String(button.dataset.view === next));
+  syncEditorNavigation();
+}
+function syncEditorNavigation(): void {
+  const settingsActive = !$('master-pane').hidden;
+  for (const button of document.querySelectorAll<HTMLButtonElement>('button[data-view]')) {
+    button.setAttribute('aria-pressed', String(!settingsActive && button.dataset.view === view));
+  }
+  document.querySelector('#settings-button')?.setAttribute('aria-current', settingsActive ? 'page' : 'false');
+  for (const button of document.querySelectorAll<HTMLButtonElement>('.outline-item')) {
+    button.setAttribute('aria-current', String(!settingsActive && button.dataset.slideId === selected));
   }
 }
 function updateDiagnostics(diagnostics: Diagnostic[] = []): void {
@@ -229,6 +237,7 @@ function updateDiagnostics(diagnostics: Diagnostic[] = []): void {
 }
 
 function selectSlide(id: string): void {
+  if (!$('master-pane').hidden) setView(view);
   selected = id;
   updateEditor();
   const card = [...document.querySelectorAll<HTMLElement>('.preview-card')].find(item => item.dataset.slideId === id);
@@ -267,8 +276,8 @@ function updateOutline(): void {
     const button = document.createElement('button');
     button.type = 'button';
     button.className = 'outline-item';
+    button.dataset.slideId = slide.id;
     button.style.paddingInlineStart = `${12 + Math.min(depth, 5) * 16}px`;
-    button.setAttribute('aria-current', slide.id === selected ? 'true' : 'false');
     button.textContent = `${slide.index + 1}. ${slide.body.match(/^#{1,3}\s+(.+)$/m)?.[1] || slide.id}`;
     button.addEventListener('click', () => selectSlide(slide.id));
     list.append(button);
@@ -287,6 +296,7 @@ function updateOutline(): void {
     button.addEventListener('click', () => {
       try {
         const added = insertSlide(sourceInput.value, parent, parent ? undefined : selected || undefined);
+        if (!$('master-pane').hidden) setView(view);
         editSource(added.text);
         selected = added.id;
         sourceInput.focus();
@@ -299,6 +309,7 @@ function updateOutline(): void {
   actions.append(addButton('Add slide'));
   if (selected) actions.append(addButton('Add child slide', selected));
   outline.append(actions);
+  syncEditorNavigation();
 }
 
 async function updatePreview(): Promise<void> {
@@ -522,6 +533,7 @@ const masterFields: MasterField[] = [
 function openSettings(): void {
   $('editor-panes').hidden = true;
   $('master-pane').hidden = false;
+  syncEditorNavigation();
   const fields = $('settings-fields');
   fields.replaceChildren();
   const sections = new Map(masterSections.map(section => {
@@ -797,7 +809,7 @@ function wire(): void {
       } catch (error) { errorNotice(error); }
     }
   });
-  for (const button of document.querySelectorAll<HTMLButtonElement>('[data-view]')) {
+  for (const button of document.querySelectorAll<HTMLButtonElement>('button[data-view]')) {
     button.addEventListener('click', () => setView(button.dataset.view as View));
   }
   $<HTMLSelectElement>('theme').addEventListener('change', event => {

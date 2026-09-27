@@ -73,6 +73,44 @@ test('integrated dev mode serves live UI and API, creates a deck from its title'
   await expect(page.locator('#editor-page')).toBeVisible();
   await expect(page.locator('#source-file')).toContainText('Test-Presentation.md');
   await expect(page.locator('#page-title')).toHaveText('Test Presentation');
+  await page.locator('#settings-button').click();
+  const samples = page.locator('#master-preview .sample-list button');
+  const viewer = page.locator('#master-preview .sample-viewer');
+  for (const width of [1280, 1920]) {
+    await page.setViewportSize({ width, height: width === 1280 ? 720 : 1080 });
+    for (const index of [2, 7, 8, 9, 10, 11, 14, 15]) {
+      await samples.nth(index).click();
+      const visuals = viewer.locator(index < 14 ? 'img.slide-image'
+        : index === 14 ? '.chart-visual canvas' : '.special-fence[data-kind="mermaid"] svg');
+      const count = index === 7 ? 2 : 1;
+      await expect(visuals).toHaveCount(count);
+      for (let item = 0; item < count; item++) {
+        const visual = visuals.nth(item);
+        await expect(visual).toBeVisible();
+        const measurement = await visual.evaluate(element => {
+          const stage = element.closest('.stage')!.getBoundingClientRect();
+          const rect = element.getBoundingClientRect();
+          return { top: rect.top - stage.top, bottom: stage.bottom - rect.bottom, width: rect.width, height: rect.height };
+        });
+        expect(measurement.top).toBeGreaterThanOrEqual(0);
+        expect(measurement.bottom).toBeGreaterThanOrEqual(0);
+        expect(measurement.width).toBeGreaterThan(0);
+        expect(measurement.height).toBeGreaterThan(0);
+        if (index < 14) {
+          await expect.poll(() => visual.evaluate(image => (image as HTMLImageElement).naturalWidth)).toBeGreaterThan(0);
+        } else if (index === 14) {
+          await expect.poll(() => visual.evaluate(element => {
+            const canvas = element as HTMLCanvasElement;
+            const pixels = canvas.getContext('2d')?.getImageData(0, 0, canvas.width, canvas.height).data;
+            return !!pixels && pixels.some((channel, offset) => offset % 4 === 3 && channel > 0);
+          })).toBe(true);
+        } else {
+          await expect(visual.locator('path')).not.toHaveCount(0);
+        }
+      }
+    }
+  }
+  await page.locator('button[data-view="split"]').click();
   await expect(page.locator('.editor-buttons > button, .view-buttons > button')).toHaveCount(5);
   expect(await page.locator('.editor-buttons > button svg, .view-buttons > button svg').count()).toBe(5);
   await expect(page.locator('#save')).toBeDisabled();

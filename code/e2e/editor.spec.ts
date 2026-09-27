@@ -222,6 +222,7 @@ Audience sees this.
   await expect(page.locator('#editor-panes')).toHaveAttribute('data-view', 'source');
   await page.locator('#save').click();
   await expect(page.locator('#save-status')).toHaveText('Saved');
+  await expect(page.locator('#save-status')).toHaveCSS('border-radius', '8px');
   await expect(page.locator('#save')).toBeDisabled();
   await expect.poll(async () => readFile(join(directory, name), 'utf8')).toContain('Updated audience paragraph');
   expect(await readFile(join(directory, name), 'utf8')).toContain('theme: "forest"');
@@ -299,6 +300,47 @@ Audience sees this.
   await expect(page.getByLabel('Bottom Right')).toHaveValue('slideNumber');
   await expect(page.getByLabel('Top Center')).toHaveValue('deckTitle');
   await expect(page.locator('#master-preview .slide-meta[data-position="TopCenter"]')).toHaveText('Browser acceptance');
+});
+
+test('master settings announces the active view and matches editor control typography', async ({ page }) => {
+  await page.goto(origin);
+  await page.locator('#deck-name').fill('Settings navigation');
+  await page.locator('#create').click();
+  await expect(page.locator('#editor-page')).toBeVisible();
+  await expect(page.locator('button[data-view="split"]')).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.locator('#editor-panes')).not.toHaveAttribute('aria-pressed');
+  await expect(page.locator('.outline-item[aria-current="true"]')).toHaveCount(1);
+
+  await page.locator('#settings-button').click();
+  await expect(page.locator('#master-pane')).toBeVisible();
+  await expect(page.locator('#editor-panes')).toBeHidden();
+  await expect(page.locator('#settings-button')).toHaveAttribute('aria-current', 'page');
+  await expect(page.locator('#settings-button')).toHaveCSS('background-color', 'rgb(233, 240, 254)');
+  await expect(page.locator('.outline-item[aria-current="true"]')).toHaveCount(0);
+  await expect(page.locator('button[data-view][aria-pressed="true"]')).toHaveCount(0);
+  for (const selector of [
+    '.topbar #theme', '.topbar [data-view="split"]', '.topbar .export-menu summary',
+    '#settings-button', '.outline-item', '.outline-actions .add-slide',
+    '#settings-fields label', '#settings-fields input', '#reset-master'
+  ]) await expect(page.locator(selector).first()).toHaveCSS('font-size', '13px');
+
+  await page.locator('.outline-item').first().click();
+  await expect(page.locator('#master-pane')).toBeHidden();
+  await expect(page.locator('button[data-view="split"]')).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.locator('#settings-button')).toHaveAttribute('aria-current', 'false');
+  await expect(page.locator('.outline-item[aria-current="true"]')).toHaveCount(1);
+
+  await page.locator('#settings-button').click();
+  await page.locator('[data-view="source"]').click();
+  await expect(page.locator('#master-pane')).toBeHidden();
+  await expect(page.locator('#editor-panes')).toHaveAttribute('data-view', 'source');
+  await expect(page.locator('button[data-view="source"]')).toHaveAttribute('aria-pressed', 'true');
+
+  await page.locator('#settings-button').click();
+  await page.getByRole('button', { name: 'Add slide', exact: true }).click();
+  await expect(page.locator('#master-pane')).toBeHidden();
+  await expect(page.locator('.outline-item[aria-current="true"]')).toHaveCount(1);
+  await expect(page.locator('#source')).toHaveValue(/::slide\{id="slide-[\da-f]{8}"\}/);
 });
 
 test('legacy slide-number setting can be overridden and reset without invalid source', async ({ page }) => {
