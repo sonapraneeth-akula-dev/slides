@@ -46,6 +46,19 @@ test('author, persist, present and share only read-only public state', async ({ 
   await page.locator('#deck-name').fill(name);
   await page.locator('#create').click();
   await expect(page.locator('#editor-page')).toBeVisible();
+  await expect(page.locator('#save')).toBeDisabled();
+  await expect(page.locator('#theme option')).toHaveText(['Signal', 'Paper', 'Midnight', 'Forest']);
+  await expect(page.locator('.preview-card').first().locator('select option')).toHaveText([
+    'Title Content', 'Two Columns', 'Three Columns', 'Picture Text', 'Blank'
+  ]);
+  await page.locator('#editor-actions .export-menu summary').click();
+  await expect(page.locator('#editor-actions .export-options')).toBeVisible();
+  await expect(page.locator('#editor-actions .export-options button')).toHaveText([
+    'Export To PDF (Coming Later)', 'Export To HTML (Coming Later)'
+  ]);
+  await expect(page.locator('#editor-actions .export-options button:enabled')).toHaveCount(0);
+  await page.locator('#editor-actions .export-menu summary').click();
+  await expect(page.locator('#save')).toHaveCSS('border-radius', '8px');
   await expect(page.locator('#page-title')).toHaveText('browser-acceptance');
   await expect(page.locator('.outline-actions')).toBeVisible();
   const outline = await page.locator('#outline').boundingBox();
@@ -55,6 +68,7 @@ test('author, persist, present and share only read-only public state', async ({ 
   await page.locator('#title-input').fill('Browser acceptance');
   await page.locator('#title-input').press('Enter');
   await expect(page.locator('#source')).toHaveValue(/title: "Browser acceptance"/);
+  await expect(page.locator('#save')).toBeEnabled();
   const source = `---
 slides:
   formatVersion: 1
@@ -118,6 +132,9 @@ Audience sees this.
   await page.locator('#settings-button').click();
   await expect(page.locator('#master-pane')).toBeVisible();
   await expect(page.locator('#settings-fields select')).toHaveCount(6);
+  await expect(page.getByLabel('Top Left').locator('option')).toHaveText([
+    'None', 'Slide Number / Total', 'Presentation Title', 'Slide Title', 'Footer Text', 'Logo Text'
+  ]);
   await page.locator('#theme').selectOption('forest');
   await expect(page.locator('#source')).toHaveValue(/theme: "forest"/);
   await page.getByLabel('Slide number in footer').check();
@@ -134,6 +151,7 @@ Audience sees this.
   await expect(page.locator('#editor-panes')).toHaveAttribute('data-view', 'source');
   await page.locator('#save').click();
   await expect(page.locator('#save-status')).toHaveText('Saved');
+  await expect(page.locator('#save')).toBeDisabled();
   await expect.poll(async () => readFile(join(directory, name), 'utf8')).toContain('Updated audience paragraph');
   expect(await readFile(join(directory, name), 'utf8')).toContain('theme: "forest"');
 
@@ -142,7 +160,11 @@ Audience sees this.
   await expect(page.locator('#presentation-page')).toBeVisible();
   await expect(page.locator('#speaker-notes')).toContainText('PRIVATE SPEAKER NOTES');
   await expect(page.locator('#stage .slide-meta[data-position="BottomRight"]')).toHaveText('1 / 2');
-  await expect(page.getByRole('button', { name: 'Export (coming later)' })).toBeDisabled();
+  await expect(page.locator('#jump option')).toHaveText(['1. Browser Acceptance', '2. Second Slide']);
+  await page.locator('.presenter-export summary').click();
+  await expect(page.locator('.presenter-export .export-options button')).toHaveCount(2);
+  await expect(page.locator('.presenter-export .export-options button:enabled')).toHaveCount(0);
+  await page.locator('.presenter-export summary').click();
   await expect(page.getByRole('button', { name: 'Save annotations (coming later)' })).toBeDisabled();
   const popupPromise = context.waitForEvent('page');
   await page.locator('#local-audience').click();
@@ -196,16 +218,24 @@ test('external edit opens conflict dialog without overwriting either version', a
   await page.locator('#deck-name').fill(name);
   await page.locator('#create').click();
   await expect(page.locator('#editor-page')).toBeVisible();
+  await expect(page.locator('#save')).toBeDisabled();
   const original = await readFile(join(directory, name), 'utf8');
+  await page.locator('#source').fill(original + '\nDraft reverted');
+  await expect(page.locator('#save')).toBeEnabled();
+  await page.locator('#source').fill(original);
+  await expect(page.locator('#save')).toBeDisabled();
   const disk = original.replace('Edit this slide in Markdown.', 'External update');
   await writeFile(join(directory, name), disk);
   await page.locator('#source').fill(original.replace('Edit this slide in Markdown.', 'Unsaved browser draft'));
+  await expect(page.locator('#save')).toBeEnabled();
   await page.locator('#save').click();
   await expect(page.locator('#conflict-dialog')).toBeVisible();
+  await expect(page.locator('#save')).toBeEnabled();
   await expect(page.locator('#draft-text')).toHaveValue(/Unsaved browser draft/);
   expect(await readFile(join(directory, name), 'utf8')).toBe(disk);
   await page.locator('#use-disk').click();
   await expect(page.locator('#source')).toHaveValue(disk);
+  await expect(page.locator('#save')).toBeDisabled();
   await expect(page.locator('#conflict-dialog')).toBeHidden();
 });
 
@@ -230,7 +260,14 @@ test('title pencil, slide buttons and multiple plain preview paragraphs work tog
   const child = page.getByRole('button', { name: 'Add child slide', exact: true });
   for (const button of [add, child]) {
     await expect(button).toBeVisible();
-    await expect(button.locator('.add-slide-icon')).toHaveText('+');
+    await expect(button.locator('.add-slide-icon svg path')).toHaveAttribute('d', 'M12 6v12M6 12h12');
+    const offset = await button.locator('.add-slide-icon svg').evaluate(icon => {
+      const circle = icon.parentElement!.getBoundingClientRect();
+      const mark = icon.getBoundingClientRect();
+      return [(mark.left + mark.right - circle.left - circle.right) / 2,
+        (mark.top + mark.bottom - circle.top - circle.bottom) / 2];
+    });
+    expect(offset.every(value => Math.abs(value) <= 0.5)).toBeTruthy();
     expect(await button.locator('.add-slide-icon').evaluate(icon => getComputedStyle(icon).backgroundColor)).toBe('rgb(35, 84, 173)');
   }
 
@@ -252,4 +289,5 @@ test('title pencil, slide buttons and multiple plain preview paragraphs work tog
   await add.click();
   await expect(page.locator('.preview-card')).toHaveCount(3);
   await expect.poll(async () => readFile(join(directory, 'Preview-editing.md'), 'utf8')).toContain('Updated tests');
+  await expect(page.locator('#save')).toBeDisabled();
 });

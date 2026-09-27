@@ -67,13 +67,24 @@ a { color: #1752ad; }
 #editor-actions { gap: 14px; }
 #editor-actions label { display: flex; align-items: center; gap: 8px; }
 #theme { min-width: 145px; }
-.editor-buttons { display: inline-flex; align-items: stretch; }
-.editor-buttons button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; border-radius: 0; margin-left: -1px; }
-.editor-buttons button:first-child { border-radius: 8px 0 0 8px; margin-left: 0; }
-.editor-buttons button:last-child { border-radius: 0 8px 8px 0; }
+.editor-buttons { display: inline-flex; align-items: stretch; gap: 8px; }
+.view-buttons { display: inline-flex; }
+.editor-buttons button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
+.view-buttons button { border-radius: 0; margin-left: -1px; }
+.view-buttons button:first-child { border-radius: 8px 0 0 8px; margin-left: 0; }
+.view-buttons button:last-child { border-radius: 0 8px 8px 0; }
 .editor-buttons button[aria-pressed="true"] { background: #e9f0fe; color: #153c86; border-color: #829cd6; position: relative; }
 .editor-buttons svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; flex: none; }
 .editor-buttons .primary[aria-pressed="true"] { color: #fff; background: #2354ad; }
+.export-menu { position: relative; }
+.export-menu summary { display: flex; align-items: center; gap: 9px; min-height: 38px; padding: 7px 12px; border: 1px solid #bbc7d6; border-radius: 8px; background: #fff; cursor: pointer; list-style: none; }
+.export-menu summary::-webkit-details-marker { display: none; }
+.export-menu summary::after { content: ''; width: 7px; height: 7px; margin: -4px 2px 0 4px; border-right: 2px solid currentColor; border-bottom: 2px solid currentColor; transform: rotate(45deg); }
+.export-menu summary:hover { border-color: #466ec1; }
+.export-menu summary:focus-visible { outline: 3px solid #3468d2; outline-offset: 2px; }
+.export-options { position: absolute; z-index: 10; top: calc(100% + 4px); right: 0; min-width: 240px; padding: 6px; border: 1px solid #bbc7d6; border-radius: 8px; background: #fff; box-shadow: 0 6px 20px #1b2c4425; }
+.export-options button { display: block; width: 100%; text-align: left; border: 0; }
+.presenter-export { display: inline-block; margin-top: 8px; }
 .eyebrow { color: #416ab8; letter-spacing: .15em; font-size: 12px; font-weight: 700; }
 .library-page { max-width: 1200px; margin: 0 auto; padding: clamp(24px, 5vw, 72px) 24px; }
 .library-intro { max-width: 700px; }
@@ -99,7 +110,8 @@ a { color: #1752ad; }
 .outline-item, .add-slide, #settings-button { display: block; width: 100%; margin: 4px 0; text-align: left; overflow-wrap: anywhere; border-color: transparent; background: transparent; }
 .outline-actions .add-slide { display: flex; align-items: center; gap: 9px; padding: 8px 10px; border-color: #b7c9ed; background: #fff; color: #2354ad; font-weight: 600; }
 .outline-actions .add-slide:hover { background: #e9f0fe; }
-.add-slide-icon { display: inline-flex; align-items: center; justify-content: center; flex: none; width: 22px; height: 22px; border-radius: 50%; background: #2354ad; color: #fff; font-size: 19px; font-weight: 400; line-height: 1; }
+.add-slide-icon { display: inline-flex; align-items: center; justify-content: center; flex: none; width: 22px; height: 22px; border-radius: 50%; background: #2354ad; color: #fff; }
+.add-slide-icon svg { display: block; width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; }
 .outline-item[aria-current="true"] { color: #153c86; background: #e9f0fe; font-weight: 700; }
 #settings-button { border-color: #cbd5e4; font-weight: 600; }
 .editor-workspace { min-height: 0; overflow: auto; }

@@ -69,8 +69,9 @@ test('integrated dev mode serves live UI and API, creates a deck from its title'
   await expect(page.locator('#editor-page')).toBeVisible();
   await expect(page.locator('#source-file')).toContainText('Test-Presentation.md');
   await expect(page.locator('#page-title')).toHaveText('Test Presentation');
-  await expect(page.locator('.editor-buttons button')).toHaveCount(5);
-  expect(await page.locator('.editor-buttons button svg').count()).toBe(5);
+  await expect(page.locator('.editor-buttons > button, .view-buttons > button')).toHaveCount(5);
+  expect(await page.locator('.editor-buttons > button svg, .view-buttons > button svg').count()).toBe(5);
+  await expect(page.locator('#save')).toBeDisabled();
   await expect(page.locator('#source')).toHaveValue(/title: "Test Presentation"/);
   const file = join(directory, 'Test-Presentation.md');
   await expect.poll(async () => readFile(file, 'utf8')).toContain('title: "Test Presentation"');

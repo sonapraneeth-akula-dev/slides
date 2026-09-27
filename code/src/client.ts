@@ -89,6 +89,12 @@ function errorNotice(error: unknown): void { notify(message(error)); }
 function dialog(id: string): HTMLDialogElement { return $<HTMLDialogElement>(id); }
 function selectedSlide(): Slide | undefined { return compiled?.slides.find(slide => slide.id === selected); }
 function isDirty(): boolean { return !!deckId && sourceInput.value !== savedText; }
+function updateSaveButton(): void {
+  $('save').toggleAttribute('disabled', page !== 'editor' || !isDirty() || !!saving);
+}
+function optionLabel(value: string): string {
+  return value.replace(/-/g, ' ').replace(/\b[a-z]/g, letter => letter.toUpperCase());
+}
 function status(value: string, warn = false): void {
   const pill = $('save-status');
   pill.hidden = false;
@@ -184,6 +190,7 @@ async function openDeck(id: string): Promise<void> {
     show('editor');
     updateDiagnostics(result.diagnostics);
     updateEditor();
+    updateSaveButton();
     if (result.deck) status('Saved');
     else status('Source has errors — edit to preview', true);
   } catch (error) { errorNotice(error); }
@@ -273,7 +280,7 @@ function updateOutline(): void {
     const icon = document.createElement('span');
     icon.className = 'add-slide-icon';
     icon.setAttribute('aria-hidden', 'true');
-    icon.textContent = '+';
+    icon.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 6v12M6 12h12"/></svg>';
     button.append(icon, document.createTextNode(label));
     button.addEventListener('click', () => {
       try { editSource(addSlide(sourceInput.value, parent)); }
@@ -307,7 +314,7 @@ async function updatePreview(): Promise<void> {
     label.textContent = `${slide.index + 1} · ${slide.id}`;
     const layout = document.createElement('select');
     layout.setAttribute('aria-label', `Layout for slide ${slide.index + 1}`);
-    for (const name of layouts) layout.add(new Option(name.replace(/-/g, ' '), name));
+    for (const name of layouts) layout.add(new Option(optionLabel(name), name));
     layout.value = slide.layout;
     layout.disabled = !canEditPreview();
     layout.addEventListener('change', () => {
@@ -457,8 +464,12 @@ async function save(): Promise<boolean> {
         status('Disk conflict — draft retained', true);
       } else status(`Save failed — draft retained: ${message(error)}`, true);
       return false;
-    } finally { saving = undefined; }
+    } finally {
+      saving = undefined;
+      updateSaveButton();
+    }
   })();
+  updateSaveButton();
   return saving;
 }
 function scheduleSave(): void {
@@ -499,7 +510,7 @@ function openSettings(): void {
       for (const [name, caption] of [
         ['none', 'None'], ['slideNumber', 'Slide number / total'], ['deckTitle', 'Presentation title'],
         ['slideTitle', 'Slide title'], ['footer', 'Footer text'], ['logo', 'Logo text']
-      ]) input.add(new Option(caption, name));
+      ]) input.add(new Option(optionLabel(caption), name));
     }
     if (input instanceof HTMLInputElement) {
       input.type = field.type;
@@ -552,7 +563,7 @@ function drawPresenter(): void {
   $('speaker-notes').replaceChildren(markdown(notes));
   const jump = $<HTMLSelectElement>('jump');
   jump.replaceChildren();
-  slides.forEach((item, position) => jump.add(new Option(`${position + 1}. ${item.body.match(/^#{1,3}\s+(.+)$/m)?.[1] || item.id}`, item.id)));
+  slides.forEach((item, position) => jump.add(new Option(`${position + 1}. ${optionLabel(item.body.match(/^#{1,3}\s+(.+)$/m)?.[1] || item.id)}`, item.id)));
   jump.value = snapshot.slideId;
   const byId = new Map(slides.map(item => [item.id, item]));
   const children = slides.filter(item => item.parent === snapshot.slideId);
@@ -652,7 +663,7 @@ function presenterKeys(event: KeyboardEvent): void {
 }
 
 function wire(): void {
-  $<HTMLSelectElement>('theme').replaceChildren(...themeNames.map(name => new Option(name, name)));
+  $<HTMLSelectElement>('theme').replaceChildren(...themeNames.map(name => new Option(optionLabel(name), name)));
   $('create').addEventListener('click', () => {
     const name = $<HTMLInputElement>('deck-name').value.trim();
     if (!name) { notify('Enter a deck name.'); return; }
@@ -680,6 +691,7 @@ function wire(): void {
     clearTimeout(saveTimer);
     deckId = '';
     show('library');
+    updateSaveButton();
     text('page-title', 'Local presentations');
     $('save-status').hidden = true;
   });
@@ -710,7 +722,7 @@ function wire(): void {
     try { editSource(setTheme(sourceInput.value, (event.target as HTMLSelectElement).value)); }
     catch (error) { errorNotice(error); }
   });
-  sourceInput.addEventListener('input', () => { scheduleCompile(); scheduleSave(); });
+  sourceInput.addEventListener('input', () => { updateSaveButton(); scheduleCompile(); scheduleSave(); });
   sourceInput.addEventListener('keydown', event => {
     if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's') {
       event.preventDefault();
@@ -731,6 +743,7 @@ function wire(): void {
     revision = diskConflict.diskRevision;
     savedText = diskConflict.diskText;
     sourceInput.value = savedText;
+    updateSaveButton();
     conflicted = false;
     diskConflict = null;
     dialog('conflict-dialog').close();

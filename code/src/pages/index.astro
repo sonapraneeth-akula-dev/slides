@@ -22,11 +22,17 @@ import '../styles.css';
         <div id="editor-actions" class="actions" hidden>
           <label>Theme <select id="theme" aria-label="Deck theme"></select></label>
           <div class="editor-buttons" role="toolbar" aria-label="Editor actions">
-            <button type="button" data-view="source"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m8 5-6 7 6 7m8-14 6 7-6 7m-3-18-3 24"/></svg>Source</button>
-            <button type="button" data-view="split"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="3" width="20" height="18" rx="2"/><path d="M12 3v18"/></svg>Split</button>
-            <button type="button" data-view="preview"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg>Preview</button>
-            <button type="button" id="save"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 2h15l3 3v17H3zM7 2v7h10V2M6 22v-9h12v9"/></svg>Save</button>
+            <div class="view-buttons" role="group" aria-label="Editor view">
+              <button type="button" data-view="source"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m8 5-6 7 6 7m8-14 6 7-6 7m-3-18-3 24"/></svg>Source</button>
+              <button type="button" data-view="split"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="3" width="20" height="18" rx="2"/><path d="M12 3v18"/></svg>Split</button>
+              <button type="button" data-view="preview"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg>Preview</button>
+            </div>
+            <button type="button" id="save" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 2h15l3 3v17H3zM7 2v7h10V2M6 22v-9h12v9"/></svg>Save</button>
             <button type="button" id="present" class="primary"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="m10 7 5 4-5 4zm2 10v5m-5 0h10"/></svg>Present</button>
+            <details class="export-menu"><summary>Export</summary><div class="export-options">
+              <button type="button" disabled title="PDF export is coming later">Export To PDF (Coming Later)</button>
+              <button type="button" disabled title="HTML export is coming later">Export To HTML (Coming Later)</button>
+            </div></details>
           </div>
         </div>
         <div id="presenter-actions" class="actions" hidden>
@@ -126,7 +132,10 @@ import '../styles.css';
           <h2>Speaker notes <span class="private-tag">Private</span></h2>
           <div id="speaker-notes" class="speaker-notes"></div>
           <p id="share-info" class="share-info">Local only. Sharing is off.</p>
-          <button type="button" class="inert" disabled title="Export is not available yet">Export (coming later)</button>
+          <details class="export-menu presenter-export"><summary>Export</summary><div class="export-options">
+            <button type="button" disabled title="PDF export is coming later">Export To PDF (Coming Later)</button>
+            <button type="button" disabled title="HTML export is coming later">Export To HTML (Coming Later)</button>
+          </div></details>
           <button type="button" class="inert" disabled title="Annotation saving is not available yet">Save annotations (coming later)</button>
         </aside>
       </main>

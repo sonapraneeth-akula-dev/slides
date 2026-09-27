@@ -10,7 +10,7 @@ Only the subsets below have implementation evidence. This is **not** a blanket c
 | Presentation mode | Implemented subset | Frozen saved deck, navigation and reveals, private notes/timer, pointer, ink, blank/blackout, explicit ink-discard confirmation, and local audience view. Browser coverage exercises reveals, navigation, blackout, ending, and notes privacy; annotation persistence/export is not implemented. |
 | Audience/LAN | Implemented subset | Read-only audience route, sanitized shared rendering, reconnect, explicit interface/port sharing, and backend isolation tests. Remote-device connectivity and visual fidelity are not verified. |
 | Integrated development | Implemented subset | `bun run dev` runs the Astro live-reloading UI and hot-reloaded Bun API together; the UI displays a DEV MODE badge. Backend reloads invalidate the owner token and active sessions, so save drafts and refresh after API source changes. LAN audience assets still require a production build. |
-| Export | Deferred | Buttons retained without export functionality. |
+| Export | Deferred | Editor and presenter menus show disabled PDF and HTML options; no export functionality. |
 | Custom components and authored code | Deferred | JSX/imports/expressions, component registration, and execution are intentionally unavailable. |
 | Full acceptance | Unverified | Browser end-to-end coverage exists for selected flows, not full mockup/PRD parity, accessibility/security review, physical LAN sharing, or measured performance. |
 
