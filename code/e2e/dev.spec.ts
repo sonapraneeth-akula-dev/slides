@@ -75,9 +75,13 @@ test('integrated dev mode serves live UI and API, creates a deck from its title'
     const surface = stage.getBoundingClientRect();
     const bounds = svg.getBoundingClientRect();
     const nodes = [...svg.querySelectorAll('.node')].map(node => node.getBoundingClientRect());
+    const footer = stage.querySelector('.slide-meta[data-position="BottomLeft"]')!.getBoundingClientRect();
     return { svgWidth: bounds.width, stageWidth: surface.width,
       nodes: nodes.length,
-      centered: nodes.every(node => Math.abs((node.left + node.right) / 2 - (surface.left + surface.right) / 2) < surface.width * .12),
+      lastNodeBottom: nodes.at(-1)?.bottom, footerTop: footer.top, stageBottom: surface.bottom,
+      scrollHeight: stage.scrollHeight, clientHeight: stage.clientHeight,
+      centered: Math.abs((Math.min(...nodes.map(node => node.left)) +
+        Math.max(...nodes.map(node => node.right))) / 2 - (surface.left + surface.right) / 2) < surface.width * .12,
       contained: nodes.every(node => node.left >= bounds.left && node.right <= bounds.right &&
         node.top >= bounds.top && node.bottom <= bounds.bottom) };
   });
@@ -85,6 +89,8 @@ test('integrated dev mode serves live UI and API, creates a deck from its title'
   expect(previewDiagram.nodes).toBe(4);
   expect(previewDiagram.centered).toBe(true);
   expect(previewDiagram.contained).toBe(true);
+  expect(previewDiagram.lastNodeBottom).toBeLessThan(previewDiagram.footerTop - 8);
+  expect(previewDiagram.scrollHeight).toBeLessThanOrEqual(previewDiagram.clientHeight + 1);
   await page.evaluate(() => { document.documentElement.style.zoom = ''; });
   await page.locator('#home').click();
   await page.locator('#deck-name').fill('example.txt');

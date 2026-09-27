@@ -550,7 +550,7 @@ test('one feature tour action opens the latest edition without overwriting edits
   await expect(page.locator('.preview-card')).toHaveCount(16);
   await expect(page.locator('#source-file')).toContainText('Slides-Feature-Tour-2.md');
   await expect(page.locator('#source')).toHaveValue(/# A reveal and private notes/);
-  await expect(page.locator('#source')).toHaveValue(/Mermaid renders this flow from idea to presentation/);
+  await expect(page.locator('#source')).toHaveValue(/Mermaid renders this left-to-right flow from idea to presentation/);
   expect((await page.locator('#source').inputValue()).match(/^:::notes$/gm)).toHaveLength(16);
   expect(await readFile(original, 'utf8')).toBe(olderText);
   await page.locator('#home').click();
@@ -581,7 +581,7 @@ test('Mermaid stays centered and unclipped in draft preview and public stages', 
   await page.locator('button[data-view="preview"]').click();
   const stage = page.locator('.preview-card[data-slide-id="diagram"] .preview-stage');
   await expect(stage.locator('.special-fence svg')).toBeVisible();
-  for (const [width, height, zoom] of [[2000, 1250, 1], [2000, 1250, 1.25], [1280, 720, 1]] as const) {
+  for (const [width, height, zoom] of [[2000, 1250, 1], [2000, 1250, 1.25], [1600, 1110, 1.5], [1280, 720, 1]] as const) {
     await page.setViewportSize({ width, height });
     await page.evaluate(value => { document.documentElement.style.zoom = String(value); }, zoom);
     const geometry = await stage.evaluate(element => {
@@ -590,11 +590,14 @@ test('Mermaid stays centered and unclipped in draft preview and public stages', 
       const bounds = svg.getBoundingClientRect();
       const nodes = [...svg.querySelectorAll('.node, .nodeLabel')].map(node => node.getBoundingClientRect());
       const footer = element.querySelector('.slide-meta[data-position="BottomLeft"]')?.getBoundingClientRect();
+      const groupLeft = Math.min(...nodes.map(node => node.left));
+      const groupRight = Math.max(...nodes.map(node => node.right));
       return {
         nodes: nodes.length,
         svgWidth: bounds.width,
         stageWidth: slide.width,
-        centered: nodes.every(node => Math.abs((node.left + node.right) / 2 - (slide.left + slide.right) / 2) < slide.width * .12),
+        groupWidth: groupRight - groupLeft,
+        centered: Math.abs((groupLeft + groupRight) / 2 - (slide.left + slide.right) / 2) < slide.width * .12,
         contained: nodes.every(node =>
           node.left >= bounds.left - 1 && node.right <= bounds.right + 1 &&
           node.top >= bounds.top - 1 && node.bottom <= bounds.bottom + 1 &&
@@ -605,10 +608,20 @@ test('Mermaid stays centered and unclipped in draft preview and public stages', 
     });
     expect(geometry.nodes).toBeGreaterThanOrEqual(4);
     expect(geometry.svgWidth).toBeGreaterThan(geometry.stageWidth * .7);
+    expect(geometry.groupWidth).toBeGreaterThan(geometry.stageWidth * .55);
     expect(geometry.centered).toBe(true);
     expect(geometry.contained).toBe(true);
     expect(geometry.overflow).toBe(false);
   }
+  await stage.evaluate(element => { element.style.setProperty('--slide-margin-bottom', '0%'); });
+  const footerClearance = await stage.evaluate(element => {
+    const nodes = [...element.querySelectorAll('.special-fence svg .node, .special-fence svg .nodeLabel')];
+    const footerTop = element.querySelector('.slide-meta[data-position="BottomLeft"]')!.getBoundingClientRect().top;
+    return { nodeBottom: Math.max(...nodes.map(node => node.getBoundingClientRect().bottom)),
+      footerTop, overflow: element.scrollHeight > element.clientHeight + 1 };
+  });
+  expect(footerClearance.nodeBottom).toBeLessThan(footerClearance.footerTop - 8);
+  expect(footerClearance.overflow).toBe(false);
   await page.locator('#present').click();
   await page.locator('#jump').selectOption('diagram');
   const audienceOpened = context.waitForEvent('page');
@@ -621,8 +634,9 @@ test('Mermaid stays centered and unclipped in draft preview and public stages', 
       const svg = element.querySelector('.special-fence svg')!.getBoundingClientRect();
       const nodes = [...element.querySelectorAll('.special-fence svg .node, .special-fence svg .nodeLabel')]
         .map(node => node.getBoundingClientRect());
-      return { nodes: nodes.length, centered: nodes.every(node =>
-        Math.abs((node.left + node.right) / 2 - (area.left + area.right) / 2) < area.width * .12),
+      return { nodes: nodes.length, centered: Math.abs((
+        Math.min(...nodes.map(node => node.left)) + Math.max(...nodes.map(node => node.right))) / 2 -
+        (area.left + area.right) / 2) < area.width * .12,
       contained: nodes.every(node =>
         node.left >= svg.left - 1 && node.right <= svg.right + 1 &&
         node.top >= svg.top - 1 && node.bottom <= svg.bottom + 1) };
@@ -642,8 +656,8 @@ test('presenter fits charts and Mermaid, shows private notes, and groups legible
   await page.locator('#present').click();
   await page.locator('#jump').selectOption('diagram');
   await expect(page.locator('#stage .special-fence svg')).toBeVisible();
-  await expect(page.locator('#speaker-notes')).toContainText('Mermaid renders this flow');
-  await expect(page.locator('#stage')).not.toContainText('Mermaid renders this flow');
+  await expect(page.locator('#speaker-notes')).toContainText('Mermaid renders this left-to-right flow');
+  await expect(page.locator('#stage')).not.toContainText('Mermaid renders this left-to-right flow');
   const diagram = await page.locator('#stage').evaluate(stage => {
     const svg = stage.querySelector('.special-fence svg')!;
     const bounds = (element: Element) => {

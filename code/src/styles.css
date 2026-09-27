@@ -278,6 +278,9 @@ a { color: #1752ad; }
 .stage-frame > .stage { font-size: clamp(12px, 2vw, 32px); }
 .stage .slide-content:has(> .slide-markdown > .special-fence[data-kind="mermaid"]),
 .stage .slide-content > .slide-markdown:has(> .special-fence[data-kind="mermaid"]) { height: 100%; }
+.stage:has(> .slide-meta[data-position^="Bottom"]) .slide-content:has(> .slide-markdown > :is(h1, h2, h3):first-child + .special-fence[data-kind="mermaid"]:last-child) {
+  height: calc(100% - 2.5em);
+}
 .stage .slide-content > .slide-markdown:has(> .special-fence[data-kind="mermaid"]) {
   display: flex;
   flex-direction: column;

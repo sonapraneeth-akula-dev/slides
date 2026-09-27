@@ -196,14 +196,14 @@ The same chart data format supports other chart types, including donut, line, ar
 # A visible Mermaid flow
 
 ```mermaid
-flowchart TD
+flowchart LR
   Idea --> Draft
   Draft --> Review
   Review --> Present
 ```
 
 :::notes
-Mermaid renders this flow from idea to presentation. The diagram scales to fit the stage without clipping labels.
+Mermaid renders this left-to-right flow from idea to presentation. The diagram fits within the slide and leaves room for the footer.
 :::
 
 ::slide{id="reveal" section="Presenting"}
