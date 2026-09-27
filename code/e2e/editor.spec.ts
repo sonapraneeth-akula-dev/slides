@@ -343,6 +343,47 @@ test('master settings announces the active view and matches editor control typog
   await expect(page.locator('#source')).toHaveValue(/::slide\{id="slide-[\da-f]{8}"\}/);
 });
 
+test('metadata stays aligned with slide margins in settings, editor and presenter', async ({ page }) => {
+  const name = 'aligned-metadata.md';
+  await page.goto(origin);
+  await page.locator('#deck-name').fill(name);
+  await page.locator('#create').click();
+  await page.locator('#settings-button').click();
+  await page.getByLabel('Left margin (%)').fill('8');
+  await page.getByLabel('Left margin (%)').press('Tab');
+  await page.getByLabel('Right margin (%)').fill('12');
+  await page.getByLabel('Right margin (%)').press('Tab');
+  await page.getByLabel('Footer text', { exact: true }).fill('Footer alignment');
+  await page.getByLabel('Footer text', { exact: true }).press('Tab');
+  await page.getByLabel('Bottom Left').selectOption('footer');
+  await page.getByLabel('Bottom Right').selectOption('slideNumber');
+
+  const aligned = async (selector: string) => {
+    const stage = page.locator(selector).first();
+    await expect(stage.locator('.slide-meta[data-position="BottomLeft"]')).toHaveText('Footer alignment');
+    await expect(stage.locator('.slide-meta[data-position="BottomRight"]')).toBeVisible();
+    const offset = await stage.evaluate(element => {
+      const stageRect = element.getBoundingClientRect();
+      const heading = element.querySelector('h1')!.getBoundingClientRect();
+      const left = element.querySelector('.slide-meta[data-position="BottomLeft"]')!.getBoundingClientRect();
+      const right = element.querySelector('.slide-meta[data-position="BottomRight"]')!.getBoundingClientRect();
+      return {
+        left: Math.abs(heading.left - left.left),
+        right: Math.abs(stageRect.right - right.right - parseFloat(getComputedStyle(element).paddingRight))
+      };
+    });
+    expect(offset.left).toBeLessThan(2);
+    expect(offset.right).toBeLessThan(2);
+  };
+  await aligned('#master-preview .stage');
+  await page.locator('button[data-view="split"]').click();
+  await aligned('#preview .preview-stage');
+  await expect.poll(async () => readFile(join(directory, name), 'utf8')).toContain('marginLeft: 8');
+  await expect(page.locator('#save')).toBeDisabled();
+  await page.locator('#present').click();
+  await aligned('#stage');
+});
+
 test('legacy slide-number setting can be overridden and reset without invalid source', async ({ page }) => {
   await page.goto(origin);
   await page.locator('#deck-name').fill('Legacy settings');

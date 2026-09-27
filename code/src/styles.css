@@ -24,12 +24,14 @@ button:focus-visible, a:focus-visible, select:focus-visible, input:focus-visible
 input, select, textarea { padding: 7px 10px; }
 select {
   appearance: none;
+  cursor: pointer;
   padding-right: 40px;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='m1 1 5 5 5-5' fill='none' stroke='%233b4b61' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
   background-position: right 14px center;
   background-size: 12px 8px;
 }
+select:disabled { cursor: not-allowed; }
 @media (forced-colors: active) {
   select { appearance: auto; background-image: none; }
 }
@@ -207,8 +209,8 @@ a { color: #1752ad; }
 .slide-meta { position: absolute; max-width: 30%; color: var(--slide-muted); font-size: .72em; overflow-wrap: anywhere; }
 .slide-meta[data-position^="Top"] { top: 2%; }
 .slide-meta[data-position^="Bottom"] { bottom: 2%; }
-.slide-meta[data-position$="Left"] { left: 5%; text-align: left; }
-.slide-meta[data-position$="Right"] { right: 5%; text-align: right; }
+.slide-meta[data-position$="Left"] { left: var(--slide-margin-left, 5%); text-align: left; }
+.slide-meta[data-position$="Right"] { right: var(--slide-margin-right, 5%); text-align: right; }
 .slide-meta[data-position$="Center"] { left: 50%; transform: translateX(-50%); text-align: center; }
 .asset-fallback, .render-fallback { display: block; border: 1px dashed var(--slide-muted); padding: .6em; overflow-wrap: anywhere; }
 .slide-image { display: block; max-width: 100%; max-height: min(35vw, 260px); margin: 0 auto; border-radius: 6px; object-fit: contain; }
