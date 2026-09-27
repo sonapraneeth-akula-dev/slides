@@ -60,7 +60,8 @@ test('author, persist, present and share only read-only public state', async ({ 
   ]);
   await expect(page.locator('#editor-actions .export-options button:enabled')).toHaveCount(0);
   await page.locator('#editor-actions .export-menu summary').click();
-  await expect(page.locator('#save')).toHaveCSS('border-radius', '8px');
+  await expect(page.locator('#save')).toHaveCSS('border-radius', '0px');
+  await expect(page.locator('.editor-buttons')).toHaveCSS('border-radius', '8px');
   await expect(page.locator('#page-title')).toHaveText('browser-acceptance');
   await expect(page.locator('.outline-actions')).toBeVisible();
   const outline = await page.locator('#outline').boundingBox();
@@ -300,6 +301,43 @@ Audience sees this.
   await expect(page.getByLabel('Bottom Right')).toHaveValue('slideNumber');
   await expect(page.getByLabel('Top Center')).toHaveValue('deckTitle');
   await expect(page.locator('#master-preview .slide-meta[data-position="TopCenter"]')).toHaveText('Browser acceptance');
+});
+
+test('editor actions form one contiguous toolbar on desktop and narrow screens', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto(origin);
+  await page.locator('#deck-name').fill('Toolbar layout');
+  await page.locator('#create').click();
+  const toolbar = page.getByRole('toolbar', { name: 'Editor actions' });
+  await expect(toolbar.locator(':scope > *')).toHaveCount(5);
+  await expect(toolbar.locator(':scope > label #theme')).toBeVisible();
+  await expect(toolbar).toHaveCSS('border-radius', '8px');
+  const positions = await toolbar.locator(':scope > *').evaluateAll(elements => elements.map(element => {
+    const rect = element.getBoundingClientRect();
+    return { left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom };
+  }));
+  for (let index = 1; index < positions.length; index++) {
+    expect(positions[index].left - positions[index - 1].right).toBeLessThan(1);
+    expect(Math.abs(positions[index].top - positions[0].top)).toBeLessThan(1);
+    expect(Math.abs(positions[index].bottom - positions[0].bottom)).toBeLessThan(1);
+  }
+  await page.locator('#theme').selectOption('forest');
+  await expect(page.locator('#theme')).toHaveValue('forest');
+  await page.locator('button[data-view="source"]').click();
+  await expect(page.locator('button[data-view="source"]')).toHaveAttribute('aria-pressed', 'true');
+  await page.locator('button[data-view="split"]').click();
+  for (const width of [960, 700, 390]) {
+    await page.setViewportSize({ width, height: 844 });
+    const bounds = await toolbar.boundingBox();
+    expect(bounds).not.toBeNull();
+    expect(bounds!.x).toBeGreaterThanOrEqual(0);
+    expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(width);
+  }
+  await page.locator('#editor-actions .export-menu summary').click();
+  await expect(page.locator('#editor-actions .export-options')).toBeVisible();
+  const menu = await page.locator('#editor-actions .export-options').boundingBox();
+  expect(menu).not.toBeNull();
+  expect(menu!.x + menu!.width).toBeLessThanOrEqual(390);
 });
 
 test('master settings announces the active view and matches editor control typography', async ({ page }) => {

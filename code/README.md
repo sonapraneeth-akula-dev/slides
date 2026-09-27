@@ -69,6 +69,6 @@ Start a presentation from a valid saved deck. Presenter controls include slide/r
 
 To share over LAN, enter the machine's specific LAN address and a permitted port range in the presenter UI. The host starts a separate audience-only listener and returns its URL; allow that port through local firewall settings as needed. Reachability from another device is **not automatically verified**. Share links grant view access to the current session; use a trusted network, avoid posting the URL publicly, and stop sharing/end the session when finished. Owner editing/API access remains bound to loopback.
 
-Save is enabled only while the deck has unsaved changes (including before autosave finishes). The Export dropdown is visible in editor and presenter modes with disabled PDF and HTML options; export is deferred by design. See [ASSUMPTIONS.md](ASSUMPTIONS.md) for scope decisions and [STATUS.md](STATUS.md) for evidence gaps.
+Theme, view selection, Save, Present, and Export form one editor toolbar that wraps together on narrow screens. Save is enabled only while the deck has unsaved changes (including before autosave finishes). The Export dropdown is visible in editor and presenter modes with disabled PDF and HTML options; export is deferred by design. See [ASSUMPTIONS.md](ASSUMPTIONS.md) for scope decisions and [STATUS.md](STATUS.md) for evidence gaps.
 
 Gallery images, charts, and Mermaid diagrams are sized to fit inside the 16:9 settings preview; these gallery-specific limits do not change authored slide or presentation rendering.
