@@ -42,6 +42,7 @@ test('author, persist, present and share only read-only public state', async ({ 
   const name = 'browser-acceptance.md';
   await page.goto(origin);
   await expect(page.locator('#library-page')).toBeVisible();
+  await expect(page.locator('#dev-mode')).toBeHidden();
   await page.locator('#deck-name').fill(name);
   await page.locator('#create').click();
   await expect(page.locator('#editor-page')).toBeVisible();

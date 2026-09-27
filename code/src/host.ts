@@ -62,7 +62,7 @@ export function privateRouter(port: number) {
       const path = url.pathname;
       if (path.startsWith('/api/')) {
         if (path === '/api/bootstrap' && request.method === 'GET') {
-          return response({ token: ownerToken, library: await listDecks(), interfaces: shareOptions() });
+          return response({ token: ownerToken, library: await listDecks(), interfaces: shareOptions(), devMode: process.env.SLIDES_DEV_MODE === '1' });
         }
         const audienceMatch = /^\/api\/public\/([a-f0-9-]+)$/.exec(path);
         if (audienceMatch && request.method === 'GET') {
@@ -172,7 +172,13 @@ export function startHost(port = 0) {
 }
 
 if (import.meta.main) {
-  if (!(await Bun.file(join(dist, 'index.html')).exists())) throw new Error('Static UI missing; run bun run build from the code directory first.');
-  const server = startHost();
+  if (process.env.SLIDES_DEV_MODE !== '1' && !(await Bun.file(join(dist, 'index.html')).exists())) {
+    throw new Error('Static UI missing; run bun run build from the code directory first.');
+  }
+  const port = process.env.SLIDES_DEV_MODE === '1' ? Number(process.env.SLIDES_DEV_API_PORT) : 0;
+  if (process.env.SLIDES_DEV_MODE === '1' && (!Number.isInteger(port) || port < 1024 || port > 65535)) {
+    throw new Error('Invalid development API port.');
+  }
+  const server = startHost(port);
   console.log(`Local Slides: http://127.0.0.1:${server.port}`);
 }

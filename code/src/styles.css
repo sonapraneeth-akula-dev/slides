@@ -49,6 +49,7 @@ a { color: #1752ad; }
 .pill { border-radius: 99px; padding: 5px 10px; background: #ebf0fa; font-size: 13px; }
 .pill.warning { background: #fff0db; }
 .pill.live { color: #8b2131; background: #ffe7e8; }
+.pill.dev-mode { color: #73420a; background: #ffe9bd; font-weight: 700; letter-spacing: .04em; }
 .eyebrow { color: #416ab8; letter-spacing: .15em; font-size: 12px; font-weight: 700; }
 .library-page { max-width: 1200px; margin: 0 auto; padding: clamp(24px, 5vw, 72px) 24px; }
 .library-intro { max-width: 700px; }

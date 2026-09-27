@@ -14,6 +14,7 @@ import '../styles.css';
       <header class="topbar">
         <a class="brand" href="/" id="home">Slides<span class="brand-dot">.</span></a>
         <span id="page-title" class="page-title">Local presentations</span>
+        <span id="dev-mode" class="pill dev-mode" hidden>DEV MODE</span>
         <span id="save-status" class="pill" role="status" aria-live="polite" hidden></span>
         <span class="spacer"></span>
         <div id="editor-actions" class="actions" hidden>
@@ -40,8 +41,8 @@ import '../styles.css';
           <h1>Make room for the story.</h1>
           <p>Write in Markdown. Present locally. Share with your audience only when you choose.</p>
           <div class="library-create">
-            <label for="deck-name">New presentation</label>
-            <div class="actions"><input id="deck-name" placeholder="Presentation name" maxlength="120" />
+            <label for="deck-name">New presentation (saved as .md by default)</label>
+            <div class="actions"><input id="deck-name" placeholder="Presentation name or filename.mdx" maxlength="120" />
               <button type="button" id="create" class="primary">Create deck</button></div>
           </div>
           <div class="library-open">

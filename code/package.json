@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "astro dev --host 127.0.0.1",
+    "dev": "bun ./scripts/dev.ts",
     "check": "astro check",
     "build": "astro build && bun ./scripts/audience-assets.ts && bun build ./src/host.ts --target=bun --outfile ./build/host.js",
     "start": "bun ./build/host.js",

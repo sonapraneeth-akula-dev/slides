@@ -51,6 +51,9 @@ async function request<T>(path: string, method = 'GET', body?: object): Promise<
     headers: { 'X-Slides-Token': token, ...(body ? { 'Content-Type': 'application/json' } : {}) },
     ...(body ? { body: JSON.stringify(body) } : {}),
   });
+  if (response.status !== 204 && !response.headers.get('content-type')?.includes('application/json')) {
+    throw new Error(`Application API returned a non-JSON response (${response.status}). Start the app with bun run dev or bun run start.`);
+  }
   const data: unknown = response.status === 204 ? null : await response.json();
   if (!response.ok) {
     const detail = data && typeof data === 'object' && 'error' in data && typeof data.error === 'string'
@@ -597,7 +600,11 @@ function wire(): void {
   $('create').addEventListener('click', () => {
     const name = $<HTMLInputElement>('deck-name').value.trim();
     if (!name) { notify('Enter a deck name.'); return; }
-    void libraryAction({ action: 'create', name });
+    if (/\.[A-Za-z0-9]+$/.test(name) && !/\.(?:md|mdx)$/i.test(name)) {
+      notify('Deck filenames must end in .md or .mdx.');
+      return;
+    }
+    void libraryAction({ action: 'create', name: /\.(?:md|mdx)$/i.test(name) ? name : `${name}.md` });
   });
   $('open').addEventListener('click', () => {
     const input = $<HTMLInputElement>('deck-path');
@@ -796,14 +803,17 @@ async function init(): Promise<void> {
   wire();
   try {
     const bootstrap = await fetch('/api/bootstrap', { cache: 'no-store' });
-    if (!bootstrap.ok) throw new Error(`Bootstrap failed (${bootstrap.status}).`);
-    const response = await bootstrap.json() as { token: string; library: LibraryEntry[] };
+    if (!bootstrap.ok) throw new Error(`Bootstrap failed (${bootstrap.status}). Start with bun run dev or bun run start.`);
+    const response = await bootstrap.json() as { token: string; library: LibraryEntry[]; devMode: boolean };
     token = response.token;
     library = response.library;
+    $('dev-mode').hidden = response.devMode !== true;
     renderLibrary();
     show('library');
   } catch (error) {
     show('library');
+    $<HTMLButtonElement>('create').disabled = true;
+    $<HTMLButtonElement>('open').disabled = true;
     status(`Unable to load library: ${message(error)}`, true);
   }
 }

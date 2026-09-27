@@ -4,17 +4,26 @@ A local-first slide editor and presenter built with Astro, TypeScript, Bun, and 
 
 ## Run
 
-Install Bun, then from this directory run:
+Install Bun, then from this directory run the integrated development server:
 
 ```powershell
 bun install
+bun run dev
+```
+
+Open the `http://127.0.0.1:4321` URL printed as **Slides development** (or the printed port if `SLIDES_DEV_PORT` is set). This starts Astro with browser live reload and the loopback Bun API together, without a build. The UI shows a **DEV MODE** badge. API source edits restart the Bun process automatically; reload the page after an API restart to obtain a fresh owner token, and save any draft first. Stop both servers with Ctrl+C. Running `astro dev` alone does not provide the application API.
+Stop any separately running Astro dev server in this project before starting the integrated command. LAN sharing in dev mode uses audience assets from the most recent `bun run build`; build once before testing LAN sharing.
+
+For a built run without the development badge:
+
+```powershell
 bun run build
 bun run start
 ```
 
-Open the loopback URL printed by the host on the same machine. Keep the Bun process running while editing or presenting. `bun run dev` serves the Astro frontend for UI work; it does not replace the Bun host or its APIs. For development checks, run `bun run check`, `bun run test`, and `bun run test:e2e` (requires the Playwright Chromium browser; install it with `bunx playwright install chromium` if missing). No cloud account, export pipeline, or CI is configured.
+Open the loopback URL printed by the host on the same machine. Keep the Bun process running while editing or presenting. For development checks, run `bun run check`, `bun run build`, `bun run test`, and `bun run test:e2e` (requires the Playwright Chromium browser; install it with `bunx playwright install chromium` if missing). No cloud account, export pipeline, or CI is configured.
 
-The library can create a starter deck, open an existing absolute `.md`/`.mdx` file path, hide an entry without deleting its file, or relink a moved file. The local library index is stored under `library/`; the deck source stays at its chosen filesystem location. Save edits before presenting. Invalid source remains editable and reports diagnostics; presentation requires a current valid compiled deck.
+The library can create a starter deck from a presentation name (saved as `.md` by default, or use a `.mdx` filename), open an existing absolute `.md`/`.mdx` file path, hide an entry without deleting its file, or relink a moved file. The local library index is stored under `library/`; the deck source stays at its chosen filesystem location. Save edits before presenting. Invalid source remains editable and reports diagnostics; presentation requires a current valid compiled deck.
 
 ## Deck source
 
