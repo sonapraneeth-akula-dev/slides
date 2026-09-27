@@ -291,3 +291,57 @@ test('title pencil, slide buttons and multiple plain preview paragraphs work tog
   await expect.poll(async () => readFile(join(directory, 'Preview-editing.md'), 'utf8')).toContain('Updated tests');
   await expect(page.locator('#save')).toBeDisabled();
 });
+
+test('renaming a slide ID updates all source references and autosaves the deck', async ({ page }) => {
+  const name = 'rename-ids.md';
+  await page.goto(origin);
+  await page.locator('#deck-name').fill(name);
+  await page.locator('#create').click();
+  await expect(page.locator('#editor-page')).toBeVisible();
+  const original = `---
+slides:
+  layouts:
+    welcome: two-columns
+---
+::slide{id="welcome"}
+# Welcome
+
+welcome is mentioned in prose.
+
+\`\`\`text
+::slide{id="example" parent="welcome"}
+\`\`\`
+
+::slide{id="child" parent="welcome"}
+# Child
+
+::slide{id="grandchild" parent="child"}
+# Grandchild
+`;
+  const source = page.locator('#source');
+  await source.fill(original);
+  await expect(page.locator('.preview-card')).toHaveCount(3);
+  await expect.poll(async () => readFile(join(directory, name), 'utf8')).toBe(original);
+  await expect(page.locator('#save')).toBeDisabled();
+
+  await source.fill(original.replace('id="welcome"', 'id="opening"'));
+  await expect(source).toHaveValue(/layouts:\n    opening: two-columns/);
+  await expect(source).toHaveValue(/::slide\{id="child" parent="opening"\}/);
+  await expect(source).toHaveValue(/welcome is mentioned in prose\./);
+  await expect(source).toHaveValue(/::slide\{id="example" parent="welcome"\}/);
+  await expect(page.locator('.outline-item[aria-current="true"]')).toContainText('Welcome');
+  await expect(page.locator('.preview-card.selected')).toHaveAttribute('data-slide-id', 'opening');
+
+  const renamed = await source.inputValue();
+  await source.fill(renamed.replace('id="opening"', 'id=""'));
+  await source.fill(renamed.replace('id="opening"', 'id="start"'));
+  await expect(source).toHaveValue(/layouts:\n    start: two-columns/);
+  await expect(source).toHaveValue(/::slide\{id="child" parent="start"\}/);
+  await expect.poll(async () => readFile(join(directory, name), 'utf8')).toBe(await source.inputValue());
+  await expect(page.locator('#save')).toBeDisabled();
+
+  await page.reload();
+  await page.locator('.deck-card').filter({ hasText: name }).getByRole('button', { name: 'Edit deck' }).click();
+  await expect(page.locator('.preview-card.selected')).toHaveAttribute('data-slide-id', 'start');
+  await expect(page.locator('#diagnostics')).toHaveText('No diagnostics');
+});

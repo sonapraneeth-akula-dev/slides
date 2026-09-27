@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { addSlide, clearTheme, editableLines, replacePlainLine, setDeckTitle, setLayout, setMaster, setTheme } from '../src/source-edit';
+import { addSlide, clearTheme, editableLines, hasUniqueSlideIds, propagateSlideIdChange, replacePlainLine, setDeckTitle, setLayout, setMaster, setTheme } from '../src/source-edit';
 
 const source = `---
 slides:
@@ -65,6 +65,51 @@ describe('source-backed editing', () => {
     expect(updated).toMatch(/::slide\{id="slide-[\da-f]{8}" parent="intro"\}/);
     expect(updated).toContain('## New slide');
     expect(() => addSlide(source, 'intro"}\nunsafe')).toThrow('Invalid parent');
+  });
+
+  test('renames slide references but leaves prose and fenced code unchanged', () => {
+    const original = `---
+slides:
+  layouts:
+    "intro": blank
+---
+::slide{id="intro"}
+# Intro
+
+intro and parent="intro" are prose
+
+\`\`\`text
+::slide{id="example" parent="intro"}
+\`\`\`
+
+::slide{id="detail" parent="intro"}
+## Detail
+
+::slide{id="last" layout="blank" parent="intro"}
+`;
+    const edited = original.replace('::slide{id="intro"}', '::slide{id="opening"}');
+    const change = propagateSlideIdChange(original, edited);
+    expect(change?.oldId).toBe('intro');
+    expect(change?.newId).toBe('opening');
+    expect(change?.text).toContain('"opening": blank');
+    expect(change?.text).toContain('::slide{id="detail" parent="opening"}');
+    expect(change?.text).toContain('::slide{id="last" layout="blank" parent="opening"}');
+    expect(change?.text).toContain('intro and parent="intro" are prose');
+    expect(change?.text).toContain('::slide{id="example" parent="intro"}');
+    expect(propagateSlideIdChange(original, original)).toBeNull();
+    expect(propagateSlideIdChange(original, original.replace('id="intro"', 'id="detail"'))).toBeNull();
+    expect(hasUniqueSlideIds(original.replace('id="intro"', 'id=""'))).toBe(false);
+    expect(propagateSlideIdChange(original, original.replace('id="intro"', 'id=""'))).toBeNull();
+    expect(propagateSlideIdChange(original, original.replace('id="intro"', 'id="opening"').replace('id="last"', 'id="later"'))).toBeNull();
+  });
+
+  test('renames inline layout keys and retains CRLF while rejecting key collisions', () => {
+    const original = '---\r\nslides: { layouts: { intro: blank, other: two-columns } }\r\n---\r\n::slide{layout="blank" id="intro"}\r\n::slide{parent="intro" id="detail"}\r\n';
+    const change = propagateSlideIdChange(original, original.replace('id="intro"', 'id="start"'));
+    expect(change?.text).toContain('{ start: blank, other: two-columns }');
+    expect(change?.text).toContain('::slide{parent="start" id="detail"}\r\n');
+    expect(change?.text).not.toMatch(/(?<!\r)\n/);
+    expect(() => propagateSlideIdChange(original, original.replace('id="intro"', 'id="other"'))).toThrow('slides.layouts already has a key');
   });
 
   test('writes back only matching plain text without allowing Markdown syntax injection', () => {

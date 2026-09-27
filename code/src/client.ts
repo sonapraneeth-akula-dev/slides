@@ -1,4 +1,4 @@
-import { addSlide, clearTheme, editableLines, layouts, replacePlainLine, setDeckTitle, setLayout, setMaster, setTheme, themeNames } from './source-edit';
+import { addSlide, clearTheme, editableLines, hasUniqueSlideIds, layouts, propagateSlideIdChange, replacePlainLine, setDeckTitle, setLayout, setMaster, setTheme, themeNames } from './source-edit';
 import { markdown, overlayMode, renderStage, type Deck, type Slide, type Snapshot, type Stroke } from './render';
 import { drawStage } from './stage-view';
 
@@ -22,6 +22,7 @@ let library: LibraryEntry[] = [];
 let deckId = '';
 let revision = '';
 let savedText = '';
+let lastRenamableSource = '';
 let validText = '';
 let compiled: Deck | null = null;
 let selected = '';
@@ -178,6 +179,7 @@ async function openDeck(id: string): Promise<void> {
     ++compileGeneration;
     deckId = id;
     sourceInput.value = savedText = result.text;
+    lastRenamableSource = result.text;
     revision = result.revision;
     compiled = result.deck;
     validText = result.deck ? result.text : '';
@@ -690,6 +692,7 @@ function wire(): void {
     if (isDirty() && !confirm('Leave without saving your draft?')) return;
     clearTimeout(saveTimer);
     deckId = '';
+    lastRenamableSource = '';
     show('library');
     updateSaveButton();
     text('page-title', 'Local presentations');
@@ -722,7 +725,26 @@ function wire(): void {
     try { editSource(setTheme(sourceInput.value, (event.target as HTMLSelectElement).value)); }
     catch (error) { errorNotice(error); }
   });
-  sourceInput.addEventListener('input', () => { updateSaveButton(); scheduleCompile(); scheduleSave(); });
+  sourceInput.addEventListener('input', () => {
+    try {
+      const change = propagateSlideIdChange(lastRenamableSource, sourceInput.value);
+      if (change) {
+        if (change.text !== sourceInput.value) {
+          const start = sourceInput.selectionStart;
+          const end = sourceInput.selectionEnd;
+          const shifted = (position: number) => position + change.replacements
+            .filter(replacement => replacement.end <= position).length * (change.newId.length - change.oldId.length);
+          sourceInput.value = change.text;
+          if (document.activeElement === sourceInput) sourceInput.setSelectionRange(shifted(start), shifted(end));
+        }
+        if (selected === change.oldId) selected = change.newId;
+      }
+    } catch (error) { errorNotice(error); }
+    if (hasUniqueSlideIds(sourceInput.value)) lastRenamableSource = sourceInput.value;
+    updateSaveButton();
+    scheduleCompile();
+    scheduleSave();
+  });
   sourceInput.addEventListener('keydown', event => {
     if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's') {
       event.preventDefault();
@@ -743,6 +765,7 @@ function wire(): void {
     revision = diskConflict.diskRevision;
     savedText = diskConflict.diskText;
     sourceInput.value = savedText;
+    lastRenamableSource = savedText;
     updateSaveButton();
     conflicted = false;
     diskConflict = null;

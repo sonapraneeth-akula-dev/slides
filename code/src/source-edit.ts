@@ -1,3 +1,5 @@
+import YAML from 'yaml';
+
 export type MasterValue = string | number | boolean;
 
 const themes = ['signal', 'paper', 'midnight', 'forest'] as const;
@@ -116,6 +118,102 @@ export function addSlide(source: string, parent?: string): string {
   const id = `slide-${crypto.randomUUID().slice(0, 8)}`;
   const newline = source.includes('\r\n') ? '\r\n' : '\n';
   return `${source.trimEnd()}${newline}${newline}::slide{id="${id}"${parent ? ` parent="${parent}"` : ''}}${newline}${newline}## New slide${newline}${newline}`;
+}
+
+type IdSpan = { value: string; start: number; end: number };
+type SlideIds = { id: IdSpan; parent?: IdSpan; directive: string };
+type IdReplacement = { start: number; end: number; value: string };
+
+function sourceSlides(source: string): SlideIds[] | null {
+  const result: SlideIds[] = [];
+  let fence = '';
+  let frontMatter = source.startsWith('---\n') || source.startsWith('---\r\n');
+  let firstLine = true;
+  for (const match of source.matchAll(/[^\r\n]*(?:\r?\n|$)/g)) {
+    const line = match[0].replace(/\r?\n$/, '');
+    const trimmed = line.trim();
+    if (frontMatter) {
+      if (firstLine) { firstLine = false; continue; }
+      if (trimmed === '---') frontMatter = false;
+      continue;
+    }
+    firstLine = false;
+    const marker = /^(`{3,}|~{3,})/.exec(trimmed)?.[1];
+    if (marker) {
+      if (!fence) fence = marker;
+      else if (marker[0] === fence[0] && marker.length >= fence.length) fence = '';
+    }
+    if (fence || marker || !trimmed.startsWith('::slide{')) continue;
+    const directive = /^::slide\{(.*)\}$/.exec(trimmed);
+    if (!directive) return null;
+    const attributes = new Map<string, IdSpan>();
+    let rest = directive[1];
+    let offset = match.index! + line.indexOf('::slide{') + '::slide{'.length;
+    while (rest.trim()) {
+      const spaces = /^\s*/.exec(rest)![0].length;
+      rest = rest.slice(spaces);
+      offset += spaces;
+      const attribute = /^([a-zA-Z][\w-]*)="([^"]*)"(?:\s+|$)/.exec(rest);
+      if (!attribute || attributes.has(attribute[1]) || !['id', 'parent', 'layout'].includes(attribute[1])) return null;
+      const start = offset + attribute[1].length + 2;
+      attributes.set(attribute[1], { value: attribute[2], start, end: start + attribute[2].length });
+      offset += attribute[0].length;
+      rest = rest.slice(attribute[0].length);
+    }
+    const id = attributes.get('id');
+    if (!id || !/^[A-Za-z][\w-]*$/.test(id.value)) return null;
+    result.push({ id, parent: attributes.get('parent'), directive: trimmed });
+  }
+  return frontMatter ? null : result;
+}
+
+export function hasUniqueSlideIds(source: string): boolean {
+  const slides = sourceSlides(source);
+  return !!slides?.length && new Set(slides.map(slide => slide.id.value)).size === slides.length;
+}
+
+export function propagateSlideIdChange(previous: string, current: string):
+  { text: string; oldId: string; newId: string; replacements: IdReplacement[] } | null {
+  const oldSlides = sourceSlides(previous);
+  const newSlides = sourceSlides(current);
+  if (!oldSlides?.length || !newSlides || oldSlides.length !== newSlides.length ||
+      new Set(oldSlides.map(slide => slide.id.value)).size !== oldSlides.length ||
+      new Set(newSlides.map(slide => slide.id.value)).size !== newSlides.length) return null;
+  const renamed = oldSlides.flatMap((slide, index) => slide.id.value === newSlides[index].id.value ? [] : [index]);
+  if (renamed.length !== 1) return null;
+  const index = renamed[0];
+  const oldId = oldSlides[index].id.value;
+  const newId = newSlides[index].id.value;
+  if (oldSlides[index].directive.replace(`id="${oldId}"`, 'id=""') !==
+      newSlides[index].directive.replace(`id="${newId}"`, 'id=""')) return null;
+  const replacements: IdReplacement[] = newSlides
+    .filter(slide => slide.parent?.value === oldId)
+    .map(slide => ({ start: slide.parent!.start, end: slide.parent!.end, value: newId }));
+
+  const front = /^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/.exec(current);
+  if (front) {
+    const document = YAML.parseDocument(front[1], { uniqueKeys: true });
+    if (document.errors.length) throw new Error('Fix YAML frontmatter before renaming a slide ID.');
+    const layouts = document.getIn(['slides', 'layouts'], true);
+    if (YAML.isMap(layouts)) {
+      const key = layouts.items.find(pair => YAML.isScalar(pair.key) && pair.key.value === oldId)?.key;
+      if (YAML.isScalar(key) && key.range) {
+        if (layouts.items.some(pair => YAML.isScalar(pair.key) && pair.key.value === newId)) {
+          throw new Error(`Cannot rename slide ID: slides.layouts already has a key for ${newId}.`);
+        }
+        const start = front.index! + front[0].indexOf(front[1]) + key.range[0];
+        const original = current.slice(start, front.index! + front[0].indexOf(front[1]) + key.range[1]);
+        const value = original.startsWith('"') ? JSON.stringify(newId)
+          : original.startsWith("'") ? `'${newId}'` : newId;
+        replacements.push({ start, end: start + original.length, value });
+      }
+    }
+  }
+  let text = current;
+  for (const replacement of [...replacements].sort((a, b) => b.start - a.start)) {
+    text = text.slice(0, replacement.start) + replacement.value + text.slice(replacement.end);
+  }
+  return { text, oldId, newId, replacements };
 }
 
 export interface EditableLine { start: number; end: number; text: string; display: string }
