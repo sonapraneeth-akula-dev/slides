@@ -1,8 +1,8 @@
-import { randomBytes } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
 import { join } from 'node:path';
 import { publicAssetPath } from './asset-path';
 import { compileDeck } from './deck';
-import { createDeck, deleteDeck, duplicateDeck, filenameTitle, grantDeck, LibraryError, libraryRoot, listDecks, openDeck, removeDeck, renameDeck, saveDeck } from './library';
+import { createDeck, deleteDeck, duplicateDeck, featureToursRoot, filenameTitle, grantDeck, LibraryError, libraryRoot, listDecks, openDeck, removeDeck, renameDeck, saveDeck } from './library';
 import { createTalk, endTalk, event, getTalk, privateState, publicState, shareOptions, startShare, stopShare } from './session';
 import { presenterSession, publicSnapshot, renderCompilation } from './presentation-model';
 import { ensureSampleImage, sampleImageResponse } from './sample-image';
@@ -33,18 +33,55 @@ async function body(request: Request): Promise<Record<string, unknown>> {
 
 async function featureTour(): Promise<{ id: string }> {
   const filename = 'Slides-Feature-Tour.md';
-  const existing = (await listDecks()).find(entry => entry.path === join(libraryRoot, filename) && !entry.missing);
-  if (existing) return { id: existing.id };
   const source = Bun.file(join(process.cwd(), 'public', 'feature-tour.md'));
   const bundled = await source.exists() ? source : Bun.file(join(dist, 'feature-tour.md'));
   if (!(await bundled.exists())) throw new LibraryError(500, 'Feature tour is missing from the application');
-  await ensureSampleImage();
   const text = await bundled.text();
+  const normalize = (value: string) => value.replace(/\r\n/g, '\n');
+  const hash = (value: string) => createHash('sha256').update(value).digest('hex');
+  const current = normalize(text);
+  const bundleHash = hash(current);
+  const marker = `  # Bundled feature tour: ${bundleHash}`;
+  const installText = text.replace(/^(slides:\r?\n)/m, `$1${marker}${text.includes('\r\n') ? '\r\n' : '\n'}`);
+  if (installText === text || !compileDeck(installText).deck) {
+    throw new LibraryError(500, 'Bundled feature tour is invalid');
+  }
+  const markerLine = /^(---\nslides:\n)  # Bundled feature tour: ([a-f0-9]{64})\n/;
+  // The pre-marker tour shipped in the first bundled edition.
+  const legacyBundleHash = '2ff5e8455502b2ab1611339d59f442f51888ba74fa687e25543ffb9d8bdd5a4b';
+  const edition = (value: string) => markerLine.exec(value)?.[2];
+  const unchanged = (value: string) => {
+    const originalHash = edition(value);
+    return originalHash ? hash(value.replace(markerLine, '$1')) === originalHash
+      : value === current || hash(value) === legacyBundleHash;
+  };
+  const tours = (await listDecks())
+    .filter(entry => entry.kind === 'tour' && !entry.missing &&
+      /^Slides-Feature-Tour(?:-\d+)?\.md$/.test(entry.name) &&
+      entry.path === join(featureToursRoot, entry.name))
+    .sort((a, b) => Number(/-(\d+)\.md$/.exec(b.name)?.[1] ?? 1) -
+      Number(/-(\d+)\.md$/.exec(a.name)?.[1] ?? 1));
+  const installed = await Promise.all(tours.map(async tour => {
+    const opened = await openDeck(tour.id);
+    return { id: tour.id, revision: opened.revision, text: normalize(opened.text) };
+  }));
+  const currentTour = installed.find(tour => edition(tour.text) === bundleHash || tour.text === current);
+  const reusable = currentTour ?? installed.find(tour => unchanged(tour.text));
+  await ensureSampleImage();
+  if (reusable) {
+    if (!currentTour) await saveDeck(reusable.id, reusable.revision, installText);
+    for (const tour of installed) {
+      if (tour.id !== reusable.id && unchanged(tour.text)) {
+        await deleteDeck(tour.id, tour.revision, true);
+      }
+    }
+    return { id: reusable.id };
+  }
   let candidate = filename;
-  for (let number = 2; await Bun.file(join(libraryRoot, candidate)).exists(); number++) {
+  for (let number = 2; await Bun.file(join(featureToursRoot, candidate)).exists(); number++) {
     candidate = `Slides-Feature-Tour-${number}.md`;
   }
-  const created = await createDeck(candidate, text);
+  const created = await createDeck(candidate, installText, 'tour');
   return { id: created.id };
 }
 

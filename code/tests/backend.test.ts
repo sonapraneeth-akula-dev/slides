@@ -2,6 +2,7 @@ import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
 import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { homedir, tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { createHash } from 'node:crypto';
 import { compileDeck, audienceProjection } from '../src/deck';
 import { publicSnapshot } from '../src/presentation-model';
 
@@ -165,6 +166,25 @@ slides:
     }
     expect(compileDeck(input.replace('    footerNumber: true\n', '')).deck).not.toBeNull();
   });
+
+  test('accepts installed font family names without allowing malformed font values', () => {
+    const input = `---
+slides:
+  master:
+    headingFont: Aptos Display
+    bodyFont: Noto Sans
+    codeFont: Cascadia Code
+---
+::slide{id="one"}
+# First`;
+    expect(compileDeck(input).diagnostics).toEqual([]);
+    for (const invalid of [
+      'headingFont: "Aptos; color: red"',
+      'headingFont: " Missing"',
+      'headingFont: 42',
+      `headingFont: ${'A'.repeat(121)}`
+    ]) expect(compileDeck(input.replace('headingFont: Aptos Display', invalid)).deck).toBeNull();
+  });
 });
 
 let dir: string;
@@ -206,6 +226,120 @@ describe('persistent library and presentation', () => {
   test('uses a home directory by default and preserves the explicit library override', () => {
     expect(library.defaultLibraryRoot).toBe(join(homedir(), '.slides'));
     expect(library.libraryRoot).toBe(dir);
+    expect(library.presentationsRoot).toBe(join(dir, 'presentations'));
+    expect(library.featureToursRoot).toBe(join(dir, 'feature-tours'));
+  });
+
+  test('organizes existing tours and personal decks without overwriting edits', async () => {
+    const workspace = await mkdtemp(join(tmpdir(), 'slides-organize-'));
+    const app = join(workspace, '.slides');
+    const personal = join(workspace, 'Presentations');
+    const tours = join(app, 'feature-tours');
+    const oldTour = join(app, 'Slides-Feature-Tour.md');
+    const oldDeck = join(app, 'My-Talk.md');
+    const external = join(workspace, 'external.md');
+    try {
+      await mkdir(app);
+      await writeFile(oldTour, source.replace('title: Journey', 'title: Edited tour'));
+      await writeFile(oldDeck, source);
+      await writeFile(external, source);
+      const tourId = library.deckId('Slides-Feature-Tour.md');
+      const deckId = library.deckId('My-Talk.md');
+      await writeFile(join(app, '.slides-library.json'), JSON.stringify({
+        entries: { [tourId]: oldTour, [deckId]: oldDeck, 'ext-example': external }, hidden: [tourId],
+      }));
+      await library.organizeLibrary(app, personal, tours);
+      expect(await readFile(join(tours, 'Slides-Feature-Tour.md'), 'utf8')).toContain('Edited tour');
+      expect(await readFile(join(personal, 'My-Talk.md'), 'utf8')).toBe(source);
+      await expect(readFile(oldTour)).rejects.toMatchObject({ code: 'ENOENT' });
+      await expect(readFile(oldDeck)).rejects.toMatchObject({ code: 'ENOENT' });
+      const index = JSON.parse(await readFile(join(app, '.slides-library.json'), 'utf8')) as {
+        entries: Record<string, string>; hidden: string[]
+      };
+      const newTourId = library.featureTourDeckId('Slides-Feature-Tour.md');
+      expect(index.entries).toEqual({
+        [newTourId]: join(tours, 'Slides-Feature-Tour.md'),
+        [deckId]: join(personal, 'My-Talk.md'),
+        'ext-example': external,
+      });
+      expect(index.hidden).toEqual([newTourId]);
+      expect(await readFile(external, 'utf8')).toBe(source);
+      await library.organizeLibrary(app, personal, tours);
+      expect(await readFile(join(app, '.slides-library.json'), 'utf8')).toBe(JSON.stringify(index));
+    } finally { await rm(workspace, { recursive: true, force: true }); }
+  });
+
+  test('does not move older decks when a different destination already exists', async () => {
+    const workspace = await mkdtemp(join(tmpdir(), 'slides-organize-conflict-'));
+    const app = join(workspace, '.slides');
+    const personal = join(workspace, 'Presentations');
+    try {
+      await mkdir(app);
+      await mkdir(personal);
+      await writeFile(join(app, 'My-Talk.md'), source);
+      await writeFile(join(personal, 'My-Talk.md'), '# Different');
+      await expect(library.organizeLibrary(app, personal, join(app, 'feature-tours')))
+        .rejects.toThrow('different contents');
+      expect(await readFile(join(app, 'My-Talk.md'), 'utf8')).toBe(source);
+      expect(await readFile(join(personal, 'My-Talk.md'), 'utf8')).toBe('# Different');
+    } finally { await rm(workspace, { recursive: true, force: true }); }
+  });
+
+  test('duplicates a tour into presentations and keeps renamed tours in app storage', async () => {
+    const tour = await library.createDeck('Slides-Feature-Tour.md', source, 'tour');
+    expect(tour.id).toBe(library.featureTourDeckId('Slides-Feature-Tour.md'));
+    const personal = await library.duplicateDeck(tour.id, 'My-Tour.md');
+    expect(personal.id).toBe(library.deckId('My-Tour.md'));
+    expect(await readFile(join(library.presentationsRoot, 'My-Tour.md'), 'utf8')).toBe(source);
+    const renamed = await library.renameDeck(tour.id, 'Slides-Feature-Tour-Renamed.md', tour.revision);
+    expect(renamed.id).toBe(library.featureTourDeckId('Slides-Feature-Tour-Renamed.md'));
+    expect(await readFile(join(library.featureToursRoot, 'Slides-Feature-Tour-Renamed.md'), 'utf8')).toBe(source);
+    const entries = await library.listDecks();
+    expect(entries.find(entry => entry.id === personal.id)?.kind).toBe('presentation');
+    expect(entries.find(entry => entry.id === renamed.id)?.kind).toBe('tour');
+    await library.removeDeck(renamed.id);
+    expect((await library.listDecks()).some(entry => entry.id === renamed.id)).toBe(false);
+  });
+
+  test('reuses unchanged tour files, removes redundant copies, and preserves edits', async () => {
+    const current = (await readFile(join(process.cwd(), 'public', 'feature-tour.md'), 'utf8')).replace(/\r\n/g, '\n');
+    const older = current.replace('# A reveal and private notes', '# A previous reveal and private notes');
+    expect(older).not.toBe(current);
+    const marker = createHash('sha256').update(older).digest('hex');
+    const previous = older.replace('slides:\n', `slides:\n  # Bundled feature tour: ${marker}\n`);
+    const original = await library.createDeck('Slides-Feature-Tour-10.md', previous, 'tour');
+    const { privateRouter } = await import('../src/host');
+    const route = privateRouter(12346);
+    const url = 'http://127.0.0.1:12346/api';
+    const headers = { host: '127.0.0.1:12346' };
+    const { token } = await (await route(new Request(`${url}/bootstrap`, { headers }))).json() as { token: string };
+    const demo = async () => {
+      const response = await route(new Request(`${url}/library`, {
+        method: 'POST',
+        headers: { ...headers, 'X-Slides-Token': token, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'demo' }),
+      }));
+      expect(response.status).toBe(201);
+      return (await response.json()) as { id: string };
+    };
+    expect((await demo()).id).toBe(original.id);
+    const refreshed = await library.openDeck(original.id);
+    expect(refreshed.text).toContain('# A reveal and private notes');
+    expect(refreshed.text).not.toContain('# A previous reveal and private notes');
+
+    const redundant = await library.createDeck('Slides-Feature-Tour-11.md', refreshed.text, 'tour');
+    expect((await demo()).id).toBe(redundant.id);
+    await expect(readFile(join(library.featureToursRoot, 'Slides-Feature-Tour-10.md')))
+      .rejects.toMatchObject({ code: 'ENOENT' });
+    expect((await library.listDecks()).some(entry => entry.id === original.id)).toBe(false);
+
+    const edited = await library.createDeck('Slides-Feature-Tour-10.md',
+      previous.replace('# A previous reveal and private notes', '# My personalized tour'), 'tour');
+    expect((await demo()).id).toBe(redundant.id);
+    expect((await library.openDeck(edited.id)).text).toContain('# My personalized tour');
+    await library.deleteDeck(edited.id, edited.revision, true);
+    const latest = await library.openDeck(redundant.id);
+    await library.deleteDeck(redundant.id, latest.revision, true);
   });
 
   test('imports legacy decks and catalog without removing or overwriting existing files', async () => {
@@ -278,7 +412,7 @@ describe('persistent library and presentation', () => {
     const { id } = await result.json();
     expect(id).toBe(library.deckId('Quarterly-Review.md'));
     expect((await library.openDeck(id)).deck?.title).toBe('Quarterly  Review');
-    expect(await readFile(join(dir, 'Quarterly-Review.md'), 'utf8')).toContain('title: "Quarterly  Review"');
+    expect(await readFile(join(library.presentationsRoot, 'Quarterly-Review.md'), 'utf8')).toContain('title: "Quarterly  Review"');
     const mdx = await create('Team Plan.mdx');
     expect(mdx.status).toBe(201);
     expect((await mdx.json()).id).toBe(library.deckId('Team-Plan.mdx'));
@@ -292,9 +426,9 @@ describe('persistent library and presentation', () => {
     expect((await library.listDecks()).map(d => d.name)).toContain('study.md');
     expect(initial.deck?.slides.length).toBe(3);
     const saved = await library.saveDeck(initial.id, initial.revision, source.replace('Paragraph **bold**', 'Edited'));
-    expect((await readFile(join(dir, 'study.md'), 'utf8'))).toContain('Edited');
+    expect((await readFile(join(library.presentationsRoot, 'study.md'), 'utf8'))).toContain('Edited');
     expect(saved.revision).not.toBe(initial.revision);
-    await writeFile(join(dir, 'study.md'), source);
+    await writeFile(join(library.presentationsRoot, 'study.md'), source);
     try {
       await library.saveDeck(initial.id, saved.revision, 'draft not lost');
       throw new Error('Expected conflict');
@@ -303,7 +437,7 @@ describe('persistent library and presentation', () => {
       expect((error as InstanceType<typeof library.LibraryError>).status).toBe(409);
       expect((error as InstanceType<typeof library.LibraryError>).details).toMatchObject({ diskText: source, draftText: 'draft not lost' });
     }
-    expect(await readFile(join(dir, 'study.md'), 'utf8')).toBe(source);
+    expect(await readFile(join(library.presentationsRoot, 'study.md'), 'utf8')).toBe(source);
   });
 
   test('names opened placeholder decks after their file', async () => {
@@ -348,7 +482,7 @@ describe('persistent library and presentation', () => {
     dispatch('previous'); expect([talk.slideId, talk.step]).toEqual(['root', 1]);
     dispatch('parent'); expect(talk.slideId).toBe('root');
     expect(() => session.event(talk, { action: 'next', sequence: 0 })).toThrow();
-    await writeFile(join(dir, 'study.md'), source.replace('Root', 'Changed'));
+    await writeFile(join(library.presentationsRoot, 'study.md'), source.replace('Root', 'Changed'));
     expect(talk.deck.slides[0].title).toBe('Root');
     await expect(session.createTalk(opened.id, opened.revision)).rejects.toThrow();
     dispatch('stroke', { stroke: {
@@ -358,7 +492,7 @@ describe('persistent library and presentation', () => {
     expect(() => session.endTalk(talk, false)).toThrow();
     session.endTalk(talk, true);
     expect(() => session.getTalk(talk.id)).toThrow();
-    await writeFile(join(dir, 'study.md'), source);
+    await writeFile(join(library.presentationsRoot, 'study.md'), source);
   });
 
   test('private API rejects forged host, origin, token, and malformed body', async () => {

@@ -65,6 +65,28 @@ test('integrated dev mode serves live UI and API, creates a deck from its title'
   await expect(page.locator('#dev-mode')).toHaveCSS('background-color', 'rgb(169, 37, 53)');
   expect(await page.locator('script[src*="/@vite/client"]').count()).toBeGreaterThan(0);
   expect((await request.get(`${origin}/api/bootstrap`, { headers: { Origin: 'http://untrusted.test' } })).status()).toBe(403);
+  await page.setViewportSize({ width: 2000, height: 1250 });
+  await page.evaluate(() => { document.documentElement.style.zoom = '1.25'; });
+  await page.locator('#open-demo').click();
+  await page.locator('button[data-view="preview"]').click();
+  await expect(page.locator('.preview-card[data-slide-id="diagram"] .special-fence svg')).toBeVisible();
+  const previewDiagram = await page.locator('.preview-card[data-slide-id="diagram"] .preview-stage').evaluate(stage => {
+    const svg = stage.querySelector('.special-fence svg')!;
+    const surface = stage.getBoundingClientRect();
+    const bounds = svg.getBoundingClientRect();
+    const nodes = [...svg.querySelectorAll('.node')].map(node => node.getBoundingClientRect());
+    return { svgWidth: bounds.width, stageWidth: surface.width,
+      nodes: nodes.length,
+      centered: nodes.every(node => Math.abs((node.left + node.right) / 2 - (surface.left + surface.right) / 2) < surface.width * .12),
+      contained: nodes.every(node => node.left >= bounds.left && node.right <= bounds.right &&
+        node.top >= bounds.top && node.bottom <= bounds.bottom) };
+  });
+  expect(previewDiagram.svgWidth).toBeGreaterThan(previewDiagram.stageWidth * .7);
+  expect(previewDiagram.nodes).toBe(4);
+  expect(previewDiagram.centered).toBe(true);
+  expect(previewDiagram.contained).toBe(true);
+  await page.evaluate(() => { document.documentElement.style.zoom = ''; });
+  await page.locator('#home').click();
   await page.locator('#deck-name').fill('example.txt');
   await page.locator('#create').click();
   await expect(page.locator('#toast')).toContainText('must end in .md or .mdx');
@@ -115,7 +137,7 @@ test('integrated dev mode serves live UI and API, creates a deck from its title'
   expect(await page.locator('.editor-buttons > button svg, .view-buttons > button svg').count()).toBe(5);
   await expect(page.locator('#save')).toBeDisabled();
   await expect(page.locator('#source')).toHaveValue(/title: "Test Presentation"/);
-  const file = join(directory, 'Test-Presentation.md');
+  const file = join(directory, 'presentations', 'Test-Presentation.md');
   await expect.poll(async () => readFile(file, 'utf8')).toContain('title: "Test Presentation"');
   await page.locator('#source').fill('::slide{id="welcome"}\n# Updated in development\n');
   await expect.poll(async () => readFile(file, 'utf8')).toContain('Updated in development');

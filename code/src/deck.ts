@@ -1,5 +1,6 @@
 import YAML from 'yaml';
 import { layouts, metadataPositions, metadataValues } from './slide-options';
+import { validFontFamily } from './font-family';
 
 export { layouts };
 export type Layout = typeof layouts[number];
@@ -22,7 +23,6 @@ const sizes = new Set(['headingSize', 'bodySize', 'codeSize']);
 const metadataKeys = new Set(metadataPositions.map(position => `metadata${position}`));
 const allowedMetadata = new Set(metadataValues);
 const insets = new Set(['marginTop', 'marginRight', 'marginBottom', 'marginLeft', 'paddingTop', 'paddingRight', 'paddingBottom', 'paddingLeft']);
-const allowedFonts = new Set(['Segoe UI', 'Georgia', 'Trebuchet MS', 'Verdana', 'Palatino', 'Consolas', 'Cascadia Code', 'Courier New']);
 
 function attributes(raw: string): Record<string, string> | null {
   const result: Record<string, string> = {};
@@ -96,7 +96,7 @@ export function compileDeck(source: string, filenameTitle?: string): Compilation
         if (Object.hasOwn(master, position)) fail(2, `Duplicate metadata position: ${position}`);
       }
     } else if (colors.has(key) && (typeof value !== 'string' || !/^#[\da-fA-F]{6}$/.test(value))) fail(2, `${key} must be a hex color`);
-    else if (fonts.has(key) && !allowedFonts.has(String(value))) fail(2, `${key} must be an available font`);
+    else if (fonts.has(key) && !validFontFamily(value)) fail(2, `${key} must be a valid font family`);
     else if (sizes.has(key) && (typeof value !== 'number' || value < 12 || value > 120)) fail(2, `${key} must be between 12 and 120`);
     else if (insets.has(key) && (typeof value !== 'number' || !Number.isFinite(value) || value < 0 || value > 20)) fail(2, `${key} must be between 0 and 20 percent`);
     else if (key === 'headingPlacement' && !['left', 'center', 'right'].includes(String(value))) fail(2, 'Unknown heading placement');

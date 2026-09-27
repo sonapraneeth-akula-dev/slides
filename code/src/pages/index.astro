@@ -13,7 +13,7 @@ import '../styles.css';
     <div id="app" aria-busy="true">
       <header class="topbar">
         <a class="brand" href="/" id="home">Slides<span class="brand-dot">.</span></a>
-        <span id="page-title" class="page-title">Local presentations</span>
+        <span id="page-title" class="page-title" hidden></span>
         <input id="title-input" aria-label="Presentation title" title="Press Enter to save, Escape to cancel" maxlength="120" hidden />
         <button type="button" id="edit-title" class="title-edit" aria-label="Edit presentation title" title="Edit presentation title" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20l4.5-1 12-12a2 2 0 0 0-2.8-2.8l-12 12L4 20Z M15.7 6.3l2.8 2.8"/></svg></button>
         <span id="dev-mode" class="pill dev-mode" hidden>DEV MODE</span>
@@ -44,28 +44,38 @@ import '../styles.css';
       </header>
 
       <main id="library-page" class="library-page" hidden>
-        <div class="library-intro">
-          <p class="eyebrow">YOUR LIBRARY</p>
-          <h1>Make room for the story.</h1>
-          <p>Write in Markdown. Present locally. Share with your audience only when you choose.</p>
-          <div class="library-demo">
-            <button type="button" id="open-demo">Explore the feature tour</button>
-            <span>A ready-to-edit deck showing layouts, sections, media, notes, and slide settings.</span>
+        <div class="library-hero">
+          <div class="library-intro">
+            <p class="eyebrow">YOUR LIBRARY</p>
+            <h1>Make room for the story.</h1>
+            <p>Write in Markdown. Present and share when you choose.</p>
+            <div class="library-demo">
+              <strong>New to Slides?</strong>
+              <span>See layouts, charts, diagrams, speaker notes, and more in an editable tour.</span>
+              <button type="button" id="open-demo">Explore latest feature tour</button>
+            </div>
           </div>
-          <div class="library-create">
-            <label for="deck-name">New presentation (spaces become hyphens in the filename)</label>
-            <div class="actions"><input id="deck-name" placeholder="Presentation name or filename.mdx" maxlength="120" />
-              <button type="button" id="create" class="primary">Create deck</button></div>
-          </div>
-          <div class="library-open">
-            <label for="deck-path">Open an existing .md or .mdx file</label>
-            <div class="actions"><input id="deck-path" placeholder="Absolute path to a deck" />
-              <button type="button" id="open">Open file</button></div>
+          <div class="library-start">
+            <div class="library-create">
+              <label for="deck-name">Create a presentation</label>
+              <div class="actions"><input id="deck-name" placeholder="Presentation name or filename.mdx" maxlength="120" />
+                <button type="button" id="create" class="primary">Create deck</button></div>
+              <p>Spaces become hyphens in the filename.</p>
+            </div>
+            <div class="library-open">
+              <label for="deck-path">Open an existing .md or .mdx file</label>
+              <div class="actions"><input id="deck-path" placeholder="Absolute path to a deck" />
+                <button type="button" id="open">Open file</button></div>
+            </div>
           </div>
         </div>
         <section class="library-list" aria-labelledby="library-heading">
-          <div class="section-heading"><h2 id="library-heading">Your decks</h2><span id="library-count"></span></div>
+          <div class="section-heading"><h2 id="library-heading">Your presentations</h2><span id="library-count"></span></div>
           <div id="deck-list" class="deck-grid"></div>
+        </section>
+        <section class="tour-library" aria-labelledby="tour-heading">
+          <div class="section-heading"><h2 id="tour-heading">Feature tours</h2><span id="tour-count"></span></div>
+          <div id="tour-list" class="deck-grid"></div>
         </section>
       </main>
 
@@ -120,7 +130,7 @@ import '../styles.css';
         </section>
         <aside id="presenter-side" class="presenter-side">
           <div class="progress"><strong id="slide-progress"></strong><span id="reveal-progress"></span><time id="timer">00:00</time></div>
-          <div class="navigation">
+          <div class="navigation" role="group" aria-label="Previous and next slide">
             <button type="button" id="previous">← Previous</button>
             <button type="button" id="next" class="primary">Next →</button>
           </div>

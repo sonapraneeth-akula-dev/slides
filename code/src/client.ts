@@ -3,8 +3,9 @@ import { markdown, overlayMode, renderStage, themePresets, type Deck, type Slide
 import { drawStage } from './stage-view';
 import { masterSamples } from './master-samples';
 import { metadataPositions, metadataValues, type MetadataKey } from './slide-options';
+import { validFontFamily } from './font-family';
 
-type LibraryEntry = { id: string; name: string; path: string; missing?: boolean };
+type LibraryEntry = { id: string; name: string; path: string; kind: 'tour' | 'presentation'; missing?: boolean };
 type Diagnostic = { severity: string; message: string; code?: string; sourceSpan?: { start?: number; end?: number }; slideId?: string };
 type DeckResponse = { text: string; revision: string; deck: Deck | null; diagnostics: Diagnostic[] };
 type SessionResponse = { sessionId: string; localKey: string; snapshot: Snapshot; notes: Record<string, string> };
@@ -25,6 +26,7 @@ let library: LibraryEntry[] = [];
 let deckId = '';
 let revision = '';
 let savedText = '';
+let sourceNewline: '\n' | '\r\n' = '\n';
 let lastRenamableSource = '';
 let validText = '';
 let compiled: Deck | null = null;
@@ -112,7 +114,7 @@ function show(next: Page): void {
   $('presenter-actions').hidden = next !== 'presentation';
   $('edit-title').hidden = next !== 'editor';
   $('title-input').hidden = true;
-  $('page-title').hidden = false;
+  $('page-title').hidden = next === 'library';
   $('app').setAttribute('aria-busy', 'false');
 }
 function errorNotice(error: unknown): void { notify(message(error)); }
@@ -132,10 +134,16 @@ function status(value: string, warn = false): void {
 }
 
 function renderLibrary(): void {
-  text('library-count', `${library.length} deck${library.length === 1 ? '' : 's'}`);
+  const personal = library.filter(entry => entry.kind !== 'tour');
+  const tours = library.filter(entry => entry.kind === 'tour');
+  text('library-count', `${personal.length} presentation${personal.length === 1 ? '' : 's'}`);
+  text('tour-count', `${tours.length} tour${tours.length === 1 ? '' : 's'}`);
   const list = $('deck-list');
+  const tourList = $('tour-list');
   list.replaceChildren();
-  if (!library.length) list.textContent = 'No decks yet. Create or open a file to get started.';
+  tourList.replaceChildren();
+  if (!personal.length) list.textContent = 'No presentations yet. Create or open one to get started.';
+  if (!tours.length) tourList.textContent = 'No feature tours yet. Explore the latest tour above.';
   for (const entry of library) {
     const card = document.createElement('article');
     card.className = 'deck-card';
@@ -179,7 +187,7 @@ function renderLibrary(): void {
       card.append(missing);
     }
     card.append(actions);
-    list.append(card);
+    (entry.kind === 'tour' ? tourList : list).append(card);
   }
 }
 
@@ -206,13 +214,15 @@ async function openDeck(id: string): Promise<void> {
     clearTimeout(compileTimer);
     ++compileGeneration;
     deckId = id;
-    sourceInput.value = savedText = result.text;
-    lastRenamableSource = result.text;
+    sourceNewline = result.text.includes('\r\n') ? '\r\n' : '\n';
+    sourceInput.value = result.text;
+    savedText = sourceInput.value;
+    lastRenamableSource = savedText;
     revision = result.revision;
     compiled = result.deck;
     outlineCollapsed.clear();
     previewCollapsed.clear();
-    validText = result.deck ? result.text : '';
+    validText = result.deck ? savedText : '';
     conflicted = false;
     diskConflict = null;
     selected = result.deck?.order[0] || result.deck?.slides[0]?.id || '';
@@ -593,7 +603,8 @@ async function save(): Promise<boolean> {
   saving = (async () => {
     try {
       const result = await request<{ revision: string; deck: Deck | null; diagnostics: Diagnostic[] }>(
-        `/api/decks/${encodeURIComponent(deckId)}`, 'PUT', { baseRevision, text: draft });
+        `/api/decks/${encodeURIComponent(deckId)}`, 'PUT',
+        { baseRevision, text: draft.replace(/\r?\n/g, sourceNewline) });
       revision = result.revision;
       savedText = draft;
       if (sourceInput.value === draft) {
@@ -636,8 +647,19 @@ const masterSections = ['Theme', 'Heading', 'Body', 'Code', 'Placements', 'Margi
 let selectedMasterSample = 4;
 type MasterField = {
   section: typeof masterSections[number]; name: string; label: string;
-  type: 'color' | 'text' | 'number' | 'select'; fallback?: string; min?: number; max?: number;
+  type: 'color' | 'text' | 'font' | 'number' | 'select'; fallback?: string; min?: number; max?: number;
 };
+type LocalFontWindow = Window & { queryLocalFonts?: () => Promise<Array<{ family: string }>> };
+let installedFontFamilies: string[] | null = null;
+function fontOptions(select: HTMLSelectElement, current: string, code: boolean): void {
+  select.replaceChildren();
+  select.add(new Option(code ? 'System monospace (default)' : 'System font (default)', ''));
+  for (const family of installedFontFamilies ?? []) select.add(new Option(family, family));
+  if (current && ![...select.options].some(option => option.value === current)) {
+    select.add(new Option(`${current} (saved font)`, current));
+  }
+  select.value = current;
+}
 const masterFields: MasterField[] = [
   { section: 'Theme', name: 'theme', label: 'Theme', type: 'select' },
   { section: 'Theme', name: 'surface', label: 'Surface', type: 'color' },
@@ -645,12 +667,12 @@ const masterFields: MasterField[] = [
   { section: 'Theme', name: 'accent', label: 'Accent', type: 'color' },
   { section: 'Theme', name: 'muted', label: 'Muted text', type: 'color' },
   { section: 'Heading', name: 'headingPlacement', label: 'Heading placement', type: 'select', fallback: 'left' },
-  { section: 'Heading', name: 'headingFont', label: 'Heading font', type: 'text' },
-  { section: 'Heading', name: 'headingSize', label: 'Heading size', type: 'number', min: 12, max: 120 },
-  { section: 'Body', name: 'bodyFont', label: 'Body font', type: 'text' },
-  { section: 'Body', name: 'bodySize', label: 'Body size', type: 'number', min: 12, max: 120 },
-  { section: 'Code', name: 'codeFont', label: 'Code font', type: 'text' },
-  { section: 'Code', name: 'codeSize', label: 'Code size', type: 'number', min: 12, max: 120 },
+  { section: 'Heading', name: 'headingFont', label: 'Heading font', type: 'font' },
+  { section: 'Heading', name: 'headingSize', label: 'Heading size', type: 'number', min: 12, max: 120, fallback: '80' },
+  { section: 'Body', name: 'bodyFont', label: 'Body font', type: 'font' },
+  { section: 'Body', name: 'bodySize', label: 'Body size', type: 'number', min: 12, max: 120, fallback: '32' },
+  { section: 'Code', name: 'codeFont', label: 'Code font', type: 'font' },
+  { section: 'Code', name: 'codeSize', label: 'Code size', type: 'number', min: 12, max: 120, fallback: '32' },
   { section: 'Placements', name: 'footer', label: 'Footer text', type: 'text' },
   { section: 'Placements', name: 'logo', label: 'Logo text', type: 'text' },
   ...(['TopLeft', 'TopCenter', 'TopRight', 'BottomLeft', 'BottomCenter', 'BottomRight'] as const)
@@ -680,33 +702,42 @@ function openSettings(): void {
   }));
   const master = compiled?.master || {};
   const preset = themePresets[compiled?.theme || 'signal'] || themePresets.signal;
+  const fontSelects = new Map<string, HTMLSelectElement>();
   for (const field of masterFields) {
     const label = document.createElement('label');
     label.textContent = field.label;
-    const input = field.type === 'select' ? document.createElement('select') : document.createElement('input');
-    if (input instanceof HTMLSelectElement) {
-      const options = field.name === 'theme' ? themeNames.map(name => [name, name])
-        : field.name === 'headingPlacement' ? [['left', 'Left'], ['center', 'Center'], ['right', 'Right']]
-        : [
-          ['none', 'None'], ['slideNumber', 'Slide number / total'], ['deckTitle', 'Presentation title'],
-          ['slideTitle', 'Slide title'], ['footer', 'Footer text'], ['logo', 'Logo text']
-        ];
-      for (const [name, caption] of options) input.add(new Option(optionLabel(caption), name));
-    }
-    if (input instanceof HTMLInputElement) {
-      input.type = field.type;
-      if (field.type === 'number') {
-        input.min = String(field.min);
-        input.max = String(field.max);
-      }
-    }
-    input.value = String(master[field.name] ?? (
+    const input = ['select', 'number', 'font'].includes(field.type)
+      ? document.createElement('select') : document.createElement('input');
+    const current = String(master[field.name] ?? (
       field.name === 'theme' ? compiled?.theme || 'signal'
         : field.name === 'metadataBottomLeft' && master.footer &&
           !Object.entries(master).some(([key, value]) => key.startsWith('metadata') && value === 'footer') ? 'footer'
           : field.name === 'metadataBottomRight' && master.footerNumber &&
             !Object.entries(master).some(([key, value]) => key.startsWith('metadata') && value === 'slideNumber') ? 'slideNumber'
             : preset[field.name] ?? field.fallback ?? (field.type === 'select' ? 'none' : '')));
+    if (input instanceof HTMLSelectElement) {
+      if (field.type === 'font') {
+        fontOptions(input, current, field.name === 'codeFont');
+        fontSelects.set(field.name, input);
+      } else if (field.type === 'number') {
+        for (let number = field.min!; number <= field.max!; number++) {
+          input.add(new Option(String(number), String(number)));
+        }
+        if (current && ![...input.options].some(option => option.value === current)) {
+          input.add(new Option(`${current} (saved value)`, current));
+        }
+      } else {
+        const options = field.name === 'theme' ? themeNames.map(name => [name, name])
+          : field.name === 'headingPlacement' ? [['left', 'Left'], ['center', 'Center'], ['right', 'Right']]
+          : [
+            ['none', 'None'], ['slideNumber', 'Slide number / total'], ['deckTitle', 'Presentation title'],
+            ['slideTitle', 'Slide title'], ['footer', 'Footer text'], ['logo', 'Logo text']
+          ];
+        for (const [name, caption] of options) input.add(new Option(optionLabel(caption), name));
+      }
+    }
+    if (input instanceof HTMLInputElement) input.type = field.type;
+    input.value = current;
     input.addEventListener('change', () => {
       try {
         const value = field.type === 'number' ? Number(input.value) : input.value;
@@ -714,13 +745,48 @@ function openSettings(): void {
           Number(value) < field.min! || Number(value) > field.max!)) {
           throw new Error(`${field.label} must be between ${field.min} and ${field.max}.`);
         }
+        if (field.type === 'font' && input.value && !validFontFamily(input.value)) {
+          throw new Error(`${field.label} is not a valid font family.`);
+        }
         editSource(field.name === 'theme' ? setTheme(sourceInput.value, String(value))
-          : setMaster(sourceInput.value, field.name, value));
+          : setMaster(sourceInput.value, field.name, field.type === 'font' && !input.value ? undefined : value));
       } catch (error) { errorNotice(error); }
     });
     label.append(input);
     sections.get(field.section)!.append(label);
   }
+  const fontPicker = document.createElement('div');
+  fontPicker.className = 'font-picker';
+  const browseFonts = document.createElement('button');
+  browseFonts.type = 'button';
+  browseFonts.textContent = 'Browse installed fonts';
+  const fontStatus = document.createElement('p');
+  fontStatus.setAttribute('role', 'status');
+  const fontWindow = window as LocalFontWindow;
+  if (!fontWindow.queryLocalFonts) {
+    browseFonts.disabled = true;
+    fontStatus.textContent = 'This browser cannot list installed fonts. System defaults and saved fonts remain available.';
+  } else {
+    fontStatus.textContent = installedFontFamilies
+      ? `${installedFontFamilies.length} installed font families available.`
+      : 'Choose Browse to allow access to installed fonts for the heading, body, and code lists.';
+    browseFonts.addEventListener('click', async () => {
+      browseFonts.disabled = true;
+      try {
+        const families = [...new Set((await fontWindow.queryLocalFonts!())
+          .map(font => font.family).filter(validFontFamily))].sort((a, b) => a.localeCompare(b));
+        if (!families.length) throw new Error('No installed font families were shared by the browser.');
+        installedFontFamilies = families;
+        if (!browseFonts.isConnected) return;
+        for (const [name, select] of fontSelects) fontOptions(select, select.value, name === 'codeFont');
+        fontStatus.textContent = `${families.length} installed font families available.`;
+      } catch (error) {
+        if (browseFonts.isConnected) fontStatus.textContent = `Unable to list installed fonts: ${message(error)}`;
+      } finally { browseFonts.disabled = false; }
+    });
+  }
+  fontPicker.append(browseFonts, fontStatus);
+  sections.get('Heading')!.append(fontPicker);
   const preview = $('master-preview');
   preview.replaceChildren();
   const heading = document.createElement('h2');
@@ -928,7 +994,7 @@ function wire(): void {
     lastRenamableSource = '';
     show('library');
     updateSaveButton();
-    text('page-title', 'Local presentations');
+    text('page-title', '');
     $('save-status').hidden = true;
   });
   $('edit-title').addEventListener('click', () => {
@@ -996,8 +1062,9 @@ function wire(): void {
   $('use-disk').addEventListener('click', () => {
     if (!diskConflict) return;
     revision = diskConflict.diskRevision;
-    savedText = diskConflict.diskText;
-    sourceInput.value = savedText;
+    sourceNewline = diskConflict.diskText.includes('\r\n') ? '\r\n' : '\n';
+    sourceInput.value = diskConflict.diskText;
+    savedText = sourceInput.value;
     lastRenamableSource = savedText;
     updateSaveButton();
     conflicted = false;
@@ -1008,7 +1075,8 @@ function wire(): void {
   $('keep-draft').addEventListener('click', () => {
     if (!diskConflict) return;
     revision = diskConflict.diskRevision;
-    savedText = diskConflict.diskText;
+    sourceNewline = diskConflict.diskText.includes('\r\n') ? '\r\n' : '\n';
+    savedText = diskConflict.diskText.replace(/\r\n/g, '\n');
     conflicted = false;
     diskConflict = null;
     dialog('conflict-dialog').close();

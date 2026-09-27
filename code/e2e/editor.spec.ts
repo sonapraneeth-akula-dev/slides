@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -38,10 +38,39 @@ test.afterAll(async () => {
   if (directory) await rm(directory, { recursive: true, force: true });
 });
 
+test('home aligns its entry actions and header at desktop and phone widths', async ({ page }) => {
+  await page.goto(origin);
+  await expect(page.locator('#library-page')).toBeVisible();
+  await expect(page.locator('#page-title')).toBeHidden();
+  await expect(page.locator('#library-page')).not.toContainText('Present locally');
+  for (const width of [2000, 1000, 390]) {
+    await page.setViewportSize({ width, height: 900 });
+    const layout = await page.evaluate(() => {
+      const brand = document.querySelector('#home')!.getBoundingClientRect();
+      const intro = document.querySelector('.library-intro')!.getBoundingClientRect();
+      const start = document.querySelector('.library-start')!.getBoundingClientRect();
+      return { brandX: brand.left, introX: intro.left, introBottom: intro.bottom,
+        startX: start.left, startY: start.top, scrollWidth: document.documentElement.scrollWidth };
+    });
+    expect(Math.abs(layout.brandX - layout.introX)).toBeLessThanOrEqual(5);
+    expect(layout.scrollWidth).toBeLessThanOrEqual(width);
+    if (width > 960) expect(layout.startX).toBeGreaterThan(layout.introX + 300);
+    else expect(layout.startY).toBeGreaterThanOrEqual(layout.introBottom);
+    await expect(page.locator('#create')).toBeVisible();
+    await expect(page.locator('#open')).toBeVisible();
+    await expect(page.locator('#open-demo')).toBeVisible();
+  }
+});
+
 test('author, persist, present and share only read-only public state', async ({ page, context, request }) => {
   const name = 'browser-acceptance.md';
   await page.goto(origin);
+  await page.evaluate(() => Object.defineProperty(window, 'queryLocalFonts', {
+    configurable: true,
+    value: async () => [{ family: 'Consolas' }, { family: 'Aptos Display' }, { family: 'Consolas' }],
+  }));
   await expect(page.locator('#library-page')).toBeVisible();
+  await expect(page.locator('#page-title')).toBeHidden();
   await expect(page.locator('#dev-mode')).toBeHidden();
   await page.locator('#deck-name').fill(name);
   await page.locator('#create').click();
@@ -139,7 +168,7 @@ Audience sees this.
   await expect(page.locator('#settings-fields legend')).toHaveText([
     'Theme', 'Heading', 'Body', 'Code', 'Placements', 'Margins', 'Padding'
   ]);
-  await expect(page.locator('#settings-fields select')).toHaveCount(8);
+  await expect(page.locator('#settings-fields select')).toHaveCount(22);
   await expect(page.getByLabel('Slide number in footer')).toHaveCount(0);
   const samples = page.locator('#master-preview .sample-list button');
   const viewer = page.locator('#master-preview .sample-viewer');
@@ -245,17 +274,24 @@ Audience sees this.
   await page.getByLabel('Surface', { exact: true }).fill('#e6e8ff');
   await expect(page.locator('#master-preview .stage').first()).toHaveCSS('background-color', 'rgb(230, 232, 255)');
   await page.getByLabel('Heading placement').selectOption('center');
-  await page.getByLabel('Left margin (%)').fill('8');
-  await page.getByLabel('Left margin (%)').press('Tab');
-  await page.getByLabel('Left padding (%)').fill('3');
-  await page.getByLabel('Left padding (%)').press('Tab');
-  await page.getByLabel('Code font').fill('Consolas');
-  await page.getByLabel('Code font').press('Tab');
+  await expect(page.getByLabel('Heading font')).toHaveValue('');
+  await expect(page.getByLabel('Heading size')).toHaveValue('80');
+  await page.getByRole('button', { name: 'Browse installed fonts' }).click();
+  await expect(page.locator('.font-picker [role="status"]')).toHaveText('2 installed font families available.');
+  await expect(page.getByLabel('Heading font').locator('option')).toHaveText([
+    'System font (default)', 'Aptos Display', 'Consolas'
+  ]);
+  await page.getByLabel('Heading font').selectOption('Aptos Display');
+  await expect(page.locator('#source')).toHaveValue(/headingFont: "Aptos Display"/);
+  await expect(viewer.locator('.stage h1').first()).toHaveCSS('font-family', /Aptos Display/);
+  await page.getByLabel('Left margin (%)').selectOption('8');
+  await page.getByLabel('Left padding (%)').selectOption('3');
+  await page.getByLabel('Code font').selectOption('Consolas');
   await expect(page.locator('#master-preview .stage').first()).toHaveCSS('--slide-margin-left', '8%');
   await expect(page.locator('#master-preview .slide-content').first()).toHaveCSS('padding-left', /px/);
   await expect(page.locator('#master-preview .stage h1').first()).toHaveCSS('text-align', 'center');
   await choose(13);
-  await expect(viewer.locator('pre code')).toHaveCSS('font-family', 'Consolas');
+  await expect(viewer.locator('pre code')).toHaveCSS('font-family', /Consolas/);
   await choose(1);
   await page.getByLabel('Bottom Right').selectOption('slideNumber');
   await expect(page.locator('#master-preview .slide-meta[data-position="BottomRight"]')).toHaveText('2 / 21');
@@ -273,12 +309,12 @@ Audience sees this.
   await expect(page.locator('#save-status')).toHaveText('Saved');
   await expect(page.locator('#save-status')).toHaveCSS('border-radius', '8px');
   await expect(page.locator('#save')).toBeDisabled();
-  await expect.poll(async () => readFile(join(directory, name), 'utf8')).toContain('Updated audience paragraph');
-  expect(await readFile(join(directory, name), 'utf8')).toContain('theme: "forest"');
-  expect(await readFile(join(directory, name), 'utf8')).toContain('headingPlacement: "center"');
-  expect(await readFile(join(directory, name), 'utf8')).toContain('marginLeft: 8');
-  expect(await readFile(join(directory, name), 'utf8')).toContain('paddingLeft: 3');
-  expect(await readFile(join(directory, name), 'utf8')).toContain('    metadata:\n');
+  await expect.poll(async () => readFile(join(directory, 'presentations', name), 'utf8')).toContain('Updated audience paragraph');
+  expect(await readFile(join(directory, 'presentations', name), 'utf8')).toContain('theme: "forest"');
+  expect(await readFile(join(directory, 'presentations', name), 'utf8')).toContain('headingPlacement: "center"');
+  expect(await readFile(join(directory, 'presentations', name), 'utf8')).toContain('marginLeft: 8');
+  expect(await readFile(join(directory, 'presentations', name), 'utf8')).toContain('paddingLeft: 3');
+  expect(await readFile(join(directory, 'presentations', name), 'utf8')).toContain('    metadata:\n');
 
   await expect(page.locator('#present')).toBeEnabled();
   await page.locator('#present').click();
@@ -476,21 +512,244 @@ test('end recovers from an expired owner token and an already-stopped presentati
   expect(endRequests).toBe(4);
 });
 
-test('feature tour installs on demand and reopens without overwriting edits', async ({ page }) => {
+test('one feature tour action opens the latest edition without overwriting edits', async ({ page }) => {
   await page.goto(origin);
+  await expect(page.locator('.library-demo button')).toHaveCount(1);
+  await expect(page.locator('#open-demo')).toHaveText('Explore latest feature tour');
   await page.locator('#open-demo').click();
+  await expect(page.locator('#editor-page')).toBeVisible();
   await expect(page.locator('.preview-card')).toHaveCount(16);
+  await expect(page.locator('#source')).toHaveValue(/# Bundled feature tour: [a-f0-9]{64}/);
   await expect(page.locator('.preview-card[data-slide-id="welcome"] .slide-cover-image img')).toBeVisible();
   await expect(page.locator('.preview-card[data-slide-id="diagram"] .special-fence svg')).toBeVisible();
-  await expect.poll(async () => readFile(join(directory, 'Slides-Feature-Tour.md'), 'utf8')).toContain('Slides feature tour');
+  await expect.poll(async () => readFile(join(directory, 'feature-tours', 'Slides-Feature-Tour.md'), 'utf8')).toContain('Slides feature tour');
+  await page.locator('#home').click();
+  await expect(page.locator('#library-page')).toBeVisible();
+  await expect(page.locator('#tour-list .deck-card')).toHaveCount(1);
+  await expect(page.locator('#deck-list .deck-card h3').filter({ hasText: /Slides-Feature-Tour/ })).toHaveCount(0);
+  await page.locator('#open-demo').click();
+  await expect(page.locator('#editor-page')).toBeVisible();
+  const original = join(directory, 'feature-tours', 'Slides-Feature-Tour.md');
   const edited = (await page.locator('#source').inputValue()).replace('# A reveal and private notes', '# My personalized tour');
   await page.locator('#source').fill(edited);
-  await expect(page.locator('#save')).toBeDisabled({ timeout: 15_000 });
+  await expect.poll(async () => readFile(original, 'utf8')).toContain('# My personalized tour');
+  await expect(page.locator('#save-status')).toHaveText('Saved');
   await page.locator('#home').click();
   await expect(page.locator('#library-page')).toBeVisible();
   await page.locator('#open-demo').click();
+  await expect(page.locator('#editor-page')).toBeVisible();
   await expect(page.locator('#source')).toHaveValue(/# My personalized tour/);
   await expect(page.locator('.preview-card')).toHaveCount(16);
+  await page.locator('#home').click();
+  await expect(page.locator('#library-page')).toBeVisible();
+  const olderText = (await readFile(original, 'utf8')).replace(
+    /(# Bundled feature tour: )[a-f0-9]{64}/, `$1${'0'.repeat(64)}`);
+  await writeFile(original, olderText);
+  await page.locator('#open-demo').click();
+  await expect(page.locator('#editor-page')).toBeVisible();
+  await expect(page.locator('.preview-card')).toHaveCount(16);
+  await expect(page.locator('#source-file')).toContainText('Slides-Feature-Tour-2.md');
+  await expect(page.locator('#source')).toHaveValue(/# A reveal and private notes/);
+  await expect(page.locator('#source')).toHaveValue(/Mermaid renders this flow from idea to presentation/);
+  expect((await page.locator('#source').inputValue()).match(/^:::notes$/gm)).toHaveLength(16);
+  expect(await readFile(original, 'utf8')).toBe(olderText);
+  await page.locator('#home').click();
+  await expect(page.locator('#library-page')).toBeVisible();
+  await page.locator('#open-demo').click();
+  await expect(page.locator('#editor-page')).toBeVisible();
+  await expect(page.locator('#source-file')).toContainText('Slides-Feature-Tour-2.md');
+  await page.locator('#home').click();
+  await expect(page.locator('#library-page')).toBeVisible();
+  const newest = join(directory, 'feature-tours', 'Slides-Feature-Tour-2.md');
+  await writeFile(newest, (await readFile(newest, 'utf8')).replace(/^  # Bundled feature tour: [a-f0-9]{64}\r?\n/m, ''));
+  await page.locator('#open-demo').click();
+  await expect(page.locator('#editor-page')).toBeVisible();
+  await expect(page.locator('#source-file')).toContainText('Slides-Feature-Tour-2.md');
+  await expect(page.locator('#tour-list .deck-card h3').filter({
+    hasText: /^Slides-Feature-Tour(?:-2)?\.md$/,
+  })).toHaveCount(2);
+  await expect(page.locator('#tour-list .deck-card h3').filter({
+    hasText: /^Slides-Feature-Tour-3\.md$/,
+  })).toHaveCount(0);
+  expect(await readFile(original, 'utf8')).toBe(olderText);
+});
+
+test('Mermaid stays centered and unclipped in draft preview and public stages', async ({ page, context }) => {
+  await page.setViewportSize({ width: 2000, height: 1250 });
+  await page.goto(origin);
+  await page.locator('#open-demo').click();
+  await page.locator('button[data-view="preview"]').click();
+  const stage = page.locator('.preview-card[data-slide-id="diagram"] .preview-stage');
+  await expect(stage.locator('.special-fence svg')).toBeVisible();
+  for (const [width, height, zoom] of [[2000, 1250, 1], [2000, 1250, 1.25], [1280, 720, 1]] as const) {
+    await page.setViewportSize({ width, height });
+    await page.evaluate(value => { document.documentElement.style.zoom = String(value); }, zoom);
+    const geometry = await stage.evaluate(element => {
+      const svg = element.querySelector('.special-fence svg')!;
+      const slide = element.getBoundingClientRect();
+      const bounds = svg.getBoundingClientRect();
+      const nodes = [...svg.querySelectorAll('.node, .nodeLabel')].map(node => node.getBoundingClientRect());
+      const footer = element.querySelector('.slide-meta[data-position="BottomLeft"]')?.getBoundingClientRect();
+      return {
+        nodes: nodes.length,
+        svgWidth: bounds.width,
+        stageWidth: slide.width,
+        centered: nodes.every(node => Math.abs((node.left + node.right) / 2 - (slide.left + slide.right) / 2) < slide.width * .12),
+        contained: nodes.every(node =>
+          node.left >= bounds.left - 1 && node.right <= bounds.right + 1 &&
+          node.top >= bounds.top - 1 && node.bottom <= bounds.bottom + 1 &&
+          node.left >= slide.left && node.right <= slide.right &&
+          node.top >= slide.top && node.bottom <= (footer?.top ?? slide.bottom) - 8),
+        overflow: element.scrollHeight > element.clientHeight + 1,
+      };
+    });
+    expect(geometry.nodes).toBeGreaterThanOrEqual(4);
+    expect(geometry.svgWidth).toBeGreaterThan(geometry.stageWidth * .7);
+    expect(geometry.centered).toBe(true);
+    expect(geometry.contained).toBe(true);
+    expect(geometry.overflow).toBe(false);
+  }
+  await page.locator('#present').click();
+  await page.locator('#jump').selectOption('diagram');
+  const audienceOpened = context.waitForEvent('page');
+  await page.locator('#local-audience').click();
+  const audience = await audienceOpened;
+  for (const surface of [page.locator('#stage'), audience.locator('#audience-stage')]) {
+    await expect(surface.locator('.special-fence svg')).toBeVisible();
+    const bounds = await surface.evaluate(element => {
+      const area = element.getBoundingClientRect();
+      const svg = element.querySelector('.special-fence svg')!.getBoundingClientRect();
+      const nodes = [...element.querySelectorAll('.special-fence svg .node, .special-fence svg .nodeLabel')]
+        .map(node => node.getBoundingClientRect());
+      return { nodes: nodes.length, centered: nodes.every(node =>
+        Math.abs((node.left + node.right) / 2 - (area.left + area.right) / 2) < area.width * .12),
+      contained: nodes.every(node =>
+        node.left >= svg.left - 1 && node.right <= svg.right + 1 &&
+        node.top >= svg.top - 1 && node.bottom <= svg.bottom + 1) };
+    });
+    expect(bounds.nodes).toBeGreaterThanOrEqual(4);
+    expect(bounds.centered).toBe(true);
+    expect(bounds.contained).toBe(true);
+  }
+});
+
+test('presenter fits charts and Mermaid, shows private notes, and groups legible controls', async ({ page }) => {
+  await page.setViewportSize({ width: 1920, height: 1080 });
+  await page.goto(origin);
+  await page.locator('#open-demo').click();
+  await expect(page.locator('.preview-card')).toHaveCount(16);
+  await expect(page.locator('#present')).toBeEnabled();
+  await page.locator('#present').click();
+  await page.locator('#jump').selectOption('diagram');
+  await expect(page.locator('#stage .special-fence svg')).toBeVisible();
+  await expect(page.locator('#speaker-notes')).toContainText('Mermaid renders this flow');
+  await expect(page.locator('#stage')).not.toContainText('Mermaid renders this flow');
+  const diagram = await page.locator('#stage').evaluate(stage => {
+    const svg = stage.querySelector('.special-fence svg')!;
+    const bounds = (element: Element) => {
+      const rect = element.getBoundingClientRect();
+      return { x: rect.x, y: rect.y, width: rect.width, height: rect.height };
+    };
+    return { stage: bounds(stage), svg: bounds(svg), heading: bounds(stage.querySelector('h1')!),
+      nodes: [...svg.querySelectorAll('.node')].map(bounds),
+      labels: [...svg.querySelectorAll('text')].map(bounds),
+      scrollHeight: stage.scrollHeight, clientHeight: stage.clientHeight };
+  });
+  expect(diagram.svg.width).toBeGreaterThan(diagram.stage.width * .6);
+  expect(diagram.svg.y - (diagram.heading.y + diagram.heading.height)).toBeLessThan(50);
+  expect(diagram.nodes).toHaveLength(4);
+  expect(diagram.labels).toHaveLength(4);
+  for (const box of [...diagram.nodes, ...diagram.labels]) {
+    expect(box.x).toBeGreaterThanOrEqual(diagram.svg.x);
+    expect(box.y).toBeGreaterThanOrEqual(diagram.svg.y);
+    expect(box.x + box.width).toBeLessThanOrEqual(diagram.svg.x + diagram.svg.width);
+    expect(box.y + box.height).toBeLessThanOrEqual(diagram.svg.y + diagram.svg.height);
+    expect(box.x + box.width).toBeLessThanOrEqual(diagram.stage.x + diagram.stage.width);
+  }
+  expect(diagram.scrollHeight).toBeLessThanOrEqual(diagram.clientHeight + 1);
+  for (const { width, height } of [{ width: 1600, height: 880 }, { width: 1280, height: 720 }]) {
+    await page.setViewportSize({ width, height });
+    const diagramBounds = await page.locator('#stage').evaluate(stage => {
+      const svg = stage.querySelector('.special-fence svg')!.getBoundingClientRect();
+      const lastNode = stage.querySelector('.special-fence svg .node:last-of-type')!.getBoundingClientRect();
+      const footer = stage.querySelector('.slide-meta[data-position="BottomLeft"]')!.getBoundingClientRect();
+      return { svgBottom: svg.bottom, nodeBottom: lastNode.bottom, footerTop: footer.top,
+        scrollHeight: stage.scrollHeight, clientHeight: stage.clientHeight };
+    });
+    expect(diagramBounds.nodeBottom).toBeLessThan(diagramBounds.footerTop - 8);
+    expect(diagramBounds.svgBottom).toBeLessThan(diagramBounds.footerTop - 8);
+    expect(diagramBounds.scrollHeight).toBeLessThanOrEqual(diagramBounds.clientHeight + 1);
+  }
+  await page.setViewportSize({ width: 1920, height: 1080 });
+  await page.locator('#jump').selectOption('bar-chart');
+  await expect(page.locator('#stage .chart-visual canvas')).toBeVisible();
+  await expect(page.locator('#speaker-notes')).toContainText('Its data table remains available');
+  await expect(page.locator('#stage')).not.toContainText('Its data table remains available');
+  const chart = await page.locator('#stage').evaluate(stage => ({
+    headingTop: stage.querySelector('h1')!.getBoundingClientRect().top - stage.getBoundingClientRect().top,
+    tableClip: getComputedStyle(stage.querySelector('.chart-data')!).clipPath,
+    tableWidth: stage.querySelector('.chart-data')!.getBoundingClientRect().width,
+    scrollHeight: stage.scrollHeight, clientHeight: stage.clientHeight,
+  }));
+  expect(chart.headingTop).toBeLessThan(100);
+  expect(chart.tableClip).toBe('inset(50%)');
+  expect(chart.tableWidth).toBe(1);
+  expect(chart.scrollHeight).toBeLessThanOrEqual(chart.clientHeight + 1);
+  await expect(page.locator('#stage .chart-data caption')).toHaveText('bar chart data');
+  await expect(page.locator('#stage .chart-data tbody tr')).toHaveCount(3);
+
+  const tools = page.locator('#presentation-tools');
+  await expect(tools.locator('button').first()).toHaveCSS('color', 'rgb(27, 37, 52)');
+  await expect(tools.locator('button').first()).toHaveCSS('background-color', 'rgb(255, 255, 255)');
+  await tools.locator('[data-tool="pen"]').click();
+  await expect(tools.locator('[data-tool="pen"]')).toHaveCSS('color', 'rgb(23, 62, 135)');
+  await tools.locator('#undo').evaluate((button: HTMLButtonElement) => { button.disabled = true; });
+  await expect(tools.locator('#undo')).toHaveCSS('color', 'rgb(66, 82, 107)');
+  await expect(tools.locator('#undo')).toHaveCSS('opacity', '1');
+  for (const width of [1920, 960, 390]) {
+    await page.setViewportSize({ width, height: 1080 });
+    for (const group of ['.navigation', '.tree-nav']) {
+      const row = page.locator(`#presenter-side ${group}`);
+      const groupBox = await row.boundingBox();
+      expect(groupBox).not.toBeNull();
+      expect(groupBox!.x).toBeGreaterThanOrEqual(0);
+      expect(groupBox!.x + groupBox!.width).toBeLessThanOrEqual(width);
+      await expect(row).toHaveCSS('border-radius', '8px');
+      const buttons = await row.locator('button').evaluateAll(elements => elements.map(element => {
+        const rect = element.getBoundingClientRect();
+        return { left: rect.left, right: rect.right, top: rect.top, scrollWidth: element.scrollWidth, width: element.clientWidth };
+      }));
+      for (let index = 1; index < buttons.length; index++) {
+        expect(Math.abs(buttons[index].left - buttons[index - 1].right)).toBeLessThan(1);
+        expect(Math.abs(buttons[index].top - buttons[0].top)).toBeLessThan(1);
+      }
+      for (const button of buttons) expect(button.scrollWidth).toBeLessThanOrEqual(button.width);
+    }
+  }
+  await expect(page.locator('.tree-nav [data-nav="parent"]')).toHaveCSS('white-space', 'nowrap');
+});
+
+test('CRLF decks can present untouched and retain line endings after edits', async ({ page }) => {
+  const path = join(directory, 'presentations', 'CRLF.md');
+  await mkdir(join(directory, 'presentations'), { recursive: true });
+  await writeFile(path, '---\r\nslides:\r\n  formatVersion: 1\r\n  title: CRLF\r\n---\r\n::slide{id="first"}\r\n# Before\r\n');
+  await page.goto(origin);
+  await page.locator('#deck-path').fill(path);
+  await page.locator('#open').click();
+  await expect(page.locator('#source')).toHaveValue(/# Before/);
+  await expect(page.locator('#present')).toBeEnabled();
+  await expect(page.locator('#save')).toBeDisabled();
+  await page.locator('#present').click();
+  await expect(page.locator('#stage h1')).toHaveText('Before');
+  await page.locator('#end').click();
+  await page.locator('#confirm-end').click();
+  await expect(page.locator('#editor-page')).toBeVisible();
+  await page.locator('#source').fill((await page.locator('#source').inputValue()).replace('# Before', '# After'));
+  await expect(page.locator('#save')).toBeEnabled();
+  await expect(page.locator('#save')).toBeDisabled({ timeout: 15_000 });
+  expect(await readFile(path, 'utf8')).toContain('\r\n# After\r\n');
+  await page.locator('#present').click();
+  await expect(page.locator('#stage h1')).toHaveText('After');
 });
 
 test('editor actions form one contiguous toolbar on desktop and narrow screens', async ({ page }) => {
@@ -528,6 +787,32 @@ test('editor actions form one contiguous toolbar on desktop and narrow screens',
   const menu = await page.locator('#editor-actions .export-options').boundingBox();
   expect(menu).not.toBeNull();
   expect(menu!.x + menu!.width).toBeLessThanOrEqual(390);
+});
+
+test('font permission errors leave saved fonts and fractional settings intact', async ({ page }) => {
+  await page.goto(origin);
+  await page.locator('#deck-name').fill('Existing typography');
+  await page.locator('#create').click();
+  await expect(page.locator('#editor-page')).toBeVisible();
+  await page.locator('#source').fill((await page.locator('#source').inputValue()).replace(
+    '    theme: signal', '    theme: signal\n    headingFont: Noto Sans\n    paddingTop: 3.5'));
+  await expect(page.locator('#diagnostics')).toHaveText('No diagnostics');
+  await page.evaluate(() => Object.defineProperty(window, 'queryLocalFonts', {
+    configurable: true,
+    value: async () => { throw new DOMException('Permission denied', 'NotAllowedError'); },
+  }));
+  await page.locator('#settings-button').click();
+  await expect(page.getByLabel('Heading font')).toHaveValue('Noto Sans');
+  await expect(page.getByLabel('Top padding (%)')).toHaveValue('3.5');
+  await expect(page.getByLabel('Top padding (%)').locator('option:checked')).toHaveText('3.5 (saved value)');
+  await page.getByRole('button', { name: 'Browse installed fonts' }).click();
+  await expect(page.locator('.font-picker [role="status"]')).toContainText('Permission denied');
+  await expect(page.getByLabel('Heading font')).toHaveValue('Noto Sans');
+  await page.getByLabel('Body size').selectOption('36');
+  await expect(page.locator('#source')).toHaveValue(/bodySize: 36/);
+  await page.getByLabel('Heading font').selectOption('');
+  await expect(page.locator('#source')).not.toHaveValue(/headingFont:/);
+  await expect(page.getByLabel('Top padding (%)')).toHaveValue('3.5');
 });
 
 test('master settings announces the active view and matches editor control typography', async ({ page }) => {
@@ -577,10 +862,8 @@ test('metadata stays aligned with slide margins in settings, editor and presente
   await page.locator('#deck-name').fill(name);
   await page.locator('#create').click();
   await page.locator('#settings-button').click();
-  await page.getByLabel('Left margin (%)').fill('8');
-  await page.getByLabel('Left margin (%)').press('Tab');
-  await page.getByLabel('Right margin (%)').fill('12');
-  await page.getByLabel('Right margin (%)').press('Tab');
+  await page.getByLabel('Left margin (%)').selectOption('8');
+  await page.getByLabel('Right margin (%)').selectOption('12');
   await page.getByLabel('Footer text', { exact: true }).fill('Footer alignment');
   await page.getByLabel('Footer text', { exact: true }).press('Tab');
   await page.getByLabel('Bottom Left').selectOption('footer');
@@ -606,7 +889,7 @@ test('metadata stays aligned with slide margins in settings, editor and presente
   await aligned('#master-preview .stage');
   await page.locator('button[data-view="split"]').click();
   await aligned('#preview .preview-stage');
-  await expect.poll(async () => readFile(join(directory, name), 'utf8')).toContain('marginLeft: 8');
+  await expect.poll(async () => readFile(join(directory, 'presentations', name), 'utf8')).toContain('marginLeft: 8');
   await expect(page.locator('#save')).toBeDisabled();
   await page.locator('#present').click();
   await aligned('#stage');
@@ -644,7 +927,7 @@ slides:
   await expect(page.locator('#source')).not.toHaveValue(/footerNumber:|metadata:|metadataBottomRight:|background:|backdrop:/);
   await expect(page.locator('#diagnostics')).toHaveText('No diagnostics');
   await expect(page.getByLabel('Bottom Right')).toHaveValue('none');
-  await expect.poll(async () => readFile(join(directory, 'Legacy-settings.md'), 'utf8')).toContain('master: {}');
+  await expect.poll(async () => readFile(join(directory, 'presentations', 'Legacy-settings.md'), 'utf8')).toContain('master: {}');
 });
 
 test('sample image renders in the editor and audience without allowing arbitrary image paths', async ({ page, context }) => {
@@ -682,20 +965,20 @@ test('external edit opens conflict dialog without overwriting either version', a
   await page.locator('#create').click();
   await expect(page.locator('#editor-page')).toBeVisible();
   await expect(page.locator('#save')).toBeDisabled();
-  const original = await readFile(join(directory, name), 'utf8');
+  const original = await readFile(join(directory, 'presentations', name), 'utf8');
   await page.locator('#source').fill(original + '\nDraft reverted');
   await expect(page.locator('#save')).toBeEnabled();
   await page.locator('#source').fill(original);
   await expect(page.locator('#save')).toBeDisabled();
   const disk = original.replace('Edit this slide in Markdown.', 'External update');
-  await writeFile(join(directory, name), disk);
+  await writeFile(join(directory, 'presentations', name), disk);
   await page.locator('#source').fill(original.replace('Edit this slide in Markdown.', 'Unsaved browser draft'));
   await expect(page.locator('#save')).toBeEnabled();
   await page.locator('#save').click();
   await expect(page.locator('#conflict-dialog')).toBeVisible();
   await expect(page.locator('#save')).toBeEnabled();
   await expect(page.locator('#draft-text')).toHaveValue(/Unsaved browser draft/);
-  expect(await readFile(join(directory, name), 'utf8')).toBe(disk);
+  expect(await readFile(join(directory, 'presentations', name), 'utf8')).toBe(disk);
   await page.locator('#use-disk').click();
   await expect(page.locator('#source')).toHaveValue(disk);
   await expect(page.locator('#save')).toBeDisabled();
@@ -734,7 +1017,7 @@ test('title pencil, slide buttons and multiple plain preview paragraphs work tog
     expect(await button.locator('.add-slide-icon').evaluate(icon => getComputedStyle(icon).backgroundColor)).toBe('rgb(35, 84, 173)');
   }
 
-  const original = await readFile(join(directory, 'Preview-editing.md'), 'utf8');
+  const original = await readFile(join(directory, 'presentations', 'Preview-editing.md'), 'utf8');
   await page.locator('#source').fill(original.replace('Edit this slide in Markdown.', 'Edit this slide in Markdown.\n\nTests'));
   const paragraphs = page.locator('.preview-card').first().locator('.stage > .slide-content > .slide-markdown > p[contenteditable="plaintext-only"]');
   await expect(paragraphs).toHaveCount(0);
@@ -751,7 +1034,7 @@ test('title pencil, slide buttons and multiple plain preview paragraphs work tog
   await expect(page.locator('#source')).toHaveValue(/::slide\{id="slide-[\da-f]{8}" parent="welcome"\}/);
   await add.click();
   await expect(page.locator('.preview-card')).toHaveCount(3);
-  await expect.poll(async () => readFile(join(directory, 'Preview-editing.md'), 'utf8')).toContain('Updated tests');
+  await expect.poll(async () => readFile(join(directory, 'presentations', 'Preview-editing.md'), 'utf8')).toContain('Updated tests');
   await expect(page.locator('#save')).toBeDisabled();
 });
 
@@ -784,7 +1067,7 @@ welcome is mentioned in prose.
   const source = page.locator('#source');
   await source.fill(original);
   await expect(page.locator('.preview-card')).toHaveCount(3);
-  await expect.poll(async () => readFile(join(directory, name), 'utf8')).toBe(original);
+  await expect.poll(async () => readFile(join(directory, 'presentations', name), 'utf8')).toBe(original);
   await expect(page.locator('#save')).toBeDisabled();
 
   await source.fill(original.replace('id="welcome"', 'id="opening"'));
@@ -800,7 +1083,7 @@ welcome is mentioned in prose.
   await source.fill(renamed.replace('id="opening"', 'id="start"'));
   await expect(source).toHaveValue(/layouts:\n    start: two-columns/);
   await expect(source).toHaveValue(/::slide\{id="child" parent="start"\}/);
-  await expect.poll(async () => readFile(join(directory, name), 'utf8')).toBe(await source.inputValue());
+  await expect.poll(async () => readFile(join(directory, 'presentations', name), 'utf8')).toBe(await source.inputValue());
   await expect(page.locator('#save')).toBeDisabled();
 
   await page.reload();
@@ -857,6 +1140,6 @@ test('add slide actions align source with the highlighted hierarchy, including d
   await page.getByRole('button', { name: 'Add slide', exact: true }).click();
   updated = await source.inputValue();
   expect(updated).toMatch(/::slide\{id="slide-[\da-f]{8}" parent="middle"\}[\s\S]*::slide\{id="slide-[\da-f]{8}"\}\s+## New slide\s+::slide\{id="last"\}/);
-  await expect.poll(async () => readFile(join(directory, name), 'utf8')).toBe(updated);
+  await expect.poll(async () => readFile(join(directory, 'presentations', name), 'utf8')).toBe(updated);
   await expect(page.locator('#save')).toBeDisabled();
 });

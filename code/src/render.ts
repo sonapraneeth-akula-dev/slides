@@ -6,6 +6,7 @@ import 'katex/dist/katex.min.css';
 import 'highlight.js/styles/github.css';
 import { sampleImageReference, sampleImageUrl } from './sample-image-reference';
 import { metadataPositions } from './slide-options';
+import { validFontFamily } from './font-family';
 
 export interface Slide {
   id: string;
@@ -247,6 +248,9 @@ async function renderFences(root: HTMLElement): Promise<void> {
       try {
         const chart = parseChart(source);
         const table = document.createElement('table');
+        const accessibleData = document.createElement('div');
+        accessibleData.className = 'chart-data';
+        accessibleData.append(table);
         const caption = document.createElement('caption');
         caption.textContent = `${chart.type} chart data${chart.unit ? ` (${chart.unit})` : ''}`;
         table.append(caption);
@@ -268,7 +272,7 @@ async function renderFences(root: HTMLElement): Promise<void> {
         const canvas = document.createElement('div');
         canvas.className = 'chart-visual';
         canvas.setAttribute('aria-hidden', 'true');
-        fence.replaceChildren(canvas, table);
+        fence.replaceChildren(canvas, accessibleData);
         const echarts = await import('echarts');
         if (!fence.isConnected) continue;
         const instance = echarts.init(canvas, undefined, { renderer: 'canvas' });
@@ -313,7 +317,6 @@ export const themePresets: Record<string, Record<string, string>> = {
   midnight: { surface: '#0f172a', text: '#e2e8f0', accent: '#38bdf8', muted: '#94a3b8' },
   forest: { surface: '#f1f6f0', text: '#1d2b1f', accent: '#2f7d4a', muted: '#5d6f60' },
 };
-const fonts = new Set(['Segoe UI', 'Georgia', 'Trebuchet MS', 'Verdana', 'Palatino', 'Consolas', 'Cascadia Code', 'Courier New']);
 
 function setAppearance(host: HTMLElement, stage: Stage): void {
   const preset = themePresets[stage.theme] || themePresets.signal;
@@ -325,7 +328,9 @@ function setAppearance(host: HTMLElement, stage: Stage): void {
   }
   for (const key of ['headingFont', 'bodyFont', 'codeFont'] as const) {
     const value = stage.master?.[key];
-    host.style.setProperty(`--${key}`, typeof value === 'string' && fonts.has(value) ? `"${value}"` : key === 'codeFont' ? 'monospace' : 'system-ui');
+    host.style.setProperty(`--${key}`, validFontFamily(value)
+      ? ['system-ui', 'ui-monospace'].includes(value) ? value : JSON.stringify(value)
+      : key === 'codeFont' ? 'ui-monospace' : 'system-ui');
   }
   const size = (key: string, baseline: number): number => {
     const value = stage.master?.[key];
