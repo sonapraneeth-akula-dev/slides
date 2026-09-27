@@ -86,7 +86,14 @@ export function compileDeck(source: string, filenameTitle?: string): Compilation
   if (typeof theme !== 'string' || !themes.has(theme)) fail(2, 'Unknown master theme');
   for (const [key, value] of Object.entries(master)) {
     if (key === 'theme') continue;
-    if (colors.has(key) && (typeof value !== 'string' || !/^#[\da-fA-F]{6}$/.test(value))) fail(2, `${key} must be a hex color`);
+    if (key === 'metadata') {
+      if (!record(value)) fail(2, 'slides.master.metadata must be a mapping');
+      else for (const [position, assignment] of Object.entries(value)) {
+        if (!metadataPositions.has(position)) fail(2, `Unknown metadata position: ${position}`);
+        else if (typeof assignment !== 'string' || !metadataValues.has(assignment)) fail(2, `Invalid metadata for ${position}`);
+        if (Object.hasOwn(master, position)) fail(2, `Duplicate metadata position: ${position}`);
+      }
+    } else if (colors.has(key) && (typeof value !== 'string' || !/^#[\da-fA-F]{6}$/.test(value))) fail(2, `${key} must be a hex color`);
     else if (fonts.has(key) && !allowedFonts.has(String(value))) fail(2, `${key} must be an available font`);
     else if (sizes.has(key) && (typeof value !== 'number' || value < 12 || value > 120)) fail(2, `${key} must be between 12 and 120`);
     else if (insets.has(key) && (typeof value !== 'number' || !Number.isFinite(value) || value < 0 || value > 20)) fail(2, `${key} must be between 0 and 20 percent`);
@@ -98,6 +105,9 @@ export function compileDeck(source: string, filenameTitle?: string): Compilation
     else if (['logo', 'footer'].includes(key) && typeof value !== 'string') fail(2, `${key} must be text`);
     else if (!['logo', 'footer', 'footerNumber', 'background', 'backdrop', 'headingPlacement'].includes(key) && !insets.has(key) && !metadataPositions.has(key) && !colors.has(key) && !fonts.has(key) && !sizes.has(key)) fail(2, `Unknown master setting: ${key}`);
   }
+  const effectiveMaster = { ...master };
+  delete effectiveMaster.metadata;
+  if (record(master.metadata)) Object.assign(effectiveMaster, master.metadata);
   const configuredLayouts = record(options.layouts) ? options.layouts : {};
   if (options.layouts !== undefined && !record(options.layouts)) fail(2, 'slides.layouts must be a mapping');
   for (const [id, layout] of Object.entries(configuredLayouts)) {
@@ -221,7 +231,7 @@ export function compileDeck(source: string, filenameTitle?: string): Compilation
     deck: diagnostics.length ? null : {
       title: typeof options.title === 'string' && options.title.trim() && options.title !== 'Untitled presentation'
         ? options.title : filenameTitle || slides[0]?.title || 'Untitled deck',
-      master: { ...master, theme }, slides: ordered
+      master: { ...effectiveMaster, theme }, slides: ordered
     },
     diagnostics
   };

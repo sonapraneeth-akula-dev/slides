@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'bun:test';
+import { compileDeck } from '../src/deck';
 import { addSlide, clearTheme, editableLines, hasUniqueSlideIds, insertSlide, propagateSlideIdChange, replacePlainLine, setDeckTitle, setLayout, setMaster, setTheme } from '../src/source-edit';
 
 const source = `---
@@ -65,6 +66,42 @@ describe('source-backed editing', () => {
     const reset = clearTheme('---\nslides:\n  master:\n    theme: "signal"\n---\n::slide{id="intro"}\n# Intro');
     expect(reset).toContain('  master: {}');
     expect(reset).not.toContain('    theme:');
+  });
+
+  test('writes metadata in its own subsection and migrates edited legacy placements', () => {
+    const legacy = source.replace('    accent: "#123456"', '    accent: "#123456"\n    metadataBottomRight: slideNumber');
+    const updated = setMaster(legacy, 'metadataBottomRight', 'none');
+    expect(updated).toContain('    metadata:\n      metadataBottomRight: "none"');
+    expect(updated).not.toMatch(/^    metadataBottomRight:/m);
+    expect(updated).toContain('    accent: "#123456"');
+    const next = setMaster(updated, 'metadataBottomCenter', 'slideNumber');
+    expect(next).toContain('      metadataBottomCenter: "slideNumber"');
+    expect(compileDeck(next).diagnostics).toEqual([]);
+    expect(compileDeck(next).deck?.master.metadataBottomCenter).toBe('slideNumber');
+    expect(setMaster(next, 'metadataBottomRight')).not.toContain('metadataBottomRight:');
+    expect(setMaster(setMaster(next, 'metadataBottomRight'), 'metadataBottomCenter')).not.toContain('    metadata:');
+    const cleared = setMaster('---\nslides:\n  master:\n    metadata:\n      metadataBottomRight: none\n---\n',
+      'metadataBottomRight');
+    expect(cleared).toContain('  master: {}');
+    expect(compileDeck(`${cleared}::slide{id="first"}\n# First\n`).diagnostics).toEqual([]);
+  });
+
+  test('preserves inline mappings and CRLF while editing and clearing placements', () => {
+    const inline = '---\r\nslides:\r\n  master: { footer: "First, second", metadataBottomRight: slideNumber, theme: paper }\r\n---\r\n';
+    const migrated = setMaster(inline, 'metadataBottomRight', 'none');
+    expect(migrated).toContain('master: { footer: "First, second", theme: paper, metadata: { metadataBottomRight: "none" } }');
+    const added = setMaster(migrated, 'metadataTopCenter', 'deckTitle');
+    expect(added).toContain('metadata: { metadataBottomRight: "none", metadataTopCenter: "deckTitle" }');
+    expect(compileDeck(`${added}::slide{id="first"}\r\n# First\r\n`).diagnostics).toEqual([]);
+    expect(setMaster(setMaster(added, 'metadataBottomRight'), 'metadataTopCenter')).toContain('master: { footer: "First, second", theme: paper }');
+    const block = '---\r\nslides:\r\n  master:\r\n    footer: "Hello"\r\n    metadata: { metadataBottomRight: none }\r\n---\r\n';
+    expect(setMaster(block, 'metadataBottomCenter', 'slideNumber'))
+      .toContain('metadata: { metadataBottomRight: none, metadataBottomCenter: "slideNumber" }');
+    expect(added).not.toMatch(/(?<!\r)\n/);
+    expect(setMaster('::slide{id="first"}\r\n', 'metadataBottomRight', 'none'))
+      .toContain('    metadata:\r\n      metadataBottomRight: "none"\r\n');
+    expect(() => setMaster(source.replace('    accent: "#123456"', '    metadata: none'), 'metadataBottomRight', 'none'))
+      .toThrow('expected a mapping');
   });
 
   test('edits only the matching slide layout and rejects unknown IDs', () => {

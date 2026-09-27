@@ -77,6 +77,22 @@ slides:
     expect(compileDeck(input, 'Quarterly report').deck?.title).toBe('Quarterly report');
     expect(compileDeck(input.replace('Untitled presentation', 'My custom title'), 'Quarterly report').deck?.title).toBe('My custom title');
     expect(compileDeck(input.replace('metadataTopCenter: slideTitle', 'metadataTopCenter: arbitrary'), 'Quarterly report').deck).toBeNull();
+    const grouped = input.replace('    metadataTopCenter: slideTitle\n    metadataBottomRight: slideNumber',
+      '    metadata:\n      metadataTopCenter: slideTitle\n      metadataBottomRight: slideNumber');
+    const compiled = compileDeck(grouped);
+    expect(compiled.diagnostics).toEqual([]);
+    expect(compiled.deck?.master.metadataTopCenter).toBe('slideTitle');
+    expect(compiled.deck?.master.metadataBottomRight).toBe('slideNumber');
+    expect(compiled.deck?.master).not.toHaveProperty('metadata');
+    expect(audienceProjection(compiled.deck!, 'one', 0).master.metadataBottomRight).toBe('slideNumber');
+    for (const invalid of [
+      grouped.replace('metadataTopCenter: slideTitle', 'metadataTopCenter: arbitrary'),
+      grouped.replace('metadataTopCenter: slideTitle', 'metadataUnknown: slideTitle'),
+      grouped.replace('metadata:\n      metadataTopCenter: slideTitle\n      metadataBottomRight: slideNumber', 'metadata: none'),
+      grouped.replace('    metadata:\n', '    metadataTopCenter: slideTitle\n    metadata:\n')
+    ]) expect(compileDeck(invalid).deck).toBeNull();
+    expect(compileDeck(grouped.replace('    metadata:\n', '    metadataTopCenter: slideTitle\n    metadata:\n'))
+      .diagnostics.some(diagnostic => diagnostic.message.includes('Duplicate metadata position'))).toBe(true);
   });
 
   test('validates heading alignment and bounded slide spacing while retaining legacy footer numbers', () => {

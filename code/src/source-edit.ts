@@ -17,15 +17,19 @@ function frontMatter(source: string): { start: number; end: number; value: strin
 
 function splitInline(value: string): string[] {
   const pieces: string[] = [];
-  let quoted = false;
+  let quoted = '';
   let escaped = false;
+  let depth = 0;
   let start = 0;
   for (let i = 0; i < value.length; i++) {
     const char = value[i];
     if (escaped) escaped = false;
-    else if (char === '\\' && quoted) escaped = true;
-    else if (char === '"') quoted = !quoted;
-    else if (char === ',' && !quoted) {
+    else if (char === '\\' && quoted === '"') escaped = true;
+    else if (quoted) { if (char === quoted) quoted = ''; }
+    else if (char === '"' || char === "'") quoted = char;
+    else if (char === '{' || char === '[') depth++;
+    else if (char === '}' || char === ']') depth--;
+    else if (char === ',' && depth === 0) {
       pieces.push(value.slice(start, i).trim());
       start = i + 1;
     }
@@ -72,6 +76,71 @@ function changeMapping(source: string, mapping: 'master' | 'layouts', key: strin
   return result.replace(/\n/g, newline);
 }
 
+function changeMetadata(source: string, key: string, value?: MasterValue): string {
+  const newline = source.includes('\r\n') ? '\r\n' : '\n';
+  const normalized = source.replace(/\r\n/g, '\n');
+  const front = frontMatter(source);
+  const lines = front.value.split('\n');
+  const master = lines.findIndex(line => /^  master:/.test(line));
+  const formatted = typeof value === 'string' ? JSON.stringify(value) : String(value);
+  if (master < 0) {
+    if (value === undefined) return source;
+    const slides = lines.findIndex(line => /^slides:\s*$/.test(line));
+    if (slides < 0) throw new Error('Cannot change settings: expected a slides: front matter section.');
+    lines.splice(slides + 1, 0, `  master:\n    metadata:\n      ${key}: ${formatted}`);
+  } else {
+    const inlineMaster = /^  master:\s*\{(.*)\}\s*$/.exec(lines[master]);
+    if (inlineMaster) {
+      const entries = splitInline(inlineMaster[1]);
+      const index = entries.findIndex(entry => /^metadata\s*:/.test(entry));
+      if (index < 0) {
+        if (value === undefined) return source;
+        entries.push(`metadata: { ${key}: ${formatted} }`);
+      } else {
+        const nested = /^metadata:\s*\{(.*)\}\s*$/.exec(entries[index]);
+        if (!nested) throw new Error('Cannot change metadata: expected a mapping.');
+        const fields = splitInline(nested[1]).filter(entry => entry.split(':', 1)[0].trim() !== key);
+        if (value !== undefined) fields.push(`${key}: ${formatted}`);
+        if (fields.length) entries[index] = `metadata: { ${fields.join(', ')} }`;
+        else entries.splice(index, 1);
+      }
+      lines[master] = `  master: { ${entries.join(', ')} }`;
+    } else if (/^  master:\s*$/.test(lines[master])) {
+      let end = master + 1;
+      while (end < lines.length && (lines[end].startsWith('    ') || !lines[end].trim())) end++;
+      const index = lines.findIndex((line, position) => position > master && position < end && /^    metadata:/.test(line));
+      if (index < 0) {
+        if (value === undefined) return source;
+        lines.splice(end, 0, `    metadata:\n      ${key}: ${formatted}`);
+      } else {
+        const inline = /^    metadata:\s*\{(.*)\}\s*$/.exec(lines[index]);
+        if (inline) {
+          const fields = splitInline(inline[1]).filter(entry => entry.split(':', 1)[0].trim() !== key);
+          if (value !== undefined) fields.push(`${key}: ${formatted}`);
+          if (fields.length) lines[index] = `    metadata: { ${fields.join(', ')} }`;
+          else lines.splice(index, 1);
+        } else if (/^    metadata:\s*$/.test(lines[index])) {
+          let nestedEnd = index + 1;
+          while (nestedEnd < end && (lines[nestedEnd].startsWith('      ') || !lines[nestedEnd].trim())) nestedEnd++;
+          const fields = lines.slice(index + 1, nestedEnd);
+          const position = fields.findIndex(line => new RegExp(`^      ${key}:`).test(line));
+          if (position >= 0) fields.splice(position, 1);
+          if (value !== undefined) fields.push(`      ${key}: ${formatted}`);
+          if (!fields.some(line => line.trim())) lines.splice(index, nestedEnd - index);
+          else lines.splice(index + 1, nestedEnd - index - 1, ...fields);
+        } else throw new Error('Cannot change metadata: expected a mapping.');
+      }
+    } else if (/^  master:\s*\{\s*\}\s*$/.test(lines[master])) {
+      if (value === undefined) return source;
+      lines[master] = `  master:\n    metadata:\n      ${key}: ${formatted}`;
+    } else throw new Error('Cannot change master: unsupported front matter shape.');
+  }
+  const result = front.end === 0
+    ? `---\n${lines.join('\n').trimEnd()}\n---\n\n${normalized}`
+    : `${normalized.slice(0, front.start)}${lines.join('\n')}${normalized.slice(front.end)}`;
+  return result.replace(/\n/g, newline);
+}
+
 export function setTheme(source: string, theme: string): string {
   if (!themes.includes(theme as typeof themes[number])) throw new Error(`Unknown theme: ${theme}`);
   return changeMapping(source, 'master', 'theme', theme);
@@ -84,6 +153,10 @@ export function clearTheme(source: string): string {
 export function setMaster(source: string, field: string, value?: MasterValue): string {
   if (!/^(surface|text|accent|muted|headingFont|headingPlacement|bodyFont|codeFont|headingSize|bodySize|codeSize|background|backdrop|logo|footer|footerNumber|(margin|padding)(Top|Right|Bottom|Left)|metadata(Top|Bottom)(Left|Center|Right))$/.test(field)) {
     throw new Error(`Unknown master field: ${field}`);
+  }
+  if (field.startsWith('metadata')) {
+    const updated = changeMetadata(source, field, value);
+    return changeMapping(updated, 'master', field);
   }
   return changeMapping(source, 'master', field, value);
 }

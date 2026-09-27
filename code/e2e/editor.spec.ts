@@ -212,9 +212,10 @@ Audience sees this.
   await expect(page.locator('#master-preview .slide-meta[data-position="BottomRight"]')).toHaveText('2 / 17');
   await page.getByLabel('Top Left').selectOption('slideNumber');
   await expect(page.locator('#master-preview .slide-meta[data-position="TopLeft"]')).toHaveText('2 / 17');
-  await expect(page.locator('#source')).toHaveValue(/metadataBottomRight: "slideNumber"/);
+  await expect(page.locator('#source')).toHaveValue(/    metadata:\n      metadataBottomRight: "slideNumber"/);
   await page.getByLabel('Top Center').selectOption('deckTitle');
   await expect(page.locator('#source')).toHaveValue(/metadataTopCenter: "deckTitle"/);
+  await expect(page.locator('#source')).toHaveValue(/      metadataTopLeft: "slideNumber"/);
   await expect(page.locator('#master-preview .slide-meta[data-position="TopCenter"]')).toHaveText('Browser acceptance');
   await expect(page.locator('#master-preview .slide-meta[data-position="BottomRight"]')).toHaveText('2 / 17');
   await page.locator('[data-view="source"]').click();
@@ -227,6 +228,7 @@ Audience sees this.
   expect(await readFile(join(directory, name), 'utf8')).toContain('headingPlacement: "center"');
   expect(await readFile(join(directory, name), 'utf8')).toContain('marginLeft: 8');
   expect(await readFile(join(directory, name), 'utf8')).toContain('paddingLeft: 3');
+  expect(await readFile(join(directory, name), 'utf8')).toContain('    metadata:\n');
 
   await expect(page.locator('#present')).toBeEnabled();
   await page.locator('#present').click();
@@ -291,6 +293,12 @@ Audience sees this.
   expect((await request.get(`${origin}/api/public/${sessionId}`, {
     headers: { 'X-Slides-Public': key },
   })).status()).toBe(404);
+  await page.reload();
+  await page.locator('.deck-card').filter({ hasText: name }).getByRole('button', { name: 'Edit deck' }).click();
+  await page.locator('#settings-button').click();
+  await expect(page.getByLabel('Bottom Right')).toHaveValue('slideNumber');
+  await expect(page.getByLabel('Top Center')).toHaveValue('deckTitle');
+  await expect(page.locator('#master-preview .slide-meta[data-position="TopCenter"]')).toHaveText('Browser acceptance');
 });
 
 test('legacy slide-number setting can be overridden and reset without invalid source', async ({ page }) => {
@@ -317,11 +325,12 @@ slides:
   await expect(page.locator('#master-preview .slide-meta[data-position="BottomRight"]')).toHaveText('5 / 17');
   await page.getByLabel('Bottom Right').selectOption('none');
   await expect(page.locator('#master-preview .slide-meta[data-position="BottomRight"]')).toHaveCount(0);
+  await expect(page.locator('#source')).toHaveValue(/    metadata:\n      metadataBottomRight: "none"/);
   await expect(page.locator('#source')).toHaveValue(/footerNumber: true/);
   page.once('dialog', dialog => { void dialog.accept(); });
   await page.locator('#reset-master').click();
   await expect(page.locator('#source')).toHaveValue(/master: \{\}/);
-  await expect(page.locator('#source')).not.toHaveValue(/footerNumber:|metadataBottomRight:|background:|backdrop:/);
+  await expect(page.locator('#source')).not.toHaveValue(/footerNumber:|metadata:|metadataBottomRight:|background:|backdrop:/);
   await expect(page.locator('#diagnostics')).toHaveText('No diagnostics');
   await expect(page.getByLabel('Bottom Right')).toHaveValue('none');
   await expect.poll(async () => readFile(join(directory, 'Legacy-settings.md'), 'utf8')).toContain('master: {}');
