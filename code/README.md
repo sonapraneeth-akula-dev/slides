@@ -11,7 +11,7 @@ bun install
 bun run dev
 ```
 
-Open the `http://127.0.0.1:4321` URL printed as **Slides development** (or the printed port if `SLIDES_DEV_PORT` is set). This starts Astro with browser live reload and the loopback Bun API together, without a build. The UI shows a **DEV MODE** badge. API source edits hot-reload the Bun host automatically; reload the page after an API reload to obtain a fresh owner token, and save any draft first. Stop both servers with Ctrl+C. Running `astro dev` alone does not provide the application API.
+Open the `http://127.0.0.1:4321` URL printed as **Slides development** (or the printed port if `SLIDES_DEV_PORT` is set). This starts Astro with browser live reload and the loopback Bun API together, without a build. The UI shows a **DEV MODE** badge. API source edits hot-reload the Bun host automatically. A backend restart rotates the owner token and ends active presentation sessions; the next owner request refreshes the token once, and End returns to the editor if the session has already gone away. Save drafts before editing backend code, and start a new presentation after a restart. Stop both servers with Ctrl+C. Running `astro dev` alone does not provide the application API.
 The integrated command can run alongside another Astro dev server on a different port; use `SLIDES_DEV_PORT` to choose one if needed. LAN sharing in dev mode uses audience assets from the most recent `bun run build`; build once before testing LAN sharing.
 
 For a built run without the development badge:

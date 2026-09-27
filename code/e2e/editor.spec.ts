@@ -429,6 +429,53 @@ flowchart TD
   await expect(audience.locator('#audience-stage img.slide-image')).toBeVisible();
 });
 
+test('end recovers from an expired owner token and an already-stopped presentation', async ({ page, request }) => {
+  await page.goto(origin);
+  await page.locator('#deck-name').fill('end-token-recovery.md');
+  await page.locator('#create').click();
+  await page.locator('#present').click();
+  await expect(page.locator('#presentation-page')).toBeVisible();
+
+  let expireNextEnd = true;
+  let endRequests = 0;
+  await page.route('**/api/sessions/*', async route => {
+    if (route.request().method() !== 'DELETE') { await route.continue(); return; }
+    endRequests++;
+    if (expireNextEnd) {
+      expireNextEnd = false;
+      await route.continue({ headers: { ...route.request().headers(), 'x-slides-token': 'expired-token' } });
+    } else await route.continue();
+  });
+
+  await page.locator('#end').click();
+  await page.locator('#confirm-end').click();
+  await expect(page.locator('#editor-page')).toBeVisible();
+  await expect(page.locator('#end-dialog')).toBeHidden();
+  expect(endRequests).toBe(2);
+  await expect(page.locator('#toast')).toBeHidden();
+
+  const started = page.waitForResponse(response =>
+    response.url().endsWith('/api/sessions') && response.request().method() === 'POST');
+  await page.locator('#present').click();
+  const { sessionId } = await (await started).json() as { sessionId: string };
+  await expect(page.locator('#presentation-page')).toBeVisible();
+  const bootstrap = await request.get(`${origin}/api/bootstrap`);
+  const { token } = await bootstrap.json() as { token: string };
+  const stopped = await request.delete(`${origin}/api/sessions/${sessionId}`, {
+    headers: { 'X-Slides-Token': token, 'Content-Type': 'application/json' },
+    data: { discardMarks: true },
+  });
+  expect(stopped.status()).toBe(200);
+
+  expireNextEnd = true;
+  await page.locator('#end').click();
+  await page.locator('#confirm-end').click();
+  await expect(page.locator('#editor-page')).toBeVisible();
+  await expect(page.locator('#end-dialog')).toBeHidden();
+  await expect(page.locator('#toast')).toHaveText('Presentation is no longer active. Returned to the editor.');
+  expect(endRequests).toBe(4);
+});
+
 test('feature tour installs on demand and reopens without overwriting edits', async ({ page }) => {
   await page.goto(origin);
   await page.locator('#open-demo').click();

@@ -8,6 +8,7 @@ type LibraryEntry = { id: string; name: string; path: string; missing?: boolean 
 type Diagnostic = { severity: string; message: string; code?: string; sourceSpan?: { start?: number; end?: number }; slideId?: string };
 type DeckResponse = { text: string; revision: string; deck: Deck | null; diagnostics: Diagnostic[] };
 type SessionResponse = { sessionId: string; localKey: string; snapshot: Snapshot; notes: Record<string, string> };
+type BootstrapResponse = { token: string; library: LibraryEntry[]; devMode: boolean };
 type Page = 'library' | 'editor' | 'presentation';
 type View = 'source' | 'split' | 'preview';
 
@@ -50,16 +51,40 @@ class ApiError extends Error {
   constructor(readonly status: number, message: string, readonly data: unknown) { super(message); }
 }
 
+async function loadBootstrap(): Promise<BootstrapResponse> {
+  const response = await fetch('/api/bootstrap', { cache: 'no-store' });
+  if (!response.ok) throw new Error(`Bootstrap failed (${response.status}). Start with bun run dev or bun run start.`);
+  const data: unknown = await response.json();
+  if (!data || typeof data !== 'object' || !('token' in data) || typeof data.token !== 'string' ||
+      !data.token || !('library' in data) || !Array.isArray(data.library) ||
+      !('devMode' in data) || typeof data.devMode !== 'boolean') {
+    throw new Error('Application bootstrap returned invalid data.');
+  }
+  return data as BootstrapResponse;
+}
+
 async function request<T>(path: string, method = 'GET', body?: object): Promise<T> {
-  const response = await fetch(path, {
+  const payload = body ? JSON.stringify(body) : undefined;
+  const send = () => fetch(path, {
     method,
     headers: { 'X-Slides-Token': token, ...(body ? { 'Content-Type': 'application/json' } : {}) },
-    ...(body ? { body: JSON.stringify(body) } : {}),
+    ...(payload ? { body: payload } : {}),
   });
-  if (response.status !== 204 && !response.headers.get('content-type')?.includes('application/json')) {
-    throw new Error(`Application API returned a non-JSON response (${response.status}). Start the app with bun run dev or bun run start.`);
+  const read = async (response: Response): Promise<unknown> => {
+    if (response.status === 204) return null;
+    if (!response.headers.get('content-type')?.includes('application/json')) {
+      throw new Error(`Application API returned a non-JSON response (${response.status}). Start the app with bun run dev or bun run start.`);
+    }
+    return response.json();
+  };
+  let response = await send();
+  let data = await read(response);
+  if (response.status === 403 && data && typeof data === 'object' && 'error' in data &&
+      data.error === 'Owner token required') {
+    token = (await loadBootstrap()).token;
+    response = await send();
+    data = await read(response);
   }
-  const data: unknown = response.status === 204 ? null : await response.json();
   if (!response.ok) {
     const detail = data && typeof data === 'object' && 'error' in data && typeof data.error === 'string'
       ? data.error : `Request failed (${response.status}).`;
@@ -1099,17 +1124,23 @@ function wire(): void {
   });
   $('confirm-end').addEventListener('click', async () => {
     if (!session) return;
+    let alreadyStopped = false;
     try {
       await request(`/api/sessions/${encodeURIComponent(session.sessionId)}`, 'DELETE', { discardMarks: true });
-      session = null;
-      sharing = false;
-      shareUrl = '';
-      tool = null;
-      dialog('end-dialog').close();
-      show('editor');
-      text('page-title', compiled?.title || 'Editor');
-      updateEditor();
-    } catch (error) { errorNotice(error); }
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 404 && error.message === 'Presentation not found') {
+        alreadyStopped = true;
+      } else { errorNotice(error); return; }
+    }
+    session = null;
+    sharing = false;
+    shareUrl = '';
+    tool = null;
+    dialog('end-dialog').close();
+    show('editor');
+    text('page-title', compiled?.title || 'Editor');
+    updateEditor();
+    if (alreadyStopped) notify('Presentation is no longer active. Returned to the editor.');
   });
   document.addEventListener('keydown', presenterKeys);
   window.addEventListener('beforeunload', event => {
@@ -1125,9 +1156,7 @@ function wire(): void {
 async function init(): Promise<void> {
   wire();
   try {
-    const bootstrap = await fetch('/api/bootstrap', { cache: 'no-store' });
-    if (!bootstrap.ok) throw new Error(`Bootstrap failed (${bootstrap.status}). Start with bun run dev or bun run start.`);
-    const response = await bootstrap.json() as { token: string; library: LibraryEntry[]; devMode: boolean };
+    const response = await loadBootstrap();
     token = response.token;
     library = response.library;
     $('dev-mode').hidden = response.devMode !== true;
