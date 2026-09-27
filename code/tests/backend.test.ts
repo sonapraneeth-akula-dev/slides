@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
+import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { homedir, tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { compileDeck, audienceProjection } from '../src/deck';
 
@@ -120,6 +120,66 @@ beforeAll(async () => {
 afterAll(async () => { if (dir) await rm(dir, { recursive: true, force: true }); });
 
 describe('persistent library and presentation', () => {
+  test('uses a home directory by default and preserves the explicit library override', () => {
+    expect(library.defaultLibraryRoot).toBe(join(homedir(), '.slides'));
+    expect(library.libraryRoot).toBe(dir);
+  });
+
+  test('imports legacy decks and catalog without removing or overwriting existing files', async () => {
+    const workspace = await mkdtemp(join(tmpdir(), 'slides-migration-'));
+    try {
+      const legacy = join(workspace, 'legacy');
+      const home = join(workspace, '.slides');
+      const external = join(workspace, 'external.md');
+      await mkdir(join(legacy, 'nested'), { recursive: true });
+      await mkdir(home);
+      await writeFile(join(legacy, 'nested', 'archive.mdx'), source);
+      await writeFile(join(legacy, 'hidden.md'), source);
+      await writeFile(join(home, 'existing.md'), '# Existing');
+      await writeFile(external, '# External');
+      const archiveId = library.deckId(join('nested', 'archive.mdx'));
+      const hiddenId = library.deckId('hidden.md');
+      const existingId = library.deckId('existing.md');
+      await writeFile(join(legacy, '.slides-library.json'), JSON.stringify({
+        entries: { [archiveId]: join(legacy, 'nested', 'archive.mdx'), [hiddenId]: join(legacy, 'hidden.md'), 'ext-example': external },
+        hidden: [hiddenId]
+      }));
+      await writeFile(join(home, '.slides-library.json'), JSON.stringify({
+        entries: { [existingId]: join(home, 'existing.md') }, hidden: []
+      }));
+      await library.migrateLegacyLibrary(legacy, home);
+      expect(await readFile(join(home, 'nested', 'archive.mdx'), 'utf8')).toBe(source);
+      expect(await readFile(join(legacy, 'nested', 'archive.mdx'), 'utf8')).toBe(source);
+      const imported = JSON.parse(await readFile(join(home, '.slides-library.json'), 'utf8')) as {
+        entries: Record<string, string>; hidden: string[]
+      };
+      expect(imported.entries).toEqual({
+        [existingId]: join(home, 'existing.md'),
+        [archiveId]: join(home, 'nested', 'archive.mdx'),
+        [hiddenId]: join(home, 'hidden.md'),
+        'ext-example': external
+      });
+      expect(imported.hidden).toEqual([hiddenId]);
+      await library.migrateLegacyLibrary(legacy, home);
+      expect(await readFile(join(home, '.slides-library.json'), 'utf8')).toBe(JSON.stringify(imported));
+    } finally { await rm(workspace, { recursive: true, force: true }); }
+  });
+
+  test('refuses to overwrite a different deck during migration', async () => {
+    const workspace = await mkdtemp(join(tmpdir(), 'slides-migration-conflict-'));
+    try {
+      const legacy = join(workspace, 'legacy');
+      const home = join(workspace, '.slides');
+      await mkdir(legacy);
+      await mkdir(home);
+      await writeFile(join(legacy, 'talk.md'), '# Old');
+      await writeFile(join(home, 'talk.md'), '# New');
+      await expect(library.migrateLegacyLibrary(legacy, home)).rejects.toThrow('different contents');
+      expect(await readFile(join(home, 'talk.md'), 'utf8')).toBe('# New');
+      expect(await readFile(join(legacy, 'talk.md'), 'utf8')).toBe('# Old');
+    } finally { await rm(workspace, { recursive: true, force: true }); }
+  });
+
   test('create API converts title spaces to filename hyphens without changing deck title', async () => {
     const { privateRouter } = await import('../src/host');
     const route = privateRouter(12345);

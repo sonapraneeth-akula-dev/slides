@@ -1,18 +1,21 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { copyFile, link, mkdir, open, readFile, readdir, realpath, rename, stat, unlink } from 'node:fs/promises';
 import { constants } from 'node:fs';
+import { homedir } from 'node:os';
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { compileDeck } from './deck';
 
 const extensions = new Set(['.md', '.mdx']);
-export const libraryRoot = resolve(process.env.SLIDES_LIBRARY ?? join(process.cwd(), 'library'));
+export const defaultLibraryRoot = join(homedir(), '.slides');
+const overriddenRoot = process.env.SLIDES_LIBRARY !== undefined;
+export const libraryRoot = resolve(process.env.SLIDES_LIBRARY ?? defaultLibraryRoot);
 const locks = new Map<string, Promise<unknown>>();
 const indexPath = join(libraryRoot, '.slides-library.json');
 type Catalog = { entries: Record<string, string>; hidden: string[] };
 let indexLock: Promise<unknown> = Promise.resolve();
-async function catalog(): Promise<Catalog> {
+async function catalogAt(path: string): Promise<Catalog> {
   let content: string;
-  try { content = await readFile(indexPath, 'utf8'); }
+  try { content = await readFile(path, 'utf8'); }
   catch (error) {
     if (error instanceof Error && 'code' in error && error.code === 'ENOENT') return { entries: {}, hidden: [] };
     throw error;
@@ -25,8 +28,79 @@ async function catalog(): Promise<Catalog> {
       !value.hidden.every(id => typeof id === 'string')) throw new LibraryError(500, 'Invalid library index');
   return value as Catalog;
 }
+async function catalog(): Promise<Catalog> { return catalogAt(indexPath); }
+
+export async function migrateLegacyLibrary(legacyRoot: string, destination: string): Promise<void> {
+  legacyRoot = resolve(legacyRoot);
+  destination = resolve(destination);
+  if (legacyRoot === destination) return;
+  const marker = join(destination, '.legacy-library-imported');
+  try { await stat(marker); return; }
+  catch (error) { if (!(error instanceof Error) || !('code' in error) || error.code !== 'ENOENT') throw error; }
+  let oldRoot: string;
+  try { oldRoot = await realpath(legacyRoot); }
+  catch (error) {
+    if (error instanceof Error && 'code' in error && error.code === 'ENOENT') return;
+    throw error;
+  }
+  if (oldRoot !== legacyRoot) throw new LibraryError(403, 'Legacy library is a symlink; import it manually');
+  const previous = await catalogAt(join(legacyRoot, '.slides-library.json'));
+  const current = await catalogAt(join(destination, '.slides-library.json'));
+  const files = new Map<string, string>();
+  async function walk(dir: string, depth: number): Promise<void> {
+    if (depth > 8) return;
+    for (const entry of await readdir(dir, { withFileTypes: true })) {
+      const path = join(dir, entry.name);
+      if (entry.isDirectory()) await walk(path, depth + 1);
+      else if (entry.isFile() && extensions.has(entry.name.slice(entry.name.lastIndexOf('.')).toLowerCase())) {
+        files.set(path, join(destination, relative(legacyRoot, path)));
+      }
+    }
+  }
+  await walk(legacyRoot, 0);
+  const merged: Catalog = { entries: { ...current.entries }, hidden: [...current.hidden] };
+  for (const [id, path] of Object.entries(previous.entries)) {
+    const target = files.get(path) ?? path;
+    if (merged.entries[id] && merged.entries[id] !== target) {
+      throw new LibraryError(409, `Library entry conflict during import: ${id}`);
+    }
+    if (!merged.entries[id]) {
+      merged.entries[id] = target;
+      if (previous.hidden.includes(id)) merged.hidden.push(id);
+    }
+  }
+  for (const [source, target] of files) {
+    try {
+      const existing = await readFile(target);
+      if (!(await readFile(source)).equals(existing)) throw new LibraryError(409, `Deck already exists with different contents: ${target}`);
+    } catch (error) {
+      if (error instanceof Error && 'code' in error && error.code === 'ENOENT') continue;
+      throw error;
+    }
+  }
+  await mkdir(destination, { recursive: true });
+  for (const [source, target] of files) {
+    await mkdir(dirname(target), { recursive: true });
+    try { await copyFile(source, target, constants.COPYFILE_EXCL); }
+    catch (error) {
+      if (!(error instanceof Error) || !('code' in error) || error.code !== 'EEXIST' ||
+          !(await readFile(source)).equals(await readFile(target))) throw error;
+    }
+  }
+  const temp = join(destination, `.slides-library.${randomUUID()}.tmp`);
+  try { await writeIndex(temp, JSON.stringify(merged)); await rename(temp, join(destination, '.slides-library.json')); }
+  catch (error) { await unlink(temp).catch(() => {}); throw error; }
+  await writeIndex(marker, legacyRoot);
+}
+
+let migration: Promise<void> | undefined;
+function prepareLibrary(): Promise<void> {
+  if (overriddenRoot) return Promise.resolve();
+  return migration ??= migrateLegacyLibrary(join(process.cwd(), 'library'), libraryRoot);
+}
 async function updateCatalog<T>(change: (value: Catalog) => T | Promise<T>): Promise<T> {
   const task = indexLock.catch(() => {}).then(async () => {
+    await prepareLibrary();
     await mkdir(libraryRoot, { recursive: true });
     const value = await catalog();
     const result = await change(value);
@@ -63,6 +137,7 @@ export class LibraryError extends Error {
 }
 
 async function pathFor(id: string, mustExist = true): Promise<string> {
+  await prepareLibrary();
   if (mustExist) {
     const value = await catalog();
     const path = value.entries[id];
@@ -102,6 +177,7 @@ export async function openDeck(id: string) {
 }
 
 export async function listDecks() {
+  await prepareLibrary();
   await mkdir(libraryRoot, { recursive: true });
   const root = await realpath(libraryRoot);
   const found: Record<string, string> = {};
@@ -146,6 +222,7 @@ export async function grantDeck(path: string, relinkId?: string) {
   const canonical = await realpath(path);
   if (canonical !== resolve(path) || !(await stat(canonical)).isFile()) throw new LibraryError(403, 'Select a regular file, not a symlink');
   if ((await stat(canonical)).size > 2_000_000) throw new LibraryError(400, 'Deck exceeds 2 MB');
+  await prepareLibrary();
   const root = await realpath(libraryRoot);
   const inside = relative(root, canonical);
   const id = inside && !inside.startsWith(`..${sep}`) && inside !== '..' && !isAbsolute(inside) && !relinkId
@@ -172,6 +249,7 @@ export async function createDeck(name: string, text: string) {
   if (!validName(name) || typeof text !== 'string') throw new LibraryError(400, 'Invalid deck name or source');
   const compiled = compileDeck(text);
   if (!compiled.deck) throw new LibraryError(422, 'Invalid source', compiled.diagnostics);
+  await prepareLibrary();
   await mkdir(libraryRoot, { recursive: true });
   const path = await pathFor(deckId(name), false);
   const handle = await open(path, 'wx');
