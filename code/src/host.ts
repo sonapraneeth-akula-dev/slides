@@ -31,6 +31,23 @@ async function body(request: Request): Promise<Record<string, unknown>> {
   return data as Record<string, unknown>;
 }
 
+async function featureTour(): Promise<{ id: string }> {
+  const filename = 'Slides-Feature-Tour.md';
+  const existing = (await listDecks()).find(entry => entry.path === join(libraryRoot, filename) && !entry.missing);
+  if (existing) return { id: existing.id };
+  const source = Bun.file(join(process.cwd(), 'public', 'feature-tour.md'));
+  const bundled = await source.exists() ? source : Bun.file(join(dist, 'feature-tour.md'));
+  if (!(await bundled.exists())) throw new LibraryError(500, 'Feature tour is missing from the application');
+  await ensureSampleImage();
+  const text = await bundled.text();
+  let candidate = filename;
+  for (let number = 2; await Bun.file(join(libraryRoot, candidate)).exists(); number++) {
+    candidate = `Slides-Feature-Tour-${number}.md`;
+  }
+  const created = await createDeck(candidate, text);
+  return { id: created.id };
+}
+
 function requireString(data: Record<string, unknown>, key: string): string {
   if (typeof data[key] !== 'string') throw new LibraryError(400, `${key} must be text`);
   return data[key];
@@ -97,6 +114,10 @@ export function privateRouter(port: number) {
           if (data.action === 'create') {
             const { title, filename } = creationName(requireString(data, 'name'));
             const created = await createDeck(filename, starter(title));
+            return response({ library: await listDecks(), id: created.id }, 201);
+          }
+          if (data.action === 'demo') {
+            const created = await featureTour();
             return response({ library: await listDecks(), id: created.id }, 201);
           }
           if (data.action === 'open' || data.action === 'relink') {

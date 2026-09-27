@@ -1,7 +1,8 @@
-import { clearTheme, editableLines, hasUniqueSlideIds, insertSlide, layouts, propagateSlideIdChange, replacePlainLine, setDeckTitle, setLayout, setMaster, setTheme, themeNames } from './source-edit';
+import { clearTheme, editableLines, hasUniqueSlideIds, insertSlide, layouts, propagateSlideIdChange, replacePlainLine, setDeckTitle, setLayout, setMaster, setSlideMetadata, setSlideSection, setTheme, themeNames } from './source-edit';
 import { markdown, overlayMode, renderStage, themePresets, type Deck, type Slide, type Snapshot, type Stage, type Stroke } from './render';
 import { drawStage } from './stage-view';
 import { masterSamples } from './master-samples';
+import { metadataPositions, metadataValues, type MetadataKey } from './slide-options';
 
 type LibraryEntry = { id: string; name: string; path: string; missing?: boolean };
 type Diagnostic = { severity: string; message: string; code?: string; sourceSpan?: { start?: number; end?: number }; slideId?: string };
@@ -42,6 +43,8 @@ let drawing: { points: Array<{ x: number; y: number }>; pointer: number } | null
 let eventPending = false;
 let sessionStart = 0;
 let toastTimer: ReturnType<typeof setTimeout> | undefined;
+const outlineCollapsed = new Set<string>();
+const previewCollapsed = new Set<string>();
 
 class ApiError extends Error {
   constructor(readonly status: number, message: string, readonly data: unknown) { super(message); }
@@ -161,7 +164,7 @@ async function libraryAction(payload: object): Promise<void> {
     library = result.library;
     renderLibrary();
     const entry = payload as { action: string; id?: string; name?: string; path?: string };
-    if (entry.action === 'create' || entry.action === 'open') {
+    if (entry.action === 'create' || entry.action === 'open' || entry.action === 'demo') {
       const added = library.find(item => item.id === result.id);
       if (added) await openDeck(added.id);
       else notify('Added to library. Select the deck to edit it.');
@@ -182,6 +185,8 @@ async function openDeck(id: string): Promise<void> {
     lastRenamableSource = result.text;
     revision = result.revision;
     compiled = result.deck;
+    outlineCollapsed.clear();
+    previewCollapsed.clear();
     validText = result.deck ? result.text : '';
     conflicted = false;
     diskConflict = null;
@@ -239,9 +244,53 @@ function updateDiagnostics(diagnostics: Diagnostic[] = []): void {
 function selectSlide(id: string): void {
   if (!$('master-pane').hidden) setView(view);
   selected = id;
+  const group = groupSlides(compiled?.slides || []).find(item => item.slides.some(slide => slide.id === id));
+  if (group) {
+    outlineCollapsed.delete(group.key);
+    previewCollapsed.delete(group.key);
+  }
   updateEditor();
   const card = [...document.querySelectorAll<HTMLElement>('.preview-card')].find(item => item.dataset.slideId === id);
   card?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+}
+
+function sectionName(slide: Slide): string {
+  if (slide.section) return slide.section;
+  if (slide.layout === 'blank') return 'Blank slides';
+  if (slide.layout.startsWith('title-image-')) return 'Title slides';
+  if (slide.body.includes('```chart')) return 'Chart slides';
+  if (slide.body.includes('```mermaid')) return 'Diagram slides';
+  if (slide.layout === 'image-full' || slide.layout === 'picture-text' ||
+      slide.body.includes('![') || Object.values(slide.slots).some(value => value.includes('!['))) return 'Image slides';
+  if (slide.body.includes('```')) return 'Code slides';
+  if (!Object.keys(slide.slots).length && !slide.reveals.length &&
+      /^# [^\n]+(?:\n+\S[^\n]*)?\s*$/.test(slide.body.trim())) return 'Title slides';
+  return 'Content slides';
+}
+
+function groupSlides(slides: Slide[]): Array<{ key: string; name: string; slides: Slide[] }> {
+  const groups: Array<{ key: string; name: string; slides: Slide[] }> = [];
+  for (const slide of slides) {
+    const name = sectionName(slide);
+    const previous = groups.at(-1);
+    if (previous?.name === name) previous.slides.push(slide);
+    else groups.push({ key: slide.id, name, slides: [slide] });
+  }
+  return groups;
+}
+
+function sectionGroup(name: string, count: number, key: string, collapsed: Set<string>): HTMLDetailsElement {
+  const group = document.createElement('details');
+  group.className = 'slide-group';
+  group.open = !collapsed.has(key);
+  const summary = document.createElement('summary');
+  summary.textContent = `${name} · ${count} ${count === 1 ? 'slide' : 'slides'}`;
+  group.append(summary);
+  group.addEventListener('toggle', () => {
+    if (group.open) collapsed.delete(key);
+    else collapsed.add(key);
+  });
+  return group;
 }
 
 function updateOutline(): void {
@@ -264,23 +313,27 @@ function updateOutline(): void {
   outline.append(list);
   const slides = compiled?.slides || [];
   const byId = new Map(slides.map(slide => [slide.id, slide]));
-  for (const slide of slides) {
-    let depth = 0;
-    let parent = slide.parent;
-    const seen = new Set<string>();
-    while (parent && byId.has(parent) && !seen.has(parent)) {
-      seen.add(parent);
-      depth++;
-      parent = byId.get(parent)?.parent;
+  for (const { key, name, slides: members } of groupSlides(slides)) {
+    const group = sectionGroup(name, members.length, key, outlineCollapsed);
+    list.append(group);
+    for (const slide of members) {
+      let depth = 0;
+      let parent = slide.parent;
+      const seen = new Set<string>();
+      while (parent && byId.has(parent) && !seen.has(parent)) {
+        seen.add(parent);
+        depth++;
+        parent = byId.get(parent)?.parent;
+      }
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'outline-item';
+      button.dataset.slideId = slide.id;
+      button.style.paddingInlineStart = `${12 + Math.min(depth, 5) * 16}px`;
+      button.textContent = `${slide.index + 1}. ${slide.body.match(/^#{1,3}\s+(.+)$/m)?.[1] || slide.id}`;
+      button.addEventListener('click', () => selectSlide(slide.id));
+      group.append(button);
     }
-    const button = document.createElement('button');
-    button.type = 'button';
-    button.className = 'outline-item';
-    button.dataset.slideId = slide.id;
-    button.style.paddingInlineStart = `${12 + Math.min(depth, 5) * 16}px`;
-    button.textContent = `${slide.index + 1}. ${slide.body.match(/^#{1,3}\s+(.+)$/m)?.[1] || slide.id}`;
-    button.addEventListener('click', () => selectSlide(slide.id));
-    list.append(button);
   }
   const actions = document.createElement('div');
   actions.className = 'outline-actions';
@@ -316,80 +369,135 @@ async function updatePreview(): Promise<void> {
   const list = $('preview');
   if (document.activeElement instanceof HTMLElement &&
       document.activeElement.closest('#preview [contenteditable="plaintext-only"]')) return;
+  const openOptions = new Set([...list.querySelectorAll<HTMLDetailsElement>('.slide-options[open]')]
+    .map(item => item.dataset.slideId));
   list.replaceChildren();
   const deck = compiled;
   if (!deck) {
     list.textContent = 'Fix source diagnostics to restore preview.';
     return;
   }
-  for (const slide of deck.slides) {
-    const card = document.createElement('article');
-    card.className = 'preview-card';
-    card.dataset.slideId = slide.id;
-    if (slide.id === selected) card.classList.add('selected');
-    const heading = document.createElement('div');
-    heading.className = 'preview-heading';
-    const label = document.createElement('strong');
-    label.textContent = `${slide.index + 1} · ${slide.id}`;
-    const type = document.createElement('span');
-    type.className = 'layout-type';
-    type.textContent = optionLabel(slide.layout);
-    const layout = document.createElement('select');
-    layout.setAttribute('aria-label', `Layout for slide ${slide.index + 1}`);
-    for (const name of layouts) layout.add(new Option(optionLabel(name), name));
-    layout.value = slide.layout;
-    layout.disabled = !canEditPreview();
-    layout.addEventListener('change', () => {
-      try { editSource(setLayout(sourceInput.value, slide.id, layout.value)); }
-      catch (error) { errorNotice(error); }
-    });
-    heading.append(label, type, layout);
-    const stage = document.createElement('div');
-    stage.className = 'stage preview-stage';
-    stage.addEventListener('click', () => { selected = slide.id; updateOutline(); });
-    card.append(heading, stage);
-    list.append(card);
-    void renderStage(stage, deck, slide, slide.reveals.length).then(() => {
-      if (!card.isConnected || compiled !== deck || !canEditPreview()) return;
-      const sourceLines = editableLines(sourceInput.value, slide.id, slide.body);
-      const rendered = stage.querySelector('.slide-content > .slide-markdown');
-      if (!rendered?.classList.contains('slide-markdown')) return;
-      const paragraphs = new Map<string, HTMLElement[]>();
-      for (const element of rendered.children) {
-        if (!(element instanceof HTMLParagraphElement)) continue;
-        const value = element.textContent || '';
-        paragraphs.set(value, [...paragraphs.get(value) || [], element]);
-      }
-      const byText = new Map<string, typeof sourceLines>();
-      for (const line of sourceLines) byText.set(line.display, [...byText.get(line.display) || [], line]);
-      for (const [value, lines] of byText) {
-        const matches = paragraphs.get(value);
-        if (!matches || matches.length !== lines.length) continue;
-        matches.forEach((paragraph, index) => {
-          const line = lines[index];
-          paragraph.contentEditable = 'plaintext-only';
-          paragraph.setAttribute('role', 'textbox');
-          paragraph.setAttribute('aria-label', `Edit plain text on slide ${slide.index + 1}, paragraph ${sourceLines.indexOf(line) + 1}`);
-          paragraph.setAttribute('aria-multiline', 'false');
-          paragraph.title = 'Click to edit this plain-text paragraph';
-          let canceled = false;
-          paragraph.addEventListener('keydown', event => {
-            if (event.key === 'Escape') { canceled = true; paragraph.textContent = line.display; paragraph.blur(); }
-            if (event.key === 'Enter') { event.preventDefault(); paragraph.blur(); }
-            event.stopPropagation();
-          });
-          paragraph.addEventListener('blur', () => {
-            if (canceled || paragraph.textContent === line.display) return;
-            if (!canEditPreview() || sourceInput.value.slice(line.start, line.end) !== line.text) {
-              notify('Preview changed while editing; draft was not modified.');
-              return;
-            }
-            try { editSource(replacePlainLine(sourceInput.value, line, paragraph.textContent || '')); }
-            catch (error) { errorNotice(error); }
-          });
+  for (const { key, name, slides } of groupSlides(deck.slides)) {
+    const group = sectionGroup(name, slides.length, key, previewCollapsed);
+    const deferred: Array<() => void> = [];
+    list.append(group);
+    for (const slide of slides) {
+      const card = document.createElement('article');
+      card.className = 'preview-card';
+      card.dataset.slideId = slide.id;
+      if (slide.id === selected) card.classList.add('selected');
+      const heading = document.createElement('div');
+      heading.className = 'preview-heading';
+      const label = document.createElement('strong');
+      label.textContent = `${slide.index + 1} · ${slide.id}`;
+      const type = document.createElement('span');
+      type.className = 'layout-type';
+      type.textContent = optionLabel(slide.layout);
+      const layout = document.createElement('select');
+      layout.setAttribute('aria-label', `Layout for slide ${slide.index + 1}`);
+      for (const name of layouts) layout.add(new Option(optionLabel(name), name));
+      layout.value = slide.layout;
+      layout.disabled = !canEditPreview();
+      layout.addEventListener('change', () => {
+        try { editSource(setLayout(sourceInput.value, slide.id, layout.value)); }
+        catch (error) { errorNotice(error); }
+      });
+      heading.append(label, type, layout);
+      const options = document.createElement('details');
+      options.className = 'slide-options';
+      options.dataset.slideId = slide.id;
+      options.open = openOptions.has(slide.id);
+      const summary = document.createElement('summary');
+      summary.textContent = 'Section and slide metadata';
+      const fields = document.createElement('div');
+      fields.className = 'slide-options-fields';
+      const sectionLabel = document.createElement('label');
+      sectionLabel.textContent = 'Section';
+      const sectionInput = document.createElement('input');
+      sectionInput.type = 'text';
+      sectionInput.maxLength = 60;
+      sectionInput.value = slide.section || '';
+      sectionInput.placeholder = `Automatic: ${sectionName({ ...slide, section: undefined })}`;
+      sectionInput.disabled = !canEditPreview();
+      sectionInput.setAttribute('aria-label', `Section for slide ${slide.index + 1}`);
+      sectionInput.addEventListener('change', () => {
+        try { editSource(setSlideSection(sourceInput.value, slide.id, sectionInput.value || undefined)); }
+        catch (error) { errorNotice(error); }
+      });
+      sectionLabel.append(sectionInput);
+      fields.append(sectionLabel);
+      for (const position of metadataPositions) {
+        const field = `metadata${position}` as MetadataKey;
+        const fieldLabel = document.createElement('label');
+        fieldLabel.textContent = position.replace(/(Top|Bottom)(Left|Center|Right)/, '$1 $2');
+        const select = document.createElement('select');
+        select.setAttribute('aria-label', `Slide ${slide.index + 1} ${position.replace(/([a-z])([A-Z])/, '$1-$2').toLowerCase()} metadata override`);
+        select.add(new Option('Inherit master setting', ''));
+        for (const value of metadataValues) select.add(new Option(optionLabel(value), value));
+        select.value = slide.metadata?.[field] || '';
+        select.disabled = !canEditPreview();
+        select.addEventListener('change', () => {
+          try { editSource(setSlideMetadata(sourceInput.value, slide.id, field, select.value || undefined)); }
+          catch (error) { errorNotice(error); }
         });
+        fieldLabel.append(select);
+        fields.append(fieldLabel);
       }
-    }).catch(errorNotice);
+      options.append(summary, fields);
+      const stage = document.createElement('div');
+      stage.className = 'stage preview-stage';
+      stage.addEventListener('click', () => { selected = slide.id; updateOutline(); });
+      card.append(heading, options, stage);
+      group.append(card);
+      const draw = () => {
+        if (stage.dataset.rendered) return;
+        stage.dataset.rendered = 'true';
+        void renderStage(stage, deck, slide, slide.reveals.length).then(() => {
+          if (!card.isConnected || compiled !== deck || !canEditPreview()) return;
+          const sourceLines = editableLines(sourceInput.value, slide.id, slide.body);
+          const rendered = stage.querySelector('.slide-content > .slide-markdown');
+          if (!rendered?.classList.contains('slide-markdown')) return;
+          const paragraphs = new Map<string, HTMLElement[]>();
+          for (const element of rendered.children) {
+            if (!(element instanceof HTMLParagraphElement)) continue;
+            const value = element.textContent || '';
+            paragraphs.set(value, [...paragraphs.get(value) || [], element]);
+          }
+          const byText = new Map<string, typeof sourceLines>();
+          for (const line of sourceLines) byText.set(line.display, [...byText.get(line.display) || [], line]);
+          for (const [value, lines] of byText) {
+            const matches = paragraphs.get(value);
+            if (!matches || matches.length !== lines.length) continue;
+            matches.forEach((paragraph, index) => {
+              const line = lines[index];
+              paragraph.contentEditable = 'plaintext-only';
+              paragraph.setAttribute('role', 'textbox');
+              paragraph.setAttribute('aria-label', `Edit plain text on slide ${slide.index + 1}, paragraph ${sourceLines.indexOf(line) + 1}`);
+              paragraph.setAttribute('aria-multiline', 'false');
+              paragraph.title = 'Click to edit this plain-text paragraph';
+              let canceled = false;
+              paragraph.addEventListener('keydown', event => {
+                if (event.key === 'Escape') { canceled = true; paragraph.textContent = line.display; paragraph.blur(); }
+                if (event.key === 'Enter') { event.preventDefault(); paragraph.blur(); }
+                event.stopPropagation();
+              });
+              paragraph.addEventListener('blur', () => {
+                if (canceled || paragraph.textContent === line.display) return;
+                if (!canEditPreview() || sourceInput.value.slice(line.start, line.end) !== line.text) {
+                  notify('Preview changed while editing; draft was not modified.');
+                  return;
+                }
+                try { editSource(replacePlainLine(sourceInput.value, line, paragraph.textContent || '')); }
+                catch (error) { errorNotice(error); }
+              });
+            });
+          }
+        }).catch(errorNotice);
+      };
+      deferred.push(draw);
+      if (group.open) draw();
+    }
+    group.addEventListener('toggle', () => { if (group.open) deferred.forEach(draw => draw()); });
   }
 }
 
@@ -608,12 +716,20 @@ function openSettings(): void {
   const list = document.createElement('nav');
   list.className = 'sample-list';
   list.setAttribute('aria-label', 'Sample slide layouts');
-  const buttons = masterSamples.map(({ title }, index) => {
+  let currentSection = '';
+  let section: HTMLDetailsElement | undefined;
+  const buttons = masterSamples.map(({ section: category, title }, index) => {
+    if (category !== currentSection) {
+      currentSection = category;
+      const count = masterSamples.filter((sample, position) => position >= index && sample.section === category).length;
+      section = sectionGroup(category, count, `sample-${index}`, new Set());
+      list.append(section);
+    }
     const button = document.createElement('button');
     button.type = 'button';
     button.textContent = `${index + 1}. ${title}`;
     button.addEventListener('click', () => selectSample(index));
-    list.append(button);
+    section!.append(button);
     return button;
   });
   const selectSample = (index: number): void => {
@@ -766,6 +882,7 @@ function wire(): void {
     }
     void libraryAction({ action: 'create', name });
   });
+  $('open-demo').addEventListener('click', () => void libraryAction({ action: 'demo' }));
   $('open').addEventListener('click', () => {
     const input = $<HTMLInputElement>('deck-path');
     const path = input.value.trim();

@@ -3,6 +3,7 @@ import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { homedir, tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { compileDeck, audienceProjection } from '../src/deck';
+import { publicSnapshot } from '../src/presentation-model';
 
 const source = `---
 slides:
@@ -93,6 +94,49 @@ slides:
     ]) expect(compileDeck(invalid).deck).toBeNull();
     expect(compileDeck(grouped.replace('    metadata:\n', '    metadataTopCenter: slideTitle\n    metadata:\n'))
       .diagnostics.some(diagnostic => diagnostic.message.includes('Duplicate metadata position'))).toBe(true);
+  });
+
+  test('validates slide-level sections and metadata and preserves overrides in audience snapshots', () => {
+    const input = `---
+slides:
+  master:
+    metadata:
+      metadataBottomRight: slideNumber
+---
+::slide{id="one" section="Findings" metadataBottomRight="none" metadataTopLeft="slideTitle" layout="title-image-left"}
+# First
+:::slot{name="image"}
+![Example](assets/sample-landscape.svg)
+:::`;
+    const compiled = compileDeck(input);
+    expect(compiled.diagnostics).toEqual([]);
+    expect(compiled.deck?.slides[0].section).toBe('Findings');
+    expect(compiled.deck?.slides[0].metadata).toEqual({ metadataBottomRight: 'none', metadataTopLeft: 'slideTitle' });
+    const projected = audienceProjection(compiled.deck!, 'one', 0);
+    expect(projected.slide.metadata).toEqual(compiled.deck!.slides[0].metadata);
+    const snapshot = publicSnapshot({
+      schemaVersion: 1, sessionId: 'test', sequence: 1, slideId: 'one', step: 0,
+      stage: { title: 'Demo', master: compiled.deck!.master, total: 1, slide: projected.slide },
+      overlay: { marks: [], blackout: false, canvas: false },
+    });
+    expect(snapshot.stage.slides[0].metadata).toEqual({ metadataBottomRight: 'none', metadataTopLeft: 'slideTitle' });
+    for (const directive of [
+      'section=""', 'section="<script>"', 'metadataBottomRight="invalid"',
+      'metadataUnknown="none"', 'metadataBottomRight="none" metadataBottomRight="slideNumber"'
+    ]) expect(compileDeck(input.replace('section="Findings"', directive)).deck).toBeNull();
+  });
+
+  test('bundled feature tour is a valid comprehensive authored deck', async () => {
+    const source = await readFile(join(process.cwd(), 'public', 'feature-tour.md'), 'utf8');
+    const compiled = compileDeck(source);
+    expect(compiled.diagnostics).toEqual([]);
+    expect(compiled.deck?.slides.length).toBe(16);
+    expect(new Set(compiled.deck?.slides.map(slide => slide.layout))).toEqual(new Set([
+      'title-content', 'title-image-left', 'title-image-right', 'two-columns',
+      'three-columns', 'picture-text', 'image-full', 'blank'
+    ]));
+    expect(compiled.deck?.slides.find(slide => slide.id === 'key-ideas')?.parent).toBe('story');
+    expect(compiled.deck?.slides.find(slide => slide.id === 'image-only')?.metadata.metadataBottomRight).toBe('none');
   });
 
   test('validates heading alignment and bounded slide spacing while retaining legacy footer numbers', () => {

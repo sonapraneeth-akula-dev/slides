@@ -1,10 +1,11 @@
 import YAML from 'yaml';
+import { layouts, metadataPositions, metadataValues, type MetadataKey } from './slide-options';
 
 export type MasterValue = string | number | boolean;
 
 const themes = ['signal', 'paper', 'midnight', 'forest'] as const;
 export const themeNames = themes;
-export const layouts = ['title-content', 'two-columns', 'three-columns', 'picture-text', 'blank'] as const;
+export { layouts };
 
 function frontMatter(source: string): { start: number; end: number; value: string } {
   const normalized = source.replace(/\r\n/g, '\n');
@@ -179,12 +180,34 @@ export function setDeckTitle(source: string, title: string): string {
 }
 export function setLayout(source: string, slideId: string, layout: string): string {
   if (!layouts.includes(layout as typeof layouts[number])) throw new Error(`Unknown layout: ${layout}`);
+  return changeSlideAttribute(source, slideId, 'layout', layout);
+}
+
+function changeSlideAttribute(source: string, slideId: string, field: string, value?: string): string {
   if (!/^[\w.-]+$/.test(slideId)) throw new Error('Invalid slide ID.');
-  const escaped = slideId.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const slide = new RegExp(`(^::slide\\{id="${escaped}"[^\\n}]*)(\\})`, 'm');
-  if (!slide.test(source)) throw new Error(`Slide ${slideId} was not found in source.`);
-  return source.replace(slide, (_match, prefix: string, suffix: string) =>
-    `${prefix.replace(/\s+layout="[^"]*"/, '')} layout="${layout}"${suffix}`);
+  const slides = sourceSlides(source);
+  if (!slides) throw new Error('Fix slide directives before editing slide settings.');
+  const slide = slides.find(item => item.id.value === slideId);
+  if (!slide) throw new Error(`Slide ${slideId} was not found in source.`);
+  const start = source.indexOf('::slide{', slide.start);
+  const prefix = slide.directive.slice(0, -1).replace(new RegExp(`\\s+${field}="[^"]*"`), '');
+  const updated = `${prefix}${value === undefined ? '' : ` ${field}="${value}"`}}`;
+  return `${source.slice(0, start)}${updated}${source.slice(start + slide.directive.length)}`;
+}
+
+export function setSlideSection(source: string, slideId: string, section?: string): string {
+  if (section !== undefined && (!section.trim() || section.length > 60 || /["{}<>\r\n]/.test(section))) {
+    throw new Error('Section must be 1–60 characters without markup or quotation marks.');
+  }
+  return changeSlideAttribute(source, slideId, 'section', section?.trim());
+}
+
+export function setSlideMetadata(source: string, slideId: string, key: MetadataKey, value?: string): string {
+  if (!metadataPositions.some(position => `metadata${position}` === key)) throw new Error(`Unknown metadata position: ${key}`);
+  if (value !== undefined && !metadataValues.includes(value as typeof metadataValues[number])) {
+    throw new Error(`Invalid metadata for ${key}: ${value}`);
+  }
+  return changeSlideAttribute(source, slideId, key, value);
 }
 
 export function insertSlide(source: string, parent?: string, after?: string): { text: string; id: string; start: number } {
@@ -301,7 +324,9 @@ function sourceSlides(source: string): SlideIds[] | null {
       rest = rest.slice(spaces);
       offset += spaces;
       const attribute = /^([a-zA-Z][\w-]*)="([^"]*)"(?:\s+|$)/.exec(rest);
-      if (!attribute || attributes.has(attribute[1]) || !['id', 'parent', 'layout'].includes(attribute[1])) return null;
+      if (!attribute || attributes.has(attribute[1]) ||
+          !['id', 'parent', 'layout', 'section'].includes(attribute[1]) &&
+          !metadataPositions.some(position => attribute[1] === `metadata${position}`)) return null;
       const start = offset + attribute[1].length + 2;
       attributes.set(attribute[1], { value: attribute[2], start, end: start + attribute[2].length });
       offset += attribute[0].length;

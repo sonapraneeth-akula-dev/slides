@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 import { compileDeck } from '../src/deck';
-import { addSlide, clearTheme, editableLines, hasUniqueSlideIds, insertSlide, propagateSlideIdChange, replacePlainLine, setDeckTitle, setLayout, setMaster, setTheme } from '../src/source-edit';
+import { addSlide, clearTheme, editableLines, hasUniqueSlideIds, insertSlide, propagateSlideIdChange, replacePlainLine, setDeckTitle, setLayout, setMaster, setSlideMetadata, setSlideSection, setTheme } from '../src/source-edit';
 
 const source = `---
 slides:
@@ -109,6 +109,30 @@ describe('source-backed editing', () => {
     expect(updated).toContain('::slide{id="detail" parent="intro" layout="two-columns"}');
     expect(updated).toContain('::slide{id="intro"}');
     expect(() => setLayout(source, 'absent', 'blank')).toThrow('not found');
+  });
+
+  test('edits a slide section and metadata without changing unrelated source or CRLF', () => {
+    const crlf = source.replace(/\n/g, '\r\n');
+    const sectioned = setSlideSection(crlf, 'detail', 'Product launch');
+    const overridden = setSlideMetadata(sectioned, 'detail', 'metadataBottomRight', 'none');
+    expect(overridden).toContain('::slide{id="detail" parent="intro" section="Product launch" metadataBottomRight="none"}\r\n');
+    expect(overridden).toContain('::slide{id="intro"}\r\n');
+    expect(overridden).not.toMatch(/(?<!\r)\n/);
+    expect(compileDeck(overridden).diagnostics).toEqual([]);
+    expect(compileDeck(overridden).deck?.slides[1].section).toBe('Product launch');
+    expect(compileDeck(overridden).deck?.slides[1].metadata.metadataBottomRight).toBe('none');
+    expect(setSlideMetadata(overridden, 'detail', 'metadataBottomRight')).not.toContain('metadataBottomRight=');
+    expect(setSlideSection(sectioned, 'detail')).not.toContain('section=');
+    expect(hasUniqueSlideIds(overridden)).toBe(true);
+    const added = insertSlide(overridden, 'intro');
+    expect(added.text).toContain('::slide{id="detail" parent="intro" section="Product launch" metadataBottomRight="none"}');
+    const renamed = propagateSlideIdChange(overridden, overridden.replace('id="intro"', 'id="start"'));
+    expect(renamed?.text).toContain('::slide{id="detail" parent="start" section="Product launch" metadataBottomRight="none"}');
+    expect(setSlideMetadata('::slide{layout="blank" id="detail"}\n', 'detail', 'metadataTopLeft', 'deckTitle'))
+      .toBe('::slide{layout="blank" id="detail" metadataTopLeft="deckTitle"}\n');
+    expect(() => setSlideSection(crlf, 'detail', '<script>')).toThrow('Section');
+    expect(() => setSlideMetadata(crlf, 'detail', 'metadataBottomRight', 'invalid')).toThrow('Invalid metadata');
+    expect(() => setSlideMetadata(crlf, 'detail', 'metadataNowhere' as 'metadataBottomRight', 'none')).toThrow('Unknown metadata');
   });
 
   test('inserts a child after its selected slide subtree, before unrelated slides', () => {

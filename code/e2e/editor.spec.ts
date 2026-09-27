@@ -50,8 +50,9 @@ test('author, persist, present and share only read-only public state', async ({ 
   await expect(page.locator('#theme option')).toHaveText(['Signal', 'Paper', 'Midnight', 'Forest']);
   await expect(page.locator('.preview-card').first().locator('.layout-type')).toHaveText('Title Content');
   await expect(page.locator('.preview-card').first()).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
-  await expect(page.locator('.preview-card').first().locator('select option')).toHaveText([
-    'Title Content', 'Two Columns', 'Three Columns', 'Picture Text', 'Blank'
+  await expect(page.locator('.preview-card').first().locator('.preview-heading select option')).toHaveText([
+    'Title Content', 'Two Columns', 'Three Columns', 'Picture Text', 'Blank',
+    'Title Image Left', 'Title Image Right', 'Image Full'
   ]);
   await page.locator('#editor-actions .export-menu summary').click();
   await expect(page.locator('#editor-actions .export-options')).toBeVisible();
@@ -146,14 +147,20 @@ Audience sees this.
     await samples.nth(index).click();
     await expect(samples.nth(index)).toHaveAttribute('aria-current', 'true');
   };
-  await expect(samples).toHaveCount(17);
+  await expect(samples).toHaveCount(21);
   await expect(samples).toHaveText([
     '1. Blank', '2. Title and subtitle', '3. Title, subtitle and image', '4. Heading only',
     '5. Heading and content', '6. Heading and two text columns', '7. Heading and three columns',
     '8. Heading and two images', '9. Heading, image and text', '10. Heading, text and image',
     '11. Image only', '12. Picture with caption', '13. Heading and table', '14. Heading and code',
-    '15. Heading and chart', '16. Heading and diagram', '17. Heading and equation'
+    '15. Heading and chart', '16. Line chart with two series', '17. Donut chart',
+    '18. Heading and diagram', '19. Heading and equation',
+    '20. Title with image on the left', '21. Title with image on the right'
   ]);
+  await expect(page.locator('#master-preview .slide-group')).toHaveCount(9);
+  await page.locator('#master-preview .slide-group').nth(1).locator('summary').click();
+  await expect(page.locator('#master-preview .slide-group').nth(1)).not.toHaveAttribute('open');
+  await page.locator('#master-preview .slide-group').nth(1).locator('summary').click();
   await expect(samples.nth(4)).toHaveAttribute('aria-current', 'true');
   await expect(viewer.locator('li')).toHaveCount(3);
   await expect(viewer.locator('.layout-type')).toHaveText('Title Content');
@@ -177,6 +184,14 @@ Audience sees this.
   await expect(viewer.locator('.slide-column')).toHaveCount(2);
   await choose(10);
   await expect(viewer.locator('img.slide-image')).toHaveCount(1);
+  await expect(viewer.locator('.stage')).toHaveAttribute('data-layout', 'image-full');
+  const imageCoverage = await viewer.locator('.stage').evaluate(stage => {
+    const surface = stage.getBoundingClientRect();
+    const image = stage.querySelector('img')!.getBoundingClientRect();
+    return { height: image.height / surface.height, width: image.width / surface.width };
+  });
+  expect(imageCoverage.height).toBeGreaterThan(.95);
+  expect(imageCoverage.width).toBeGreaterThan(.95);
   await choose(12);
   await expect(viewer.locator('table')).toHaveCount(1);
   await choose(13);
@@ -184,9 +199,42 @@ Audience sees this.
   await choose(14);
   await expect(viewer.locator('.chart-visual canvas')).toHaveCount(1);
   await choose(15);
-  await expect(viewer.locator('.special-fence[data-kind="mermaid"] svg')).toHaveCount(1);
+  await expect(viewer.locator('.chart-visual canvas')).toHaveCount(1);
   await choose(16);
+  await expect(viewer.locator('.chart-visual canvas')).toHaveCount(1);
+  await choose(17);
+  await expect(viewer.locator('.special-fence[data-kind="mermaid"] svg')).toHaveCount(1);
+  const diagramCoverage = await viewer.locator('.stage').evaluate(stage => {
+    const surface = stage.getBoundingClientRect();
+    const svg = stage.querySelector('.special-fence svg')!;
+    const diagram = svg.getBoundingClientRect();
+    const nodes = [...svg.querySelectorAll('.node')].map(node => node.getBoundingClientRect());
+    return {
+      height: diagram.height, nodeCount: nodes.length,
+      nodeHeight: Math.max(0, ...nodes.map(node => node.height)),
+      labels: [...svg.querySelectorAll('text')].map(label => label.textContent?.trim()).filter(Boolean),
+      inFrame: diagram.top >= surface.top && diagram.bottom <= surface.bottom &&
+        diagram.left >= surface.left && diagram.right <= surface.right
+    };
+  });
+  expect(diagramCoverage.height).toBeGreaterThan(120);
+  expect(diagramCoverage.nodeCount).toBeGreaterThanOrEqual(4);
+  expect(diagramCoverage.nodeHeight).toBeGreaterThan(10);
+  expect(diagramCoverage.labels).toEqual(expect.arrayContaining(['Idea', 'Draft', 'Review', 'Present']));
+  expect(diagramCoverage.inFrame).toBe(true);
+  await choose(18);
   await expect(viewer.locator('.katex')).toHaveCount(1);
+  for (const [index, direction] of [[19, 'left'], [20, 'right']] as const) {
+    await choose(index);
+    await expect(viewer.locator('.stage')).toHaveAttribute('data-layout', `title-image-${direction}`);
+    const placement = await viewer.locator('.stage').evaluate(stage => {
+      const surface = stage.getBoundingClientRect();
+      const image = stage.querySelector('.slide-cover-image')!.getBoundingClientRect();
+      return { height: image.height / surface.height, left: image.left - surface.left, right: surface.right - image.right };
+    });
+    expect(placement.height).toBeGreaterThan(.95);
+    expect(placement[direction]).toBeLessThan(5);
+  }
   await expect(page.locator('#source')).not.toHaveValue(/master-sample/);
   await expect(page.getByLabel('Top Left').locator('option')).toHaveText([
     'None', 'Slide Number / Total', 'Presentation Title', 'Slide Title', 'Footer Text', 'Logo Text'
@@ -210,15 +258,15 @@ Audience sees this.
   await expect(viewer.locator('pre code')).toHaveCSS('font-family', 'Consolas');
   await choose(1);
   await page.getByLabel('Bottom Right').selectOption('slideNumber');
-  await expect(page.locator('#master-preview .slide-meta[data-position="BottomRight"]')).toHaveText('2 / 17');
+  await expect(page.locator('#master-preview .slide-meta[data-position="BottomRight"]')).toHaveText('2 / 21');
   await page.getByLabel('Top Left').selectOption('slideNumber');
-  await expect(page.locator('#master-preview .slide-meta[data-position="TopLeft"]')).toHaveText('2 / 17');
+  await expect(page.locator('#master-preview .slide-meta[data-position="TopLeft"]')).toHaveText('2 / 21');
   await expect(page.locator('#source')).toHaveValue(/    metadata:\n      metadataBottomRight: "slideNumber"/);
   await page.getByLabel('Top Center').selectOption('deckTitle');
   await expect(page.locator('#source')).toHaveValue(/metadataTopCenter: "deckTitle"/);
   await expect(page.locator('#source')).toHaveValue(/      metadataTopLeft: "slideNumber"/);
   await expect(page.locator('#master-preview .slide-meta[data-position="TopCenter"]')).toHaveText('Browser acceptance');
-  await expect(page.locator('#master-preview .slide-meta[data-position="BottomRight"]')).toHaveText('2 / 17');
+  await expect(page.locator('#master-preview .slide-meta[data-position="BottomRight"]')).toHaveText('2 / 21');
   await page.locator('[data-view="source"]').click();
   await expect(page.locator('#editor-panes')).toHaveAttribute('data-view', 'source');
   await page.locator('#save').click();
@@ -301,6 +349,101 @@ Audience sees this.
   await expect(page.getByLabel('Bottom Right')).toHaveValue('slideNumber');
   await expect(page.getByLabel('Top Center')).toHaveValue('deckTitle');
   await expect(page.locator('#master-preview .slide-meta[data-position="TopCenter"]')).toHaveText('Browser acceptance');
+});
+
+test('sections, full-height images, table styling, and slide metadata persist into the audience view', async ({ page, context }) => {
+  await page.goto(origin);
+  await page.locator('#deck-name').fill('section-overrides.md');
+  await page.locator('#create').click();
+  await page.locator('#source').fill(`---
+slides:
+  title: Section overrides
+  master:
+    metadata:
+      metadataBottomRight: slideNumber
+---
+::slide{id="cover" section="Overview" layout="title-image-right"}
+# Section cover
+:::slot{name="image"}
+![Landscape](assets/sample-landscape.svg)
+:::
+
+::slide{id="photo" section="Overview" layout="image-full"}
+![Landscape](assets/sample-landscape.svg)
+
+::slide{id="data" section="Details"}
+# Data and diagram
+| Type | Value |
+| --- | --- |
+| A | 3 |
+| B | 5 |
+\`\`\`mermaid
+flowchart TD
+  A --> B
+  B --> C
+\`\`\`
+`);
+  await expect(page.locator('.preview-card')).toHaveCount(3);
+  await expect(page.locator('#outline .slide-group > summary')).toHaveText(['Overview · 2 slides', 'Details · 1 slide']);
+  await expect(page.locator('#preview .slide-group > summary')).toHaveText(['Overview · 2 slides', 'Details · 1 slide']);
+  await page.locator('#outline .slide-group').first().locator('summary').click();
+  await expect(page.locator('#outline .outline-item[data-slide-id="cover"]')).toBeHidden();
+  await page.locator('#outline .slide-group').first().locator('summary').click();
+  await page.locator('#preview .slide-group').first().locator(':scope > summary').click();
+  await expect(page.locator('.preview-card[data-slide-id="cover"]')).toBeHidden();
+  await page.locator('#preview .slide-group').first().locator(':scope > summary').click();
+
+  const cover = page.locator('.preview-card[data-slide-id="cover"]');
+  await cover.locator('.slide-options summary').click();
+  await cover.getByLabel('Slide 1 bottom-right metadata override').selectOption('none');
+  await expect(page.locator('#source')).toHaveValue(/::slide\{id="cover" section="Overview" layout="title-image-right" metadataBottomRight="none"\}/);
+  await expect(cover.locator('.slide-meta[data-position="BottomRight"]')).toHaveCount(0);
+  await cover.getByLabel('Slide 1 top-left metadata override').selectOption('slideTitle');
+  await expect(cover.locator('.slide-meta[data-position="TopLeft"]')).toHaveText('Section cover');
+  const photo = page.locator('.preview-card[data-slide-id="photo"]');
+  await photo.locator('.slide-options summary').click();
+  await photo.getByLabel('Section for slide 2').fill('Details');
+  await photo.getByLabel('Section for slide 2').press('Tab');
+  await expect(page.locator('#outline .slide-group > summary')).toHaveText(['Overview · 1 slide', 'Details · 2 slides']);
+  await expect(page.locator('#source')).toHaveValue(/::slide\{id="photo" layout="image-full" section="Details"\}/);
+  await page.locator('#preview .slide-group').nth(1).locator(':scope > summary').click();
+  await cover.getByLabel('Slide 1 top-center metadata override').selectOption('deckTitle');
+  await page.locator('#preview .slide-group').nth(1).locator(':scope > summary').click();
+  const table = page.locator('.preview-card[data-slide-id="data"] table');
+  await expect(table.locator('thead th').first()).toHaveCSS('font-weight', '800');
+  const rows = await table.locator('tbody tr').evaluateAll(elements => elements.map(row => getComputedStyle(row).backgroundColor));
+  expect(rows[0]).not.toBe(rows[1]);
+  await expect(page.locator('.preview-card[data-slide-id="data"] .special-fence svg')).toBeVisible();
+  await expect(page.locator('#save')).toBeDisabled({ timeout: 15_000 });
+  await page.locator('#present').click();
+  await expect(page.locator('#stage .slide-meta[data-position="BottomRight"]')).toHaveCount(0);
+  await expect(page.locator('#stage .slide-meta[data-position="TopLeft"]')).toHaveText('Section cover');
+  const popupPromise = context.waitForEvent('page');
+  await page.locator('#local-audience').click();
+  const audience = await popupPromise;
+  await expect(audience.locator('#audience-stage .slide-meta[data-position="BottomRight"]')).toHaveCount(0);
+  await expect(audience.locator('#audience-stage .slide-meta[data-position="TopLeft"]')).toHaveText('Section cover');
+  await page.locator('#next').click();
+  await expect(audience.locator('#audience-stage')).toHaveAttribute('data-layout', 'image-full');
+  await expect(audience.locator('#audience-stage .slide-meta[data-position="BottomRight"]')).toHaveText('2 / 3');
+  await expect(audience.locator('#audience-stage img.slide-image')).toBeVisible();
+});
+
+test('feature tour installs on demand and reopens without overwriting edits', async ({ page }) => {
+  await page.goto(origin);
+  await page.locator('#open-demo').click();
+  await expect(page.locator('.preview-card')).toHaveCount(16);
+  await expect(page.locator('.preview-card[data-slide-id="welcome"] .slide-cover-image img')).toBeVisible();
+  await expect(page.locator('.preview-card[data-slide-id="diagram"] .special-fence svg')).toBeVisible();
+  await expect.poll(async () => readFile(join(directory, 'Slides-Feature-Tour.md'), 'utf8')).toContain('Slides feature tour');
+  const edited = (await page.locator('#source').inputValue()).replace('# A reveal and private notes', '# My personalized tour');
+  await page.locator('#source').fill(edited);
+  await expect(page.locator('#save')).toBeDisabled({ timeout: 15_000 });
+  await page.locator('#home').click();
+  await expect(page.locator('#library-page')).toBeVisible();
+  await page.locator('#open-demo').click();
+  await expect(page.locator('#source')).toHaveValue(/# My personalized tour/);
+  await expect(page.locator('.preview-card')).toHaveCount(16);
 });
 
 test('editor actions form one contiguous toolbar on desktop and narrow screens', async ({ page }) => {
@@ -443,7 +586,7 @@ slides:
   await page.locator('#settings-button').click();
   await expect(page.getByLabel('Slide number in footer')).toHaveCount(0);
   await expect(page.getByLabel('Bottom Right')).toHaveValue('slideNumber');
-  await expect(page.locator('#master-preview .slide-meta[data-position="BottomRight"]')).toHaveText('5 / 17');
+  await expect(page.locator('#master-preview .slide-meta[data-position="BottomRight"]')).toHaveText('5 / 21');
   await page.getByLabel('Bottom Right').selectOption('none');
   await expect(page.locator('#master-preview .slide-meta[data-position="BottomRight"]')).toHaveCount(0);
   await expect(page.locator('#source')).toHaveValue(/    metadata:\n      metadataBottomRight: "none"/);

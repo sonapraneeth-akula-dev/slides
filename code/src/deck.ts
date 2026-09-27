@@ -1,12 +1,14 @@
 import YAML from 'yaml';
+import { layouts, metadataPositions, metadataValues } from './slide-options';
 
-export const layouts = ['blank', 'title-content', 'two-columns', 'three-columns', 'picture-text'] as const;
+export { layouts };
 export type Layout = typeof layouts[number];
 export interface Diagnostic { line: number; column: number; message: string }
 export interface SlideItem { text: string; line: number; step: number; slot: string }
 export interface Slide {
   id: string; parent: string | null; title: string; number: string; index: number;
-  layout: Layout; items: SlideItem[]; notes: string[]; reveals: number;
+  layout: Layout; section?: string; metadata: Record<string, string>;
+  items: SlideItem[]; notes: string[]; reveals: number;
 }
 export interface Deck { title: string; master: Record<string, unknown>; slides: Slide[] }
 export interface Compilation { deck: Deck | null; diagnostics: Diagnostic[] }
@@ -17,8 +19,8 @@ const themes = new Set(['signal', 'paper', 'midnight', 'forest']);
 const colors = new Set(['surface', 'text', 'accent', 'muted']);
 const fonts = new Set(['headingFont', 'bodyFont', 'codeFont']);
 const sizes = new Set(['headingSize', 'bodySize', 'codeSize']);
-const metadataPositions = new Set(['metadataTopLeft', 'metadataTopCenter', 'metadataTopRight', 'metadataBottomLeft', 'metadataBottomCenter', 'metadataBottomRight']);
-const metadataValues = new Set(['none', 'slideNumber', 'deckTitle', 'slideTitle', 'footer', 'logo']);
+const metadataKeys = new Set(metadataPositions.map(position => `metadata${position}`));
+const allowedMetadata = new Set(metadataValues);
 const insets = new Set(['marginTop', 'marginRight', 'marginBottom', 'marginLeft', 'paddingTop', 'paddingRight', 'paddingBottom', 'paddingLeft']);
 const allowedFonts = new Set(['Segoe UI', 'Georgia', 'Trebuchet MS', 'Verdana', 'Palatino', 'Consolas', 'Cascadia Code', 'Courier New']);
 
@@ -89,8 +91,8 @@ export function compileDeck(source: string, filenameTitle?: string): Compilation
     if (key === 'metadata') {
       if (!record(value)) fail(2, 'slides.master.metadata must be a mapping');
       else for (const [position, assignment] of Object.entries(value)) {
-        if (!metadataPositions.has(position)) fail(2, `Unknown metadata position: ${position}`);
-        else if (typeof assignment !== 'string' || !metadataValues.has(assignment)) fail(2, `Invalid metadata for ${position}`);
+        if (!metadataKeys.has(position)) fail(2, `Unknown metadata position: ${position}`);
+        else if (typeof assignment !== 'string' || !allowedMetadata.has(assignment as typeof metadataValues[number])) fail(2, `Invalid metadata for ${position}`);
         if (Object.hasOwn(master, position)) fail(2, `Duplicate metadata position: ${position}`);
       }
     } else if (colors.has(key) && (typeof value !== 'string' || !/^#[\da-fA-F]{6}$/.test(value))) fail(2, `${key} must be a hex color`);
@@ -99,11 +101,11 @@ export function compileDeck(source: string, filenameTitle?: string): Compilation
     else if (insets.has(key) && (typeof value !== 'number' || !Number.isFinite(value) || value < 0 || value > 20)) fail(2, `${key} must be between 0 and 20 percent`);
     else if (key === 'headingPlacement' && !['left', 'center', 'right'].includes(String(value))) fail(2, 'Unknown heading placement');
     else if (key === 'footerNumber' && typeof value !== 'boolean') fail(2, 'footerNumber must be boolean');
-    else if (metadataPositions.has(key) && (typeof value !== 'string' || !metadataValues.has(value))) fail(2, `Invalid metadata for ${key}`);
+    else if (metadataKeys.has(key) && (typeof value !== 'string' || !allowedMetadata.has(value as typeof metadataValues[number]))) fail(2, `Invalid metadata for ${key}`);
     else if (key === 'background' && !['solid', 'gradient', 'band'].includes(String(value))) fail(2, 'Unknown background');
     else if (key === 'backdrop' && !['off', 'drift'].includes(String(value))) fail(2, 'Unknown backdrop');
     else if (['logo', 'footer'].includes(key) && typeof value !== 'string') fail(2, `${key} must be text`);
-    else if (!['logo', 'footer', 'footerNumber', 'background', 'backdrop', 'headingPlacement'].includes(key) && !insets.has(key) && !metadataPositions.has(key) && !colors.has(key) && !fonts.has(key) && !sizes.has(key)) fail(2, `Unknown master setting: ${key}`);
+    else if (!['logo', 'footer', 'footerNumber', 'background', 'backdrop', 'headingPlacement'].includes(key) && !insets.has(key) && !metadataKeys.has(key) && !colors.has(key) && !fonts.has(key) && !sizes.has(key)) fail(2, `Unknown master setting: ${key}`);
   }
   const effectiveMaster = { ...master };
   delete effectiveMaster.metadata;
@@ -135,11 +137,18 @@ export function compileDeck(source: string, filenameTitle?: string): Compilation
       if (container) fail(line, 'Close the container before the next slide');
       const match = /^::slide\{(.*)\}$/.exec(trimmed);
       const attrs = match && attributes(match[1]);
-      if (!attrs || !attrs.id || !slideId.test(attrs.id) || Object.keys(attrs).some(k => !['id', 'parent', 'layout'].includes(k))) {
-        fail(line, 'Invalid slide directive (expected id, optional parent and layout)');
+      if (!attrs || !attrs.id || !slideId.test(attrs.id) ||
+          Object.keys(attrs).some(k => !['id', 'parent', 'layout', 'section'].includes(k) && !metadataKeys.has(k))) {
+        fail(line, 'Invalid slide directive (expected id, optional parent, layout, section and metadata positions)');
         current = undefined;
         container = undefined;
         continue;
+      }
+      if (attrs.section !== undefined && (!attrs.section.trim() || attrs.section.length > 60 || /[{}<>]/.test(attrs.section))) {
+        fail(line, 'Section must be 1–60 characters without markup');
+      }
+      for (const key of metadataKeys) if (attrs[key] !== undefined && !allowedMetadata.has(attrs[key] as typeof metadataValues[number])) {
+        fail(line, `Invalid metadata for ${key}`);
       }
       if (ids.has(attrs.id)) fail(line, `Duplicate slide id: ${attrs.id}`);
       ids.add(attrs.id);
@@ -148,6 +157,7 @@ export function compileDeck(source: string, filenameTitle?: string): Compilation
       current = {
         id: attrs.id, parent: attrs.parent || null, title: '', number: '', index: slides.length,
         layout: layouts.includes(chosen as Layout) ? chosen as Layout : 'title-content',
+        section: attrs.section?.trim(), metadata: Object.fromEntries(Object.entries(attrs).filter(([key]) => metadataKeys.has(key))),
         items: [], notes: [], reveals: 0
       };
       slides.push(current);
@@ -245,7 +255,7 @@ export function audienceProjection(deck: Deck, slideId: string, step: number) {
     master: deck.master,
     slide: {
       id: slide.id, title: slide.title, number: slide.number, index: slide.index,
-      layout: slide.layout, reveals: slide.reveals,
+      layout: slide.layout, reveals: slide.reveals, metadata: slide.metadata,
       items: slide.items.filter(item => item.step <= step).map(({ text, step, slot }) => ({ text, step, slot }))
     },
     total: deck.slides.length, step

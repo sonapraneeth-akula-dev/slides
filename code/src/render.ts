@@ -5,12 +5,15 @@ import DOMPurify from 'dompurify';
 import 'katex/dist/katex.min.css';
 import 'highlight.js/styles/github.css';
 import { sampleImageReference, sampleImageUrl } from './sample-image-reference';
+import { metadataPositions } from './slide-options';
 
 export interface Slide {
   id: string;
   parent?: string;
   index: number;
   layout: string;
+  section?: string;
+  metadata?: Record<string, string>;
   body: string;
   reveals: string[];
   slots: Record<string, string>;
@@ -228,6 +231,7 @@ async function renderFences(root: HTMLElement): Promise<void> {
           startOnLoad: false,
           securityLevel: 'strict',
           theme: 'neutral',
+          htmlLabels: false,
           flowchart: { htmlLabels: false },
           maxTextSize: 4000,
         });
@@ -354,7 +358,18 @@ export async function renderStage(host: HTMLElement, stage: Stage, slide: Slide 
   if (slide.layout !== 'blank') {
     const content = document.createElement('div');
     content.className = 'slide-content';
-    content.append(markdown(slide.body));
+    if (slide.layout === 'title-image-left' || slide.layout === 'title-image-right') {
+      const text = markdown(slide.body);
+      text.classList.add('slide-cover-text');
+      const image = markdown(slide.slots?.image || '');
+      image.classList.add('slide-cover-image');
+      image.setAttribute('aria-label', 'Cover image');
+      content.append(text, image);
+    } else {
+      const body = markdown(slide.body);
+      if (slide.layout === 'image-full') body.classList.add('slide-full-image');
+      content.append(body);
+    }
     const names = slide.layout === 'three-columns' ? ['left', 'center', 'right']
       : slide.layout === 'two-columns' ? ['left', 'right'] : slide.layout === 'picture-text' ? ['image', 'text'] : [];
     if (names.length) {
@@ -377,10 +392,9 @@ export async function renderStage(host: HTMLElement, stage: Stage, slide: Slide 
     host.append(content);
   }
   const master = stage.master || {};
-  const positions = ['TopLeft', 'TopCenter', 'TopRight', 'BottomLeft', 'BottomCenter', 'BottomRight'] as const;
-  const assigned = positions.map(position => master[`metadata${position}`]);
-  for (const position of positions) {
-    const configured = master[`metadata${position}`];
+  const assigned = metadataPositions.map(position => slide.metadata?.[`metadata${position}`] ?? master[`metadata${position}`]);
+  for (const position of metadataPositions) {
+    const configured = slide.metadata?.[`metadata${position}`] ?? master[`metadata${position}`];
     const kind = configured === undefined
       ? position === 'BottomLeft' && master.footer && !assigned.includes('footer') ? 'footer'
         : position === 'BottomRight' && master.footerNumber === true && !assigned.includes('slideNumber') ? 'slideNumber' : 'none'

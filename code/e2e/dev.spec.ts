@@ -78,10 +78,10 @@ test('integrated dev mode serves live UI and API, creates a deck from its title'
   const viewer = page.locator('#master-preview .sample-viewer');
   for (const width of [1280, 1920]) {
     await page.setViewportSize({ width, height: width === 1280 ? 720 : 1080 });
-    for (const index of [2, 7, 8, 9, 10, 11, 14, 15]) {
+    for (const index of [2, 7, 8, 9, 10, 11, 14, 15, 16, 17]) {
       await samples.nth(index).click();
       const visuals = viewer.locator(index < 14 ? 'img.slide-image'
-        : index === 14 ? '.chart-visual canvas' : '.special-fence[data-kind="mermaid"] svg');
+        : index < 17 ? '.chart-visual canvas' : '.special-fence[data-kind="mermaid"] svg');
       const count = index === 7 ? 2 : 1;
       await expect(visuals).toHaveCount(count);
       for (let item = 0; item < count; item++) {
@@ -98,7 +98,7 @@ test('integrated dev mode serves live UI and API, creates a deck from its title'
         expect(measurement.height).toBeGreaterThan(0);
         if (index < 14) {
           await expect.poll(() => visual.evaluate(image => (image as HTMLImageElement).naturalWidth)).toBeGreaterThan(0);
-        } else if (index === 14) {
+        } else if (index < 17) {
           await expect.poll(() => visual.evaluate(element => {
             const canvas = element as HTMLCanvasElement;
             const pixels = canvas.getContext('2d')?.getImageData(0, 0, canvas.width, canvas.height).data;
