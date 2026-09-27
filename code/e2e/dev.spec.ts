@@ -65,9 +65,11 @@ test('integrated dev mode serves live UI and API, creates a deck from its title'
   await page.locator('#deck-name').fill('Test Presentation');
   await page.locator('#create').click();
   await expect(page.locator('#editor-page')).toBeVisible();
-  await expect(page.locator('#source-file')).toContainText('Test Presentation.md');
-  const file = join(directory, 'Test Presentation.md');
-  await expect.poll(async () => readFile(file, 'utf8')).toContain('# Welcome');
+  await expect(page.locator('#source-file')).toContainText('Test-Presentation.md');
+  await expect(page.locator('#page-title')).toHaveText('Test Presentation');
+  await expect(page.locator('#source')).toHaveValue(/title: "Test Presentation"/);
+  const file = join(directory, 'Test-Presentation.md');
+  await expect.poll(async () => readFile(file, 'utf8')).toContain('title: "Test Presentation"');
   await page.locator('#source').fill('::slide{id="welcome"}\n# Updated in development\n');
   await expect.poll(async () => readFile(file, 'utf8')).toContain('Updated in development');
   await expect(page.locator('#save-status')).toHaveText('Saved');

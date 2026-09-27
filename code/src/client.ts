@@ -604,7 +604,7 @@ function wire(): void {
       notify('Deck filenames must end in .md or .mdx.');
       return;
     }
-    void libraryAction({ action: 'create', name: /\.(?:md|mdx)$/i.test(name) ? name : `${name}.md` });
+    void libraryAction({ action: 'create', name });
   });
   $('open').addEventListener('click', () => {
     const input = $<HTMLInputElement>('deck-path');

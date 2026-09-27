@@ -38,10 +38,22 @@ function response(data: unknown, status = 200): Response {
   return Response.json(data, { status, headers: { 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' } });
 }
 
-const starter = `---
+function creationName(input: string): { title: string; filename: string } {
+  const name = input.trim();
+  const extension = /\.(md|mdx)$/i.exec(name)?.[0];
+  if (!extension && /\.[A-Za-z0-9]+$/.test(name)) throw new LibraryError(400, 'Deck filenames must end in .md or .mdx');
+  const title = extension ? name.slice(0, -extension.length).trim() : name;
+  if (!title || title.length > 120 || !/^[\w][\w .-]*$/.test(title)) {
+    throw new LibraryError(400, 'Enter a title using letters, numbers, spaces, hyphens, underscores or dots');
+  }
+  return { title, filename: `${title.replace(/ +/g, '-')}${extension ?? '.md'}` };
+}
+
+function starter(title: string): string {
+  return `---
 slides:
   formatVersion: 1
-  title: Untitled presentation
+  title: ${JSON.stringify(title)}
   master:
     theme: signal
 ---
@@ -50,6 +62,7 @@ slides:
 
 Edit this slide in Markdown.
 `;
+}
 
 export function privateRouter(port: number) {
   return async (request: Request): Promise<Response> => {
@@ -75,7 +88,8 @@ export function privateRouter(port: number) {
         if (path === '/api/library' && request.method === 'POST') {
           const data = await body(request);
           if (data.action === 'create') {
-            const created = await createDeck(requireString(data, 'name'), starter);
+            const { title, filename } = creationName(requireString(data, 'name'));
+            const created = await createDeck(filename, starter(title));
             return response({ library: await listDecks(), id: created.id }, 201);
           }
           if (data.action === 'open' || data.action === 'relink') {

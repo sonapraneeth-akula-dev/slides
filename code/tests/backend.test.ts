@@ -77,6 +77,30 @@ beforeAll(async () => {
 afterAll(async () => { if (dir) await rm(dir, { recursive: true, force: true }); });
 
 describe('persistent library and presentation', () => {
+  test('create API converts title spaces to filename hyphens without changing deck title', async () => {
+    const { privateRouter } = await import('../src/host');
+    const route = privateRouter(12345);
+    const headers = { host: '127.0.0.1:12345', 'Content-Type': 'application/json' };
+    const bootstrap = await (await route(new Request('http://127.0.0.1:12345/api/bootstrap', { headers }))).json();
+    const create = (name: string) => route(new Request('http://127.0.0.1:12345/api/library', {
+      method: 'POST', headers: { ...headers, 'X-Slides-Token': bootstrap.token },
+      body: JSON.stringify({ action: 'create', name }),
+    }));
+
+    const result = await create('Quarterly  Review');
+    expect(result.status).toBe(201);
+    const { id } = await result.json();
+    expect(id).toBe(library.deckId('Quarterly-Review.md'));
+    expect((await library.openDeck(id)).deck?.title).toBe('Quarterly  Review');
+    expect(await readFile(join(dir, 'Quarterly-Review.md'), 'utf8')).toContain('title: "Quarterly  Review"');
+    const mdx = await create('Team Plan.mdx');
+    expect(mdx.status).toBe(201);
+    expect((await mdx.json()).id).toBe(library.deckId('Team-Plan.mdx'));
+    expect((await library.openDeck(library.deckId('Team-Plan.mdx'))).deck?.title).toBe('Team Plan');
+    expect((await create('Quarterly Review.md')).status).toBe(409);
+    expect((await create('example.txt')).status).toBe(400);
+  });
+
   test('creates/opens, saves confirmed bytes and detects external edit without data loss', async () => {
     const initial = await library.createDeck('study.md', source);
     expect((await library.listDecks()).map(d => d.name)).toContain('study.md');
