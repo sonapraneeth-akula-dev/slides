@@ -1,4 +1,4 @@
-import { addSlide, clearTheme, editableLines, hasUniqueSlideIds, layouts, propagateSlideIdChange, replacePlainLine, setDeckTitle, setLayout, setMaster, setTheme, themeNames } from './source-edit';
+import { clearTheme, editableLines, hasUniqueSlideIds, insertSlide, layouts, propagateSlideIdChange, replacePlainLine, setDeckTitle, setLayout, setMaster, setTheme, themeNames } from './source-edit';
 import { markdown, overlayMode, renderStage, type Deck, type Slide, type Snapshot, type Stroke } from './render';
 import { drawStage } from './stage-view';
 
@@ -285,7 +285,13 @@ function updateOutline(): void {
     icon.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 6v12M6 12h12"/></svg>';
     button.append(icon, document.createTextNode(label));
     button.addEventListener('click', () => {
-      try { editSource(addSlide(sourceInput.value, parent)); }
+      try {
+        const added = insertSlide(sourceInput.value, parent, parent ? undefined : selected || undefined);
+        editSource(added.text);
+        selected = added.id;
+        sourceInput.focus();
+        sourceInput.setSelectionRange(added.start, added.start);
+      }
       catch (error) { errorNotice(error); }
     });
     return button;

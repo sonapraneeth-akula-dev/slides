@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { addSlide, clearTheme, editableLines, hasUniqueSlideIds, propagateSlideIdChange, replacePlainLine, setDeckTitle, setLayout, setMaster, setTheme } from '../src/source-edit';
+import { addSlide, clearTheme, editableLines, hasUniqueSlideIds, insertSlide, propagateSlideIdChange, replacePlainLine, setDeckTitle, setLayout, setMaster, setTheme } from '../src/source-edit';
 
 const source = `---
 slides:
@@ -87,6 +87,39 @@ describe('source-backed editing', () => {
     expect(updated).toMatch(/::slide\{id="fake"\}\r\n```\r\n\r\n::slide\{id="slide-[\da-f]{8}" parent="first"\}\r\n\r\n## New slide\r\n\r\n::slide\{id="second"\}/);
     expect(updated).not.toMatch(/(?<!\r)\n/);
     expect(updated.slice(0, updated.indexOf('::slide{id="second"}')).replace(/::slide\{id="slide-[\da-f]{8}" parent="first"\}\r\n\r\n## New slide\r\n\r\n/, '')).toBe(original.slice(0, original.indexOf('::slide{id="second"}')));
+  });
+
+  test('repairs displaced children before placing a new child beside its subtree', () => {
+    const displaced = `::slide{id="Welcome"}
+# Welcome
+
+::slide{id="first" parent="Welcome"}
+# First
+
+::slide{id="grandchild" parent="first"}
+# Grandchild
+
+::slide{id="sibling" parent="Welcome"}
+# Sibling
+
+::slide{id="late" parent="first"}
+# Late child
+
+::slide{id="last"}
+# Last
+`;
+    const added = insertSlide(displaced, 'first');
+    const ids = [...added.text.matchAll(/^::slide\{id="([^"]+)"/gm)].map(match => match[1]);
+    expect(ids).toEqual(['Welcome', 'first', 'grandchild', 'late', added.id, 'sibling', 'last']);
+    expect(added.text.slice(added.start)).toStartWith(`::slide{id="${added.id}" parent="first"}`);
+    expect(added.text).toContain('::slide{id="late" parent="first"}\n# Late child');
+    expect(added.text).toContain('::slide{id="sibling" parent="Welcome"}\n# Sibling');
+    const root = insertSlide(displaced, undefined, 'first');
+    expect([...root.text.matchAll(/^::slide\{id="([^"]+)"/gm)].map(match => match[1]))
+      .toEqual(['Welcome', 'first', 'grandchild', 'late', 'sibling', root.id, 'last']);
+    expect(root.text.slice(root.start)).toStartWith(`::slide{id="${root.id}"}`);
+    const appended = addSlide(displaced);
+    expect(appended.indexOf('::slide{id="last"}')).toBeLessThan(appended.lastIndexOf('::slide{id="slide-'));
   });
 
   test('renames slide references but leaves prose and fenced code unchanged', () => {

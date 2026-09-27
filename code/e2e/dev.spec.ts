@@ -78,4 +78,24 @@ test('integrated dev mode serves live UI and API, creates a deck from its title'
   await page.locator('#source').fill('::slide{id="welcome"}\n# Updated in development\n');
   await expect.poll(async () => readFile(file, 'utf8')).toContain('Updated in development');
   await expect(page.locator('#save-status')).toHaveText('Saved');
+
+  await page.locator('#source').fill(`::slide{id="welcome"}
+# Welcome
+
+::slide{id="child" parent="welcome"}
+# Child
+
+::slide{id="sibling" parent="welcome"}
+# Sibling
+
+::slide{id="late" parent="child"}
+# Late
+`);
+  await expect(page.locator('.preview-card')).toHaveCount(4);
+  await page.getByRole('button', { name: '2. Child', exact: true }).click();
+  await page.getByRole('button', { name: 'Add child slide', exact: true }).click();
+  const reordered = await page.locator('#source').inputValue();
+  expect([...reordered.matchAll(/^::slide\{id="([^"]+)"/gm)].map(match => match[1]))
+    .toEqual(['welcome', 'child', 'late', expect.stringMatching(/^slide-[\da-f]{8}$/), 'sibling']);
+  await expect.poll(async () => readFile(file, 'utf8')).toBe(reordered);
 });

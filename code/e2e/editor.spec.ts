@@ -346,7 +346,7 @@ welcome is mentioned in prose.
   await expect(page.locator('#diagnostics')).toHaveText('No diagnostics');
 });
 
-test('add child slide inserts under the highlighted source subtree, not at the end', async ({ page }) => {
+test('add slide actions align source with the highlighted hierarchy, including displaced children', async ({ page }) => {
   const name = 'child-placement.md';
   await page.goto(origin);
   await page.locator('#deck-name').fill(name);
@@ -362,29 +362,38 @@ test('add child slide inserts under the highlighted source subtree, not at the e
 ::slide{id="leaf" parent="child"}
 # Leaf
 
-::slide{id="middle"}
+::slide{id="middle" parent="root"}
 # Middle
+
+::slide{id="late" parent="child"}
+# Late child
 
 ::slide{id="last"}
 # Last
 `);
-  await expect(page.locator('.preview-card')).toHaveCount(5);
+  await expect(page.locator('.preview-card')).toHaveCount(6);
   const addChild = page.getByRole('button', { name: 'Add child slide', exact: true });
-  await page.locator('.outline-item').filter({ hasText: 'Root' }).click();
+  await page.getByRole('button', { name: '2. Child', exact: true }).click();
   await addChild.click();
   let updated = await source.inputValue();
-  expect(updated).toMatch(/::slide\{id="leaf" parent="child"\}[\s\S]*::slide\{id="slide-[\da-f]{8}" parent="root"\}[\s\S]*::slide\{id="middle"\}/);
+  const insertedId = /::slide\{id="(slide-[\da-f]{8})" parent="child"\}/.exec(updated)?.[1];
+  expect(insertedId).toBeDefined();
+  expect([...updated.matchAll(/^::slide\{id="([^"]+)"/gm)].map(match => match[1]))
+    .toEqual(['root', 'child', 'leaf', 'late', insertedId, 'middle', 'last']);
+  expect(await source.evaluate(element => (element as HTMLTextAreaElement).selectionStart))
+    .toBe(updated.indexOf(`::slide{id="${insertedId}" parent="child"}`));
+  await expect(page.locator('.preview-card.selected')).toHaveAttribute('data-slide-id', insertedId!);
 
-  await expect(page.locator('.preview-card')).toHaveCount(6);
+  await expect(page.locator('.preview-card')).toHaveCount(7);
   await page.locator('.outline-item').filter({ hasText: 'Middle' }).click();
   await addChild.click();
   updated = await source.inputValue();
-  expect(updated).toMatch(/::slide\{id="middle"\}[\s\S]*::slide\{id="slide-[\da-f]{8}" parent="middle"\}[\s\S]*::slide\{id="last"\}/);
+  expect(updated).toMatch(/::slide\{id="middle" parent="root"\}[\s\S]*::slide\{id="slide-[\da-f]{8}" parent="middle"\}[\s\S]*::slide\{id="last"\}/);
   await expect(page.locator('#diagnostics')).toHaveText('No diagnostics');
 
   await page.getByRole('button', { name: 'Add slide', exact: true }).click();
   updated = await source.inputValue();
-  expect(updated).toMatch(/::slide\{id="last"\}[\s\S]*::slide\{id="slide-[\da-f]{8}"\}\s+## New slide\s*$/);
+  expect(updated).toMatch(/::slide\{id="slide-[\da-f]{8}" parent="middle"\}[\s\S]*::slide\{id="slide-[\da-f]{8}"\}\s+## New slide\s+::slide\{id="last"\}/);
   await expect.poll(async () => readFile(join(directory, name), 'utf8')).toBe(updated);
   await expect(page.locator('#save')).toBeDisabled();
 });

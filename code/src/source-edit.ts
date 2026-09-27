@@ -113,33 +113,84 @@ export function setLayout(source: string, slideId: string, layout: string): stri
     `${prefix.replace(/\s+layout="[^"]*"/, '')} layout="${layout}"${suffix}`);
 }
 
-export function addSlide(source: string, parent?: string): string {
+export function insertSlide(source: string, parent?: string, after?: string): { text: string; id: string; start: number } {
   if (parent && !/^[\w.-]+$/.test(parent)) throw new Error('Invalid parent slide ID.');
-  const id = `slide-${crypto.randomUUID().slice(0, 8)}`;
+  if (after && !/^[\w.-]+$/.test(after)) throw new Error('Invalid selected slide ID.');
+  let id = `slide-${crypto.randomUUID().slice(0, 8)}`;
   const newline = source.includes('\r\n') ? '\r\n' : '\n';
-  const content = `::slide{id="${id}"${parent ? ` parent="${parent}"` : ''}}${newline}${newline}## New slide${newline}${newline}`;
-  if (!parent) return `${source.trimEnd()}${newline}${newline}${content}`;
+  let content = `::slide{id="${id}"${parent ? ` parent="${parent}"` : ''}}${newline}${newline}## New slide${newline}${newline}`;
+  if (!parent && !after) {
+    const prefix = `${source.trimEnd()}${newline}${newline}`;
+    return { text: prefix + content, id, start: prefix.length };
+  }
   const slides = sourceSlides(source);
   if (!slides || new Set(slides.map(slide => slide.id.value)).size !== slides.length) {
-    throw new Error('Fix slide directives before adding a child slide.');
+    throw new Error('Fix slide directives before adding a slide.');
   }
-  const index = slides.findIndex(slide => slide.id.value === parent);
-  if (index < 0) throw new Error(`Parent slide ${parent} was not found in source.`);
+  while (slides.some(slide => slide.id.value === id)) id = `slide-${crypto.randomUUID().slice(0, 8)}`;
+  content = `::slide{id="${id}"${parent ? ` parent="${parent}"` : ''}}${newline}${newline}## New slide${newline}${newline}`;
+  const anchor = parent || after!;
   const byId = new Map(slides.map(slide => [slide.id.value, slide]));
-  const next = slides.slice(index + 1).find(slide => {
+  if (!byId.has(anchor)) throw new Error(`Slide ${anchor} was not found in source.`);
+  const children = new Map<string, SlideIds[]>();
+  const roots: SlideIds[] = [];
+  for (const slide of slides) {
+    const ancestor = slide.parent?.value;
+    if (!ancestor) roots.push(slide);
+    else {
+      if (!byId.has(ancestor)) throw new Error(`Unknown parent slide: ${ancestor}`);
+      const siblings = children.get(ancestor) || [];
+      siblings.push(slide);
+      children.set(ancestor, siblings);
+    }
+  }
+  const ordered: SlideIds[] = [];
+  const seen = new Set<string>();
+  function visit(slide: SlideIds): void {
+    if (seen.has(slide.id.value)) throw new Error('Fix slide hierarchy before adding a slide.');
+    seen.add(slide.id.value);
+    ordered.push(slide);
+    for (const child of children.get(slide.id.value) || []) visit(child);
+  }
+  for (const root of roots) visit(root);
+  if (ordered.length !== slides.length) throw new Error('Fix slide hierarchy before adding a slide.');
+  const alreadyOrdered = ordered.every((slide, index) => slide === slides[index]);
+  const blocks = alreadyOrdered ? null : new Map(slides.map((slide, index) =>
+    [slide, source.slice(slide.start, slides[index + 1]?.start ?? source.length)]));
+  const arranged = blocks ? source.slice(0, slides[0].start) + ordered.map(slide => blocks.get(slide)!).join('') : source;
+  const arrangedSlides = arranged === source ? slides : sourceSlides(arranged)!;
+  const arrangedById = new Map(arrangedSlides.map(slide => [slide.id.value, slide]));
+  let target = anchor;
+  if (!parent) {
+    const visited = new Set<string>();
+    while (arrangedById.get(target)?.parent?.value) {
+      if (visited.has(target)) throw new Error('Fix slide hierarchy before adding a slide.');
+      visited.add(target);
+      target = arrangedById.get(target)!.parent!.value;
+    }
+  }
+  const index = arrangedSlides.findIndex(slide => slide.id.value === target);
+  const next = arrangedSlides.slice(index + 1).find(slide => {
     let ancestor = slide.parent?.value;
     const seen = new Set<string>();
     while (ancestor && !seen.has(ancestor)) {
-      if (ancestor === parent) return false;
+      if (ancestor === target) return false;
       seen.add(ancestor);
-      ancestor = byId.get(ancestor)?.parent?.value;
+      ancestor = arrangedById.get(ancestor)?.parent?.value;
     }
     return true;
   });
-  if (!next) return `${source.trimEnd()}${newline}${newline}${content}`;
-  const before = source.slice(0, next.start);
+  if (!next) {
+    const prefix = `${arranged.trimEnd()}${newline}${newline}`;
+    return { text: prefix + content, id, start: prefix.length };
+  }
+  const before = arranged.slice(0, next.start);
   const separator = before.endsWith(newline + newline) ? '' : before.endsWith(newline) ? newline : newline + newline;
-  return `${before}${separator}${content}${source.slice(next.start)}`;
+  return { text: `${before}${separator}${content}${arranged.slice(next.start)}`, id, start: before.length + separator.length };
+}
+
+export function addSlide(source: string, parent?: string, after?: string): string {
+  return insertSlide(source, parent, after).text;
 }
 
 type IdSpan = { value: string; start: number; end: number };
