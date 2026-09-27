@@ -322,24 +322,75 @@ describe('persistent library and presentation', () => {
       expect(response.status).toBe(201);
       return (await response.json()) as { id: string };
     };
-    expect((await demo()).id).toBe(original.id);
-    const refreshed = await library.openDeck(original.id);
+    const canonicalId = library.featureTourDeckId('Slides-Feature-Tour.md');
+    expect((await demo()).id).toBe(canonicalId);
+    const refreshed = await library.openDeck(canonicalId);
     expect(refreshed.text).toContain('# A reveal and private notes');
     expect(refreshed.text).not.toContain('# A previous reveal and private notes');
-
-    const redundant = await library.createDeck('Slides-Feature-Tour-11.md', refreshed.text, 'tour');
-    expect((await demo()).id).toBe(redundant.id);
     await expect(readFile(join(library.featureToursRoot, 'Slides-Feature-Tour-10.md')))
       .rejects.toMatchObject({ code: 'ENOENT' });
-    expect((await library.listDecks()).some(entry => entry.id === original.id)).toBe(false);
+    const catalog = JSON.parse(await readFile(join(library.libraryRoot, '.slides-library.json'), 'utf8')) as {
+      entries: Record<string, string>;
+    };
+    expect(catalog.entries[canonicalId]).toBe(join(library.featureToursRoot, 'Slides-Feature-Tour.md'));
+    expect(catalog.entries[original.id]).toBeUndefined();
+
+    const redundant = await library.createDeck('Slides-Feature-Tour-11.md', refreshed.text, 'tour');
+    expect((await demo()).id).toBe(canonicalId);
+    await expect(readFile(join(library.featureToursRoot, 'Slides-Feature-Tour-11.md')))
+      .rejects.toMatchObject({ code: 'ENOENT' });
+    expect((await library.listDecks()).some(entry => entry.id === redundant.id)).toBe(false);
 
     const edited = await library.createDeck('Slides-Feature-Tour-10.md',
       previous.replace('# A previous reveal and private notes', '# My personalized tour'), 'tour');
-    expect((await demo()).id).toBe(redundant.id);
+    expect((await demo()).id).toBe(canonicalId);
     expect((await library.openDeck(edited.id)).text).toContain('# My personalized tour');
     await library.deleteDeck(edited.id, edited.revision, true);
-    const latest = await library.openDeck(redundant.id);
-    await library.deleteDeck(redundant.id, latest.revision, true);
+    const latest = await library.openDeck(canonicalId);
+    await library.deleteDeck(canonicalId, latest.revision, true);
+  });
+
+  test('normalizes a markerless numbered tour without replacing an edited canonical tour', async () => {
+    const current = await readFile(join(process.cwd(), 'public', 'feature-tour.md'), 'utf8');
+    const numbered = await library.createDeck('Slides-Feature-Tour-2.md', current, 'tour');
+    const { privateRouter } = await import('../src/host');
+    const route = privateRouter(12347);
+    const url = 'http://127.0.0.1:12347/api';
+    const headers = { host: '127.0.0.1:12347' };
+    const { token } = await (await route(new Request(`${url}/bootstrap`, { headers }))).json() as { token: string };
+    const demo = async () => {
+      const response = await route(new Request(`${url}/library`, {
+        method: 'POST',
+        headers: { ...headers, 'X-Slides-Token': token, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'demo' }),
+      }));
+      expect(response.status).toBe(201);
+      return (await response.json()) as { id: string };
+    };
+    const canonicalId = library.featureTourDeckId('Slides-Feature-Tour.md');
+    expect((await demo()).id).toBe(canonicalId);
+    expect((await demo()).id).toBe(canonicalId);
+    await expect(readFile(join(library.featureToursRoot, 'Slides-Feature-Tour-2.md')))
+      .rejects.toMatchObject({ code: 'ENOENT' });
+    const refreshed = await library.openDeck(canonicalId);
+    expect(refreshed.text).toContain('# Bundled feature tour:');
+    expect((await library.listDecks()).some(entry => entry.id === numbered.id)).toBe(false);
+
+    const edited = refreshed.text.replace('# A reveal and private notes', '# My personalized tour');
+    await library.saveDeck(canonicalId, refreshed.revision, edited);
+    expect((await demo()).id).toBe(canonicalId);
+    expect((await library.openDeck(canonicalId)).text).toBe(edited);
+
+    const next = (await library.openDeck(canonicalId)).text.replace(
+      /(# Bundled feature tour: )[a-f0-9]{64}/, `$1${'0'.repeat(64)}`);
+    const changed = await library.saveDeck(canonicalId, (await library.openDeck(canonicalId)).revision, next);
+    expect((await demo()).id).toBe(numbered.id);
+    expect((await library.openDeck(canonicalId)).text).toBe(next);
+    expect((await library.openDeck(numbered.id)).text).toContain('# A reveal and private notes');
+    expect((await demo()).id).toBe(numbered.id);
+    await library.deleteDeck(canonicalId, changed.revision, true);
+    const latest = await library.openDeck(numbered.id);
+    await library.deleteDeck(numbered.id, latest.revision, true);
   });
 
   test('imports legacy decks and catalog without removing or overwriting existing files', async () => {

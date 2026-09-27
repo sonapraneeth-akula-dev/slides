@@ -2,7 +2,7 @@ import { createHash, randomBytes } from 'node:crypto';
 import { join } from 'node:path';
 import { publicAssetPath } from './asset-path';
 import { compileDeck } from './deck';
-import { createDeck, deleteDeck, duplicateDeck, featureToursRoot, filenameTitle, grantDeck, LibraryError, libraryRoot, listDecks, openDeck, removeDeck, renameDeck, saveDeck } from './library';
+import { createDeck, deleteDeck, duplicateDeck, featureTourDeckId, featureToursRoot, filenameTitle, grantDeck, LibraryError, libraryRoot, listDecks, openDeck, removeDeck, renameDeck, saveDeck } from './library';
 import { createTalk, endTalk, event, getTalk, privateState, publicState, shareOptions, startShare, stopShare } from './session';
 import { presenterSession, publicSnapshot, renderCompilation } from './presentation-model';
 import { ensureSampleImage, sampleImageResponse } from './sample-image';
@@ -65,17 +65,28 @@ async function featureTour(): Promise<{ id: string }> {
     const opened = await openDeck(tour.id);
     return { id: tour.id, revision: opened.revision, text: normalize(opened.text) };
   }));
+  const canonicalId = featureTourDeckId(filename);
   const currentTour = installed.find(tour => edition(tour.text) === bundleHash || tour.text === current);
-  const reusable = currentTour ?? installed.find(tour => unchanged(tour.text));
+  const reusable = installed.find(tour => tour.id === canonicalId && unchanged(tour.text))
+    ?? currentTour
+    ?? installed.find(tour => unchanged(tour.text));
   await ensureSampleImage();
   if (reusable) {
-    if (!currentTour) await saveDeck(reusable.id, reusable.revision, installText);
+    let id = reusable.id;
+    let revision = reusable.revision;
+    const unedited = unchanged(reusable.text);
+    if (unedited && reusable.text !== normalize(installText)) {
+      revision = (await saveDeck(id, revision, installText)).revision;
+    }
+    if (unedited && id !== canonicalId && !(await Bun.file(join(featureToursRoot, filename)).exists())) {
+      id = (await renameDeck(id, filename, revision)).id;
+    }
     for (const tour of installed) {
       if (tour.id !== reusable.id && unchanged(tour.text)) {
         await deleteDeck(tour.id, tour.revision, true);
       }
     }
-    return { id: reusable.id };
+    return { id };
   }
   let candidate = filename;
   for (let number = 2; await Bun.file(join(featureToursRoot, candidate)).exists(); number++) {
