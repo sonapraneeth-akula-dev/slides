@@ -1,0 +1,10 @@
+# Implementation assumptions
+
+- The HTML mockup supplies visual direction, not a complete executable specification. Source files remain the durable representation; no proprietary editor format or remote account is required.
+- Bun hosts the local application and persistence API. Astro builds static owner and audience shells; `astro dev` alone is not the complete app. Production owner access stays on loopback with a per-run token.
+- `.mdx` is accepted as a filename extension, but executable MDX imports, JSX, expressions, and custom components are intentionally unsupported. Unsupported constructs receive source diagnostics rather than execution.
+- Editing a plain-text paragraph in preview changes source; structural Markdown and rich elements require source edits. A deck with diagnostics can still be saved and repaired, but cannot be newly presented until it compiles.
+- Presentation state is frozen from the last valid saved deck when the session starts. Ending a marked session confirms discarding **all** slide ink; durable annotation saving awaits the deferred export design.
+- LAN sharing is explicit, read-only, session-scoped, and unverified for remote reachability. The operator provides a specific local interface and port range and handles firewall configuration. The bearer link is intended only for trusted local networks.
+- Chart data is bounded inline JSON, not CSV/JSON file references; code is rendered, not run. Mermaid accepts only the explicitly constrained safe grammar.
+- Export controls remain visible with no export action. Custom components and authored-code execution are future scope; absent broad PRD coverage and cross-device/browser evidence remain incomplete, not implicitly accepted.
