@@ -58,6 +58,10 @@ test.afterAll(async () => {
 test('integrated dev mode serves live UI and API, creates a deck from its title', async ({ page, request }) => {
   await page.goto(origin);
   await expect(page.locator('#dev-mode')).toBeVisible();
+  const sampleImage = await request.get(`${origin}/api/sample-image`);
+  expect(sampleImage.status()).toBe(200);
+  expect(sampleImage.headers()['content-type']).toBe('image/svg+xml');
+  expect(await readFile(join(directory, 'assets', 'sample-landscape.svg'), 'utf8')).toContain('<svg');
   await expect(page.locator('#dev-mode')).toHaveCSS('background-color', 'rgb(169, 37, 53)');
   expect(await page.locator('script[src*="/@vite/client"]').count()).toBeGreaterThan(0);
   expect((await request.get(`${origin}/api/bootstrap`, { headers: { Origin: 'http://untrusted.test' } })).status()).toBe(403);

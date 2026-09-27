@@ -3,6 +3,8 @@ import { existsSync, readFileSync } from 'node:fs';
 import { networkInterfaces } from 'node:os';
 import { join } from 'node:path';
 import { publicAssetPath } from './asset-path';
+import { sampleImageResponse } from './sample-image';
+import { sampleImageUrl } from './sample-image-reference';
 import { audienceProjection, type Deck } from './deck';
 import { LibraryError, openDeck } from './library';
 import { publicSnapshot } from './presentation-model';
@@ -138,6 +140,13 @@ export function startShare(talk: Talk, address: string, start: number, end: numb
           if (url.pathname === '/state') {
             if (request.headers.get('X-Slides-Public') !== key) return new Response('Forbidden', { status: 403 });
             return Response.json(publicSnapshot(publicState(talk)), { headers: { 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' } });
+          }
+          if (url.pathname === sampleImageUrl) {
+            try { return await sampleImageResponse(request.method); }
+            catch (error) {
+              if (error instanceof LibraryError) return new Response(error.message, { status: error.status });
+              throw error;
+            }
           }
           const asset = publicAssetPath(url.pathname);
           if (!asset || !allowedAssets.has(asset)) return new Response('Not found', { status: 404 });

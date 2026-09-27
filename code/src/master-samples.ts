@@ -1,5 +1,6 @@
 import { layouts } from './source-edit';
 import type { Slide } from './render';
+import { sampleImageReference } from './sample-image-reference';
 
 type Layout = typeof layouts[number];
 interface SampleDefinition {
@@ -9,7 +10,7 @@ interface SampleDefinition {
   slots?: Record<string, string>;
 }
 
-const image = '![Image placeholder](assets/example.png)';
+const image = `![Illustrated mountain landscape](${sampleImageReference})`;
 const samples: SampleDefinition[] = [
   { title: 'Blank', layout: 'blank', body: '' },
   { title: 'Title and subtitle', layout: 'title-content', body: '# Presentation title\n\nA short subtitle or presenter name' },
@@ -18,7 +19,7 @@ const samples: SampleDefinition[] = [
   { title: 'Heading and content', layout: 'title-content', body: '# Heading and content\n\n- First point\n- Second point\n- Third point' },
   { title: 'Heading and two text columns', layout: 'two-columns', body: '# Two columns', slots: { left: '## First idea\n\nShort explanation.', right: '## Second idea\n\nShort explanation.' } },
   { title: 'Heading and three columns', layout: 'three-columns', body: '# Three columns', slots: { left: '**Plan**\n\nDiscover', center: '**Build**\n\nCreate', right: '**Share**\n\nPresent' } },
-  { title: 'Heading and two images', layout: 'two-columns', body: '# Two images', slots: { left: '![Left image placeholder](assets/left.png)', right: '![Right image placeholder](assets/right.png)' } },
+  { title: 'Heading and two images', layout: 'two-columns', body: '# Two images', slots: { left: `![Left landscape](${sampleImageReference})`, right: `![Right landscape](${sampleImageReference})` } },
   { title: 'Heading, image and text', layout: 'picture-text', body: '# Image and text', slots: { image, text: '## Description\n\nExplain the visual beside it.' } },
   { title: 'Heading, text and image', layout: 'two-columns', body: '# Text and image', slots: { left: '## Description\n\nExplain the visual beside it.', right: image } },
   { title: 'Image only', layout: 'title-content', body: image },

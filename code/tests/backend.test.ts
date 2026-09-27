@@ -120,6 +120,29 @@ beforeAll(async () => {
 afterAll(async () => { if (dir) await rm(dir, { recursive: true, force: true }); });
 
 describe('persistent library and presentation', () => {
+  test('copies the bundled sample image once, serves it only at its fixed route, and rejects modifications', async () => {
+    const { privateRouter } = await import('../src/host');
+    const route = privateRouter(12345);
+    const request = (path: string, method = 'GET') =>
+      route(new Request(`http://127.0.0.1:12345${path}`, { method, headers: { host: '127.0.0.1:12345' } }));
+    expect((await request('/api/bootstrap')).status).toBe(200);
+    const bundled = await readFile(join(process.cwd(), 'public', 'sample-landscape.svg'));
+    const installed = join(dir, 'assets', 'sample-landscape.svg');
+    expect(await readFile(installed)).toEqual(bundled);
+    const response = await request('/api/sample-image');
+    expect(response.status).toBe(200);
+    expect(response.headers.get('content-type')).toBe('image/svg+xml');
+    expect(response.headers.get('content-security-policy')).toContain('sandbox');
+    expect(Buffer.from(await response.arrayBuffer())).toEqual(bundled);
+    expect((await request('/api/sample-image', 'HEAD')).status).toBe(200);
+    expect((await request('/api/other.svg')).status).toBe(403);
+    try {
+      await writeFile(installed, '<svg onload="alert(1)"/>');
+      expect((await request('/api/sample-image')).status).toBe(409);
+      expect(await readFile(installed, 'utf8')).toContain('onload');
+    } finally { await writeFile(installed, bundled); }
+  });
+
   test('uses a home directory by default and preserves the explicit library override', () => {
     expect(library.defaultLibraryRoot).toBe(join(homedir(), '.slides'));
     expect(library.libraryRoot).toBe(dir);
@@ -346,6 +369,11 @@ describe('persistent library and presentation', () => {
       expect((await get('/')).status).toBe(404);
       expect((await get(`/${ownerScript}`)).status).toBe(404);
       expect((await get('/api/bootstrap')).status).toBe(404);
+      const image = await get('/api/sample-image');
+      expect(image.status).toBe(200);
+      expect(image.headers.get('content-type')).toBe('image/svg+xml');
+      expect(image.headers.get('content-security-policy')).toContain('sandbox');
+      expect((await get('/api/other.svg')).status).toBe(404);
       expect((await get('/state')).status).toBe(403);
       expect((await get('/state', 'wrong')).status).toBe(403);
       const state = await (await get('/state', talk.share!.key)).text();

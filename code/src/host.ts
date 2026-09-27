@@ -2,9 +2,11 @@ import { randomBytes } from 'node:crypto';
 import { join } from 'node:path';
 import { publicAssetPath } from './asset-path';
 import { compileDeck } from './deck';
-import { createDeck, deleteDeck, duplicateDeck, filenameTitle, grantDeck, LibraryError, listDecks, openDeck, removeDeck, renameDeck, saveDeck } from './library';
+import { createDeck, deleteDeck, duplicateDeck, filenameTitle, grantDeck, LibraryError, libraryRoot, listDecks, openDeck, removeDeck, renameDeck, saveDeck } from './library';
 import { createTalk, endTalk, event, getTalk, privateState, publicState, shareOptions, startShare, stopShare } from './session';
 import { presenterSession, publicSnapshot, renderCompilation } from './presentation-model';
+import { ensureSampleImage, sampleImageResponse } from './sample-image';
+import { sampleImageUrl } from './sample-image-reference';
 
 const dist = join(process.cwd(), 'dist');
 const ownerToken = randomBytes(32).toString('base64url');
@@ -73,9 +75,14 @@ export function privateRouter(port: number) {
         throw new LibraryError(403, 'Invalid host or origin');
       }
       const path = url.pathname;
+      if (path === sampleImageUrl && (request.method === 'GET' || request.method === 'HEAD')) {
+        return await sampleImageResponse(request.method);
+      }
       if (path.startsWith('/api/')) {
         if (path === '/api/bootstrap' && request.method === 'GET') {
-          return response({ token: ownerToken, library: await listDecks(), interfaces: shareOptions(), devMode: process.env.SLIDES_DEV_MODE === '1' });
+          const library = await listDecks();
+          await ensureSampleImage();
+          return response({ token: ownerToken, library, interfaces: shareOptions(), devMode: process.env.SLIDES_DEV_MODE === '1' });
         }
         const audienceMatch = /^\/api\/public\/([a-f0-9-]+)$/.exec(path);
         if (audienceMatch && request.method === 'GET') {
@@ -194,6 +201,8 @@ if (import.meta.main) {
   if (process.env.SLIDES_DEV_MODE === '1' && (!Number.isInteger(port) || port < 1024 || port > 65535)) {
     throw new Error('Invalid development API port.');
   }
+  await listDecks();
+  await ensureSampleImage(libraryRoot);
   const server = startHost(port);
   console.log(`Local Slides: http://127.0.0.1:${server.port}`);
 }

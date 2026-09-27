@@ -320,6 +320,9 @@ async function updatePreview(): Promise<void> {
     heading.className = 'preview-heading';
     const label = document.createElement('strong');
     label.textContent = `${slide.index + 1} · ${slide.id}`;
+    const type = document.createElement('span');
+    type.className = 'layout-type';
+    type.textContent = optionLabel(slide.layout);
     const layout = document.createElement('select');
     layout.setAttribute('aria-label', `Layout for slide ${slide.index + 1}`);
     for (const name of layouts) layout.add(new Option(optionLabel(name), name));
@@ -329,7 +332,7 @@ async function updatePreview(): Promise<void> {
       try { editSource(setLayout(sourceInput.value, slide.id, layout.value)); }
       catch (error) { errorNotice(error); }
     });
-    heading.append(label, layout);
+    heading.append(label, type, layout);
     const stage = document.createElement('div');
     stage.className = 'stage preview-stage';
     stage.addEventListener('click', () => { selected = slide.id; updateOutline(); });
@@ -486,6 +489,7 @@ function scheduleSave(): void {
 }
 
 const masterSections = ['Theme', 'Heading', 'Body', 'Code', 'Placements', 'Margins', 'Padding'] as const;
+let selectedMasterSample = 4;
 type MasterField = {
   section: typeof masterSections[number]; name: string; label: string;
   type: 'color' | 'text' | 'number' | 'select'; fallback?: string; min?: number; max?: number;
@@ -577,30 +581,46 @@ function openSettings(): void {
   const heading = document.createElement('h2');
   heading.textContent = 'Live layout samples';
   const caption = document.createElement('p');
-  caption.textContent = 'Representative compositions using supported slide layouts. Image areas show unavailable-image placeholders; local image assets are not supported yet. These samples are not added to your deck.';
+  caption.textContent = 'Select a sample to see how master settings affect it. Samples do not change your deck.';
   preview.append(heading, caption);
   if (!compiled) {
     preview.append(document.createTextNode('Fix source diagnostics to see the preview.'));
     return;
   }
   const stage: Stage = { title: compiled.title, theme: compiled.theme, master, slides: masterSamples.map(sample => sample.slide) };
-  const grid = document.createElement('div');
-  grid.className = 'master-samples-grid';
-  preview.append(grid);
-  for (const { title: sampleTitle, slide } of masterSamples) {
-    const card = document.createElement('article');
-    card.className = 'preview-card';
+  const area = document.createElement('div');
+  area.className = 'master-preview-body';
+  const viewer = document.createElement('section');
+  viewer.className = 'sample-viewer';
+  viewer.setAttribute('aria-label', 'Selected layout sample');
+  const list = document.createElement('nav');
+  list.className = 'sample-list';
+  list.setAttribute('aria-label', 'Sample slide layouts');
+  const buttons = masterSamples.map(({ title }, index) => {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.textContent = `${index + 1}. ${title}`;
+    button.addEventListener('click', () => selectSample(index));
+    list.append(button);
+    return button;
+  });
+  const selectSample = (index: number): void => {
+    selectedMasterSample = index;
+    const { title: sampleTitle, slide } = masterSamples[index];
     const title = document.createElement('h3');
     title.textContent = sampleTitle;
     const layout = document.createElement('span');
-    layout.className = 'sample-layout';
+    layout.className = 'layout-type';
     layout.textContent = optionLabel(slide.layout);
     const surface = document.createElement('div');
     surface.className = 'stage';
-    card.append(title, layout, surface);
-    grid.append(card);
+    viewer.replaceChildren(title, layout, surface);
+    buttons.forEach((button, position) => button.setAttribute('aria-current', String(position === index)));
     void renderStage(surface, stage, slide, 0).catch(errorNotice);
-  }
+  };
+  area.append(viewer, list);
+  preview.append(area);
+  selectSample(selectedMasterSample);
 }
 
 function currentSlide(snapshot: Snapshot): Slide | undefined {

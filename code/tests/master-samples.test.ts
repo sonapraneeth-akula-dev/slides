@@ -1,6 +1,7 @@
 import { expect, test } from 'bun:test';
 import { masterSamples } from '../src/master-samples';
 import { layouts } from '../src/source-edit';
+import { sampleImageReference } from '../src/sample-image-reference';
 
 test('master gallery covers supported layouts and composition families without modifying a deck', () => {
   expect(masterSamples).toHaveLength(17);
@@ -22,4 +23,9 @@ test('master gallery covers supported layouts and composition families without m
   ))).toHaveLength(6);
   expect(masterSamples.map(sample => sample.title)).toContain('Image only');
   expect(masterSamples.map(sample => sample.title)).toContain('Heading and chart');
+  for (const sample of masterSamples) {
+    for (const match of `${sample.slide.body}\n${Object.values(sample.slide.slots).join('\n')}`.matchAll(/!\[[^\]]+\]\(([^)]+)\)/g)) {
+      expect(match[1]).toBe(sampleImageReference);
+    }
+  }
 });

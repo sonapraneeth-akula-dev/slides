@@ -4,6 +4,7 @@ import hljs from 'highlight.js';
 import DOMPurify from 'dompurify';
 import 'katex/dist/katex.min.css';
 import 'highlight.js/styles/github.css';
+import { sampleImageReference, sampleImageUrl } from './sample-image-reference';
 
 export interface Slide {
   id: string;
@@ -54,6 +55,9 @@ const md = new MarkdownIt({ html: false, linkify: false, breaks: true });
 md.renderer.rules.image = (tokens, index) => {
   const token = tokens[index];
   const alt = token.content || 'Unlabelled image';
+  if (token.attrGet('src') === sampleImageReference) {
+    return `<img class="slide-image" src="${sampleImageUrl}" alt="${md.utils.escapeHtml(alt)}" loading="lazy">`;
+  }
   return `<span class="asset-fallback" role="img" aria-label="${md.utils.escapeHtml(alt)}">Image unavailable: ${md.utils.escapeHtml(alt)}</span>`;
 };
 md.renderer.rules.fence = (tokens, index) => {
@@ -123,7 +127,7 @@ export function markdown(source: string): HTMLElement {
   const element = document.createElement('div');
   element.className = 'slide-markdown';
   element.innerHTML = DOMPurify.sanitize(md.render(source), {
-    FORBID_TAGS: ['iframe', 'object', 'form', 'script', 'style', 'img'],
+    FORBID_TAGS: ['iframe', 'object', 'form', 'script', 'style'],
   });
   return element;
 }

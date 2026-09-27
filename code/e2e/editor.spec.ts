@@ -48,6 +48,8 @@ test('author, persist, present and share only read-only public state', async ({ 
   await expect(page.locator('#editor-page')).toBeVisible();
   await expect(page.locator('#save')).toBeDisabled();
   await expect(page.locator('#theme option')).toHaveText(['Signal', 'Paper', 'Midnight', 'Forest']);
+  await expect(page.locator('.preview-card').first().locator('.layout-type')).toHaveText('Title Content');
+  await expect(page.locator('.preview-card').first()).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
   await expect(page.locator('.preview-card').first().locator('select option')).toHaveText([
     'Title Content', 'Two Columns', 'Three Columns', 'Picture Text', 'Blank'
   ]);
@@ -129,6 +131,7 @@ Audience sees this.
 
   await page.locator('.preview-card').first().getByLabel('Layout for slide 1').selectOption('two-columns');
   await expect(page.locator('#source')).toHaveValue(/layout="two-columns"/);
+  await expect(page.locator('.preview-card').first().locator('.layout-type')).toHaveText('Two Columns');
   await page.locator('#settings-button').click();
   await expect(page.locator('#master-pane')).toBeVisible();
   await expect(page.locator('#settings-fields legend')).toHaveText([
@@ -136,32 +139,53 @@ Audience sees this.
   ]);
   await expect(page.locator('#settings-fields select')).toHaveCount(8);
   await expect(page.getByLabel('Slide number in footer')).toHaveCount(0);
-  const samples = page.locator('#master-preview .preview-card');
+  const samples = page.locator('#master-preview .sample-list button');
+  const viewer = page.locator('#master-preview .sample-viewer');
+  const choose = async (index: number) => {
+    await samples.nth(index).click();
+    await expect(samples.nth(index)).toHaveAttribute('aria-current', 'true');
+  };
   await expect(samples).toHaveCount(17);
-  await expect(samples.locator(':scope > h3')).toHaveText([
-    'Blank', 'Title and subtitle', 'Title, subtitle and image', 'Heading only',
-    'Heading and content', 'Heading and two text columns', 'Heading and three columns',
-    'Heading and two images', 'Heading, image and text', 'Heading, text and image',
-    'Image only', 'Picture with caption', 'Heading and table', 'Heading and code',
-    'Heading and chart', 'Heading and diagram', 'Heading and equation'
+  await expect(samples).toHaveText([
+    '1. Blank', '2. Title and subtitle', '3. Title, subtitle and image', '4. Heading only',
+    '5. Heading and content', '6. Heading and two text columns', '7. Heading and three columns',
+    '8. Heading and two images', '9. Heading, image and text', '10. Heading, text and image',
+    '11. Image only', '12. Picture with caption', '13. Heading and table', '14. Heading and code',
+    '15. Heading and chart', '16. Heading and diagram', '17. Heading and equation'
   ]);
-  await expect(samples.nth(0).locator('.stage')).toHaveAttribute('data-layout', 'blank');
-  await expect(samples.nth(0).locator('.slide-content')).toHaveCount(0);
-  await expect(samples.nth(1).locator('.slide-content')).toContainText('A short subtitle');
-  await expect(samples.nth(2).locator('.asset-fallback')).toHaveCount(1);
-  await expect(samples.nth(4).locator('li')).toHaveCount(3);
-  await expect(samples.nth(5).locator('.slide-column')).toHaveCount(2);
-  await expect(samples.nth(6).locator('.slide-column')).toHaveCount(3);
-  await expect(samples.nth(7).locator('.asset-fallback')).toHaveCount(2);
-  await expect(samples.nth(8).locator('.slide-column')).toHaveCount(2);
-  await expect(samples.nth(9).locator('.asset-fallback')).toHaveCount(1);
-  await expect(samples.nth(10).locator('.asset-fallback')).toHaveCount(1);
-  await expect(samples.nth(12).locator('table')).toHaveCount(1);
-  await expect(samples.nth(13).locator('pre code')).toContainText('const answer = 42');
-  await expect(samples.nth(14).locator('.chart-visual canvas')).toHaveCount(1);
-  await expect(samples.nth(15).locator('.special-fence[data-kind="mermaid"] svg')).toHaveCount(1);
-  await expect(samples.nth(16).locator('.katex')).toHaveCount(1);
-  await expect(page.locator('#master-preview')).toContainText('Image areas show unavailable-image placeholders');
+  await expect(samples.nth(4)).toHaveAttribute('aria-current', 'true');
+  await expect(viewer.locator('li')).toHaveCount(3);
+  await expect(viewer.locator('.layout-type')).toHaveText('Title Content');
+  await expect(page.locator('#master-pane')).toHaveCSS('padding-left', '12px');
+  await expect(viewer).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+  await choose(0);
+  await expect(viewer.locator('.stage')).toHaveAttribute('data-layout', 'blank');
+  await expect(viewer.locator('.slide-content')).toHaveCount(0);
+  await choose(1);
+  await expect(viewer.locator('.slide-content')).toContainText('A short subtitle');
+  await choose(2);
+  await expect(viewer.locator('img.slide-image')).toHaveCount(1);
+  await expect.poll(() => viewer.locator('img').evaluate(image => (image as HTMLImageElement).naturalWidth)).toBeGreaterThan(0);
+  await choose(5);
+  await expect(viewer.locator('.slide-column')).toHaveCount(2);
+  await choose(6);
+  await expect(viewer.locator('.slide-column')).toHaveCount(3);
+  await choose(7);
+  await expect(viewer.locator('img.slide-image')).toHaveCount(2);
+  await choose(8);
+  await expect(viewer.locator('.slide-column')).toHaveCount(2);
+  await choose(10);
+  await expect(viewer.locator('img.slide-image')).toHaveCount(1);
+  await choose(12);
+  await expect(viewer.locator('table')).toHaveCount(1);
+  await choose(13);
+  await expect(viewer.locator('pre code')).toContainText('const answer = 42');
+  await choose(14);
+  await expect(viewer.locator('.chart-visual canvas')).toHaveCount(1);
+  await choose(15);
+  await expect(viewer.locator('.special-fence[data-kind="mermaid"] svg')).toHaveCount(1);
+  await choose(16);
+  await expect(viewer.locator('.katex')).toHaveCount(1);
   await expect(page.locator('#source')).not.toHaveValue(/master-sample/);
   await expect(page.getByLabel('Top Left').locator('option')).toHaveText([
     'None', 'Slide Number / Total', 'Presentation Title', 'Slide Title', 'Footer Text', 'Logo Text'
@@ -181,16 +205,18 @@ Audience sees this.
   await expect(page.locator('#master-preview .stage').first()).toHaveCSS('--slide-margin-left', '8%');
   await expect(page.locator('#master-preview .slide-content').first()).toHaveCSS('padding-left', /px/);
   await expect(page.locator('#master-preview .stage h1').first()).toHaveCSS('text-align', 'center');
-  await expect(samples.nth(13).locator('pre code')).toHaveCSS('font-family', 'Consolas');
+  await choose(13);
+  await expect(viewer.locator('pre code')).toHaveCSS('font-family', 'Consolas');
+  await choose(1);
   await page.getByLabel('Bottom Right').selectOption('slideNumber');
-  await expect(page.locator('#master-preview .slide-meta[data-position="BottomRight"]').first()).toHaveText('1 / 17');
+  await expect(page.locator('#master-preview .slide-meta[data-position="BottomRight"]')).toHaveText('2 / 17');
   await page.getByLabel('Top Left').selectOption('slideNumber');
-  await expect(page.locator('#master-preview .slide-meta[data-position="TopLeft"]').first()).toHaveText('1 / 17');
+  await expect(page.locator('#master-preview .slide-meta[data-position="TopLeft"]')).toHaveText('2 / 17');
   await expect(page.locator('#source')).toHaveValue(/metadataBottomRight: "slideNumber"/);
   await page.getByLabel('Top Center').selectOption('deckTitle');
   await expect(page.locator('#source')).toHaveValue(/metadataTopCenter: "deckTitle"/);
-  await expect(page.locator('#master-preview .slide-meta[data-position="TopCenter"]').first()).toHaveText('Browser acceptance');
-  await expect(page.locator('#master-preview .slide-meta[data-position="BottomRight"]').first()).toHaveText('1 / 17');
+  await expect(page.locator('#master-preview .slide-meta[data-position="TopCenter"]')).toHaveText('Browser acceptance');
+  await expect(page.locator('#master-preview .slide-meta[data-position="BottomRight"]')).toHaveText('2 / 17');
   await page.locator('[data-view="source"]').click();
   await expect(page.locator('#editor-panes')).toHaveAttribute('data-view', 'source');
   await page.locator('#save').click();
@@ -288,7 +314,7 @@ slides:
   await page.locator('#settings-button').click();
   await expect(page.getByLabel('Slide number in footer')).toHaveCount(0);
   await expect(page.getByLabel('Bottom Right')).toHaveValue('slideNumber');
-  await expect(page.locator('#master-preview .slide-meta[data-position="BottomRight"]').first()).toHaveText('1 / 17');
+  await expect(page.locator('#master-preview .slide-meta[data-position="BottomRight"]')).toHaveText('5 / 17');
   await page.getByLabel('Bottom Right').selectOption('none');
   await expect(page.locator('#master-preview .slide-meta[data-position="BottomRight"]')).toHaveCount(0);
   await expect(page.locator('#source')).toHaveValue(/footerNumber: true/);
@@ -299,6 +325,34 @@ slides:
   await expect(page.locator('#diagnostics')).toHaveText('No diagnostics');
   await expect(page.getByLabel('Bottom Right')).toHaveValue('none');
   await expect.poll(async () => readFile(join(directory, 'Legacy-settings.md'), 'utf8')).toContain('master: {}');
+});
+
+test('sample image renders in the editor and audience without allowing arbitrary image paths', async ({ page, context }) => {
+  await page.goto(origin);
+  await page.locator('#deck-name').fill('Images');
+  await page.locator('#create').click();
+  await expect(page.locator('#editor-page')).toBeVisible();
+  await page.locator('#source').fill(`::slide{id="first"}
+# Example
+
+![Landscape](assets/sample-landscape.svg)
+
+![Not available](assets/private.png)`);
+  const preview = page.locator('#preview .preview-card').first();
+  await expect(preview.locator('img.slide-image')).toHaveCount(1);
+  await expect.poll(() => preview.locator('img').evaluate(image => (image as HTMLImageElement).naturalWidth)).toBeGreaterThan(0);
+  await expect(preview.locator('.asset-fallback')).toContainText('Not available');
+  await expect(preview.locator('.layout-type')).toHaveText('Title Content');
+  await page.locator('#save').click();
+  await expect(page.locator('#save')).toBeDisabled();
+  await page.locator('#present').click();
+  await expect(page.locator('#stage img.slide-image')).toHaveCount(1);
+  const audiencePromise = context.waitForEvent('page');
+  await page.locator('#local-audience').click();
+  const audience = await audiencePromise;
+  await expect(audience.locator('#audience-stage img.slide-image')).toHaveCount(1);
+  await expect.poll(() => audience.locator('#audience-stage img').evaluate(image => (image as HTMLImageElement).naturalWidth)).toBeGreaterThan(0);
+  await expect(audience.locator('#audience-stage .asset-fallback')).toContainText('Not available');
 });
 
 test('external edit opens conflict dialog without overwriting either version', async ({ page }) => {
