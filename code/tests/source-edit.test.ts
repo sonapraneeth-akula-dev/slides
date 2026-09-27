@@ -60,11 +60,33 @@ describe('source-backed editing', () => {
     expect(() => setLayout(source, 'absent', 'blank')).toThrow('not found');
   });
 
-  test('adds a validated child slide after the existing source', () => {
+  test('inserts a child after its selected slide subtree, before unrelated slides', () => {
     const updated = addSlide(source, 'intro');
     expect(updated).toMatch(/::slide\{id="slide-[\da-f]{8}" parent="intro"\}/);
     expect(updated).toContain('## New slide');
+    const tail = '::slide{id="next"}\n# Next\n';
+    const nested = source.replace('## Detail', '## Detail\n\n::slide{id="grandchild" parent="detail"}\n# Grandchild') + '\n' + tail;
+    const afterRoot = addSlide(nested, 'intro');
+    const child = afterRoot.match(/::slide\{id="(slide-[\da-f]{8})" parent="intro"\}/)?.[1];
+    expect(child).toBeDefined();
+    expect(afterRoot.indexOf('::slide{id="grandchild"')).toBeLessThan(afterRoot.indexOf(`::slide{id="${child}"`));
+    expect(afterRoot.indexOf(`::slide{id="${child}"`)).toBeLessThan(afterRoot.indexOf('::slide{id="next"'));
+    const afterDetail = addSlide(nested, 'detail');
+    expect(afterDetail).toMatch(/::slide\{id="grandchild" parent="detail"\}[\s\S]*::slide\{id="slide-[\da-f]{8}" parent="detail"\}[\s\S]*::slide\{id="next"\}/);
+    const afterNext = addSlide(nested, 'next');
+    expect(afterNext).toMatch(/::slide\{id="next"\}[\s\S]*::slide\{id="slide-[\da-f]{8}" parent="next"\}/);
+    expect(addSlide(nested)).toMatch(/::slide\{id="next"\}[\s\S]*::slide\{id="slide-[\da-f]{8}"\}/);
+    expect(() => addSlide(source, 'absent')).toThrow('was not found');
+    expect(() => addSlide(source.replace('id="detail"', 'id=""'), 'intro')).toThrow('Fix slide directives');
     expect(() => addSlide(source, 'intro"}\nunsafe')).toThrow('Invalid parent');
+  });
+
+  test('inserts around fenced directives without modifying existing CRLF content', () => {
+    const original = '::slide{id="first"}\r\n```text\r\n::slide{id="fake"}\r\n```\r\n\r\n::slide{id="second"}\r\nSecond\r\n';
+    const updated = addSlide(original, 'first');
+    expect(updated).toMatch(/::slide\{id="fake"\}\r\n```\r\n\r\n::slide\{id="slide-[\da-f]{8}" parent="first"\}\r\n\r\n## New slide\r\n\r\n::slide\{id="second"\}/);
+    expect(updated).not.toMatch(/(?<!\r)\n/);
+    expect(updated.slice(0, updated.indexOf('::slide{id="second"}')).replace(/::slide\{id="slide-[\da-f]{8}" parent="first"\}\r\n\r\n## New slide\r\n\r\n/, '')).toBe(original.slice(0, original.indexOf('::slide{id="second"}')));
   });
 
   test('renames slide references but leaves prose and fenced code unchanged', () => {

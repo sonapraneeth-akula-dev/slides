@@ -117,11 +117,33 @@ export function addSlide(source: string, parent?: string): string {
   if (parent && !/^[\w.-]+$/.test(parent)) throw new Error('Invalid parent slide ID.');
   const id = `slide-${crypto.randomUUID().slice(0, 8)}`;
   const newline = source.includes('\r\n') ? '\r\n' : '\n';
-  return `${source.trimEnd()}${newline}${newline}::slide{id="${id}"${parent ? ` parent="${parent}"` : ''}}${newline}${newline}## New slide${newline}${newline}`;
+  const content = `::slide{id="${id}"${parent ? ` parent="${parent}"` : ''}}${newline}${newline}## New slide${newline}${newline}`;
+  if (!parent) return `${source.trimEnd()}${newline}${newline}${content}`;
+  const slides = sourceSlides(source);
+  if (!slides || new Set(slides.map(slide => slide.id.value)).size !== slides.length) {
+    throw new Error('Fix slide directives before adding a child slide.');
+  }
+  const index = slides.findIndex(slide => slide.id.value === parent);
+  if (index < 0) throw new Error(`Parent slide ${parent} was not found in source.`);
+  const byId = new Map(slides.map(slide => [slide.id.value, slide]));
+  const next = slides.slice(index + 1).find(slide => {
+    let ancestor = slide.parent?.value;
+    const seen = new Set<string>();
+    while (ancestor && !seen.has(ancestor)) {
+      if (ancestor === parent) return false;
+      seen.add(ancestor);
+      ancestor = byId.get(ancestor)?.parent?.value;
+    }
+    return true;
+  });
+  if (!next) return `${source.trimEnd()}${newline}${newline}${content}`;
+  const before = source.slice(0, next.start);
+  const separator = before.endsWith(newline + newline) ? '' : before.endsWith(newline) ? newline : newline + newline;
+  return `${before}${separator}${content}${source.slice(next.start)}`;
 }
 
 type IdSpan = { value: string; start: number; end: number };
-type SlideIds = { id: IdSpan; parent?: IdSpan; directive: string };
+type SlideIds = { id: IdSpan; parent?: IdSpan; directive: string; start: number };
 type IdReplacement = { start: number; end: number; value: string };
 
 function sourceSlides(source: string): SlideIds[] | null {
@@ -162,7 +184,7 @@ function sourceSlides(source: string): SlideIds[] | null {
     }
     const id = attributes.get('id');
     if (!id || !/^[A-Za-z][\w-]*$/.test(id.value)) return null;
-    result.push({ id, parent: attributes.get('parent'), directive: trimmed });
+    result.push({ id, parent: attributes.get('parent'), directive: trimmed, start: match.index! });
   }
   return frontMatter ? null : result;
 }

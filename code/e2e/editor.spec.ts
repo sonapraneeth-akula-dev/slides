@@ -345,3 +345,46 @@ welcome is mentioned in prose.
   await expect(page.locator('.preview-card.selected')).toHaveAttribute('data-slide-id', 'start');
   await expect(page.locator('#diagnostics')).toHaveText('No diagnostics');
 });
+
+test('add child slide inserts under the highlighted source subtree, not at the end', async ({ page }) => {
+  const name = 'child-placement.md';
+  await page.goto(origin);
+  await page.locator('#deck-name').fill(name);
+  await page.locator('#create').click();
+  await expect(page.locator('#editor-page')).toBeVisible();
+  const source = page.locator('#source');
+  await source.fill(`::slide{id="root"}
+# Root
+
+::slide{id="child" parent="root"}
+# Child
+
+::slide{id="leaf" parent="child"}
+# Leaf
+
+::slide{id="middle"}
+# Middle
+
+::slide{id="last"}
+# Last
+`);
+  await expect(page.locator('.preview-card')).toHaveCount(5);
+  const addChild = page.getByRole('button', { name: 'Add child slide', exact: true });
+  await page.locator('.outline-item').filter({ hasText: 'Root' }).click();
+  await addChild.click();
+  let updated = await source.inputValue();
+  expect(updated).toMatch(/::slide\{id="leaf" parent="child"\}[\s\S]*::slide\{id="slide-[\da-f]{8}" parent="root"\}[\s\S]*::slide\{id="middle"\}/);
+
+  await expect(page.locator('.preview-card')).toHaveCount(6);
+  await page.locator('.outline-item').filter({ hasText: 'Middle' }).click();
+  await addChild.click();
+  updated = await source.inputValue();
+  expect(updated).toMatch(/::slide\{id="middle"\}[\s\S]*::slide\{id="slide-[\da-f]{8}" parent="middle"\}[\s\S]*::slide\{id="last"\}/);
+  await expect(page.locator('#diagnostics')).toHaveText('No diagnostics');
+
+  await page.getByRole('button', { name: 'Add slide', exact: true }).click();
+  updated = await source.inputValue();
+  expect(updated).toMatch(/::slide\{id="last"\}[\s\S]*::slide\{id="slide-[\da-f]{8}"\}\s+## New slide\s*$/);
+  await expect.poll(async () => readFile(join(directory, name), 'utf8')).toBe(updated);
+  await expect(page.locator('#save')).toBeDisabled();
+});
