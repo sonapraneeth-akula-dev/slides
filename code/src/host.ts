@@ -2,7 +2,7 @@ import { randomBytes } from 'node:crypto';
 import { join } from 'node:path';
 import { publicAssetPath } from './asset-path';
 import { compileDeck } from './deck';
-import { createDeck, deleteDeck, duplicateDeck, grantDeck, LibraryError, listDecks, openDeck, removeDeck, renameDeck, saveDeck } from './library';
+import { createDeck, deleteDeck, duplicateDeck, filenameTitle, grantDeck, LibraryError, listDecks, openDeck, removeDeck, renameDeck, saveDeck } from './library';
 import { createTalk, endTalk, event, getTalk, privateState, publicState, shareOptions, startShare, stopShare } from './session';
 import { presenterSession, publicSnapshot, renderCompilation } from './presentation-model';
 
@@ -129,7 +129,8 @@ export function privateRouter(port: number) {
         if (path === '/api/compile' && request.method === 'POST') {
           const data = await body(request);
           const text = requireString(data, 'text');
-          return response(renderCompilation(text, compileDeck(text)));
+          const title = data.deckId === undefined ? undefined : await filenameTitle(requireString(data, 'deckId'));
+          return response(renderCompilation(text, compileDeck(text, title)));
         }
         if (path === '/api/sessions' && request.method === 'POST') {
           const data = await body(request);

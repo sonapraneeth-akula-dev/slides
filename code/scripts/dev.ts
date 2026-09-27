@@ -38,7 +38,7 @@ process.once('SIGINT', stop);
 process.once('SIGTERM', stop);
 
 async function waitFor(url: string, child: ReturnType<typeof spawn>, check: (response: Response) => Promise<boolean>): Promise<void> {
-  for (let attempt = 0; attempt < 100; attempt++) {
+  for (let attempt = 0; attempt < 300; attempt++) {
     if (stopping) throw new Error('Development servers stopped.');
     if (child.exitCode !== null || child.signalCode !== null) throw new Error(`Development server exited before becoming ready: ${url}`);
     try {
@@ -93,7 +93,7 @@ try {
   });
   await waitFor(`http://127.0.0.1:${apiPort}/api/bootstrap`, api, async response => response.ok && (await response.json()).devMode === true);
 
-  const ui = spawn(process.execPath, ['./node_modules/astro/bin/astro.mjs', 'dev', '--host', '127.0.0.1', '--port', String(uiPort)], {
+  const ui = spawn(process.execPath, ['./node_modules/astro/bin/astro.mjs', 'dev', '--ignore-lock', '--host', '127.0.0.1', '--port', String(uiPort)], {
     cwd: process.cwd(), env: { ...env, SLIDES_DEV_API_PORT: String(apiPort) }, stdio: 'inherit',
   });
   children.push(ui);

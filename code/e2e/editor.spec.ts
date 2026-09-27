@@ -46,6 +46,15 @@ test('author, persist, present and share only read-only public state', async ({ 
   await page.locator('#deck-name').fill(name);
   await page.locator('#create').click();
   await expect(page.locator('#editor-page')).toBeVisible();
+  await expect(page.locator('#page-title')).toHaveText('browser-acceptance');
+  await expect(page.locator('.outline-actions')).toBeVisible();
+  const outline = await page.locator('#outline').boundingBox();
+  const actions = await page.locator('.outline-actions').boundingBox();
+  expect(outline && actions && actions.y + actions.height).toBeGreaterThanOrEqual((outline?.y ?? 0) + (outline?.height ?? 0) - 20);
+  await page.locator('#edit-title').click();
+  await page.locator('#title-input').fill('Browser acceptance');
+  await page.locator('#title-input').press('Enter');
+  await expect(page.locator('#source')).toHaveValue(/title: "Browser acceptance"/);
   const source = `---
 slides:
   formatVersion: 1
@@ -89,6 +98,7 @@ Audience sees this.
   await page.locator('#source').fill(source);
   await expect(page.locator('.preview-card')).toHaveCount(2);
   await expect(page.locator('#diagnostics')).toHaveText('No diagnostics');
+  await expect(page.locator('#page-title')).toHaveText('Browser acceptance');
   await expect(page.locator('.preview-card').first().locator('code')).toContainText('answer');
   await expect(page.locator('.preview-card').first().locator('.katex')).toHaveCount(1);
   await expect(page.locator('.preview-card').first().locator('.special-fence[data-kind="mermaid"] svg')).toHaveCount(1);
@@ -107,8 +117,19 @@ Audience sees this.
   await expect(page.locator('#source')).toHaveValue(/layout="two-columns"/);
   await page.locator('#settings-button').click();
   await expect(page.locator('#master-pane')).toBeVisible();
+  await expect(page.locator('#settings-fields select')).toHaveCount(6);
   await page.locator('#theme').selectOption('forest');
   await expect(page.locator('#source')).toHaveValue(/theme: "forest"/);
+  await page.getByLabel('Slide number in footer').check();
+  await expect(page.locator('#master-preview .slide-meta[data-position="BottomRight"]')).toHaveText('1 / 2');
+  await page.getByLabel('Top Left').selectOption('slideNumber');
+  await expect(page.locator('#master-preview .slide-meta[data-position="TopLeft"]')).toHaveText('1 / 2');
+  await expect(page.locator('#master-preview .slide-meta[data-position="BottomRight"]')).toHaveCount(0);
+  await page.getByLabel('Bottom Right').selectOption('slideNumber');
+  await expect(page.locator('#source')).toHaveValue(/metadataBottomRight: "slideNumber"/);
+  await page.getByLabel('Top Center').selectOption('deckTitle');
+  await expect(page.locator('#source')).toHaveValue(/metadataTopCenter: "deckTitle"/);
+  await expect(page.locator('#master-preview .slide-meta[data-position="BottomRight"]')).toHaveText('1 / 2');
   await page.locator('[data-view="source"]').click();
   await expect(page.locator('#editor-panes')).toHaveAttribute('data-view', 'source');
   await page.locator('#save').click();
@@ -120,6 +141,7 @@ Audience sees this.
   await page.locator('#present').click();
   await expect(page.locator('#presentation-page')).toBeVisible();
   await expect(page.locator('#speaker-notes')).toContainText('PRIVATE SPEAKER NOTES');
+  await expect(page.locator('#stage .slide-meta[data-position="BottomRight"]')).toHaveText('1 / 2');
   await expect(page.getByRole('button', { name: 'Export (coming later)' })).toBeDisabled();
   await expect(page.getByRole('button', { name: 'Save annotations (coming later)' })).toBeDisabled();
   const popupPromise = context.waitForEvent('page');
@@ -127,6 +149,7 @@ Audience sees this.
   const audience = await popupPromise;
   await audience.waitForLoadState('domcontentloaded');
   await expect(audience.locator('#audience-stage')).toContainText('Original paragraph');
+  await expect(audience.locator('#audience-stage .slide-meta[data-position="BottomRight"]')).toHaveText('1 / 2');
   await expect(audience.locator('body')).not.toContainText('PRIVATE SPEAKER NOTES');
   await expect(audience.locator('.audience-page')).toBeVisible();
 
@@ -150,6 +173,7 @@ Audience sees this.
   await expect(audience.locator('#audience-stage')).toContainText('Revealed text');
   await page.locator('#next').click();
   await expect(page.locator('#slide-progress')).toHaveText('Slide 2 / 2');
+  await expect(audience.locator('#audience-stage .slide-meta[data-position="BottomRight"]')).toHaveText('2 / 2');
   await expect(audience.locator('#audience-stage')).toContainText('Updated audience paragraph');
   await page.locator('#previous').click();
   await expect(page.locator('#slide-progress')).toHaveText('Slide 1 / 2');
@@ -183,4 +207,49 @@ test('external edit opens conflict dialog without overwriting either version', a
   await page.locator('#use-disk').click();
   await expect(page.locator('#source')).toHaveValue(disk);
   await expect(page.locator('#conflict-dialog')).toBeHidden();
+});
+
+test('title pencil, slide buttons and multiple plain preview paragraphs work together', async ({ page }) => {
+  await page.goto(origin);
+  await page.locator('#deck-name').fill('Preview editing');
+  await page.locator('#create').click();
+  await expect(page.locator('#editor-page')).toBeVisible();
+
+  const title = page.locator('#page-title');
+  const pencil = page.locator('#edit-title');
+  const titleBox = await title.boundingBox();
+  const pencilBox = await pencil.boundingBox();
+  expect(titleBox && pencilBox && pencilBox.x >= titleBox.x + titleBox.width).toBeTruthy();
+  await expect(pencil.locator('svg path')).toHaveAttribute('d', /M4 20.*12-12/);
+  await pencil.click();
+  await expect(pencil).toBeHidden();
+  await page.locator('#title-input').press('Escape');
+  await expect(pencil).toBeVisible();
+
+  const add = page.getByRole('button', { name: 'Add slide', exact: true });
+  const child = page.getByRole('button', { name: 'Add child slide', exact: true });
+  for (const button of [add, child]) {
+    await expect(button).toBeVisible();
+    await expect(button.locator('.add-slide-icon')).toHaveText('+');
+    expect(await button.locator('.add-slide-icon').evaluate(icon => getComputedStyle(icon).backgroundColor)).toBe('rgb(35, 84, 173)');
+  }
+
+  const original = await readFile(join(directory, 'Preview-editing.md'), 'utf8');
+  await page.locator('#source').fill(original.replace('Edit this slide in Markdown.', 'Edit this slide in Markdown.\n\nTests'));
+  const paragraphs = page.locator('.preview-card').first().locator('.stage > .slide-markdown > p[contenteditable="plaintext-only"]');
+  await expect(paragraphs).toHaveCount(0);
+  await expect(paragraphs).toHaveCount(2);
+  await paragraphs.nth(1).fill('Updated tests');
+  await paragraphs.nth(1).press('Tab');
+  await expect(page.locator('#source')).toHaveValue(/Edit this slide in Markdown\.\n\nUpdated tests/);
+  await expect(paragraphs).toHaveCount(2);
+  await paragraphs.first().fill('Updated intro');
+  await page.waitForTimeout(350);
+  await paragraphs.first().press('Tab');
+  await expect(page.locator('#source')).toHaveValue(/Updated intro\n\nUpdated tests/);
+  await child.click();
+  await expect(page.locator('#source')).toHaveValue(/::slide\{id="slide-[\da-f]{8}" parent="welcome"\}/);
+  await add.click();
+  await expect(page.locator('.preview-card')).toHaveCount(3);
+  await expect.poll(async () => readFile(join(directory, 'Preview-editing.md'), 'utf8')).toContain('Updated tests');
 });

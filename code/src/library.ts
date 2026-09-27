@@ -92,9 +92,13 @@ async function read(id: string) {
   return { text, revision, path, info };
 }
 
+export async function filenameTitle(id: string): Promise<string> {
+  return basename(await pathFor(id)).replace(/\.(md|mdx)$/i, '');
+}
+
 export async function openDeck(id: string) {
   const { text, revision } = await read(id);
-  return { id, text, revision, ...compileDeck(text) };
+  return { id, text, revision, ...compileDeck(text, await filenameTitle(id)) };
 }
 
 export async function listDecks() {
@@ -254,7 +258,7 @@ export async function saveDeck(id: string, baseRevision: string, text: string) {
     }
     const persisted = await read(id);
     if (persisted.text !== text) throw new LibraryError(500, 'Saved bytes differ from requested source');
-    return { revision: persisted.revision, ...compileDeck(text) };
+    return { revision: persisted.revision, ...compileDeck(text, await filenameTitle(id)) };
   });
   locks.set(id, task);
   try { return await task; }

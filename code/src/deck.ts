@@ -17,6 +17,8 @@ const themes = new Set(['signal', 'paper', 'midnight', 'forest']);
 const colors = new Set(['surface', 'text', 'accent', 'muted']);
 const fonts = new Set(['headingFont', 'bodyFont', 'codeFont']);
 const sizes = new Set(['headingSize', 'bodySize', 'codeSize']);
+const metadataPositions = new Set(['metadataTopLeft', 'metadataTopCenter', 'metadataTopRight', 'metadataBottomLeft', 'metadataBottomCenter', 'metadataBottomRight']);
+const metadataValues = new Set(['none', 'slideNumber', 'deckTitle', 'slideTitle', 'footer', 'logo']);
 const allowedFonts = new Set(['Segoe UI', 'Georgia', 'Trebuchet MS', 'Verdana', 'Palatino', 'Consolas', 'Cascadia Code', 'Courier New']);
 
 function attributes(raw: string): Record<string, string> | null {
@@ -51,7 +53,7 @@ function outsideMath(line: string, state: { block: boolean }): string {
   return plain;
 }
 
-export function compileDeck(source: string): Compilation {
+export function compileDeck(source: string, filenameTitle?: string): Compilation {
   const diagnostics: Diagnostic[] = [];
   const fail = (line: number, message: string, column = 1) => diagnostics.push({ line, column, message });
   if (typeof source !== 'string' || source.length > 2_000_000) {
@@ -87,10 +89,11 @@ export function compileDeck(source: string): Compilation {
     else if (fonts.has(key) && !allowedFonts.has(String(value))) fail(2, `${key} must be an available font`);
     else if (sizes.has(key) && (typeof value !== 'number' || value < 12 || value > 120)) fail(2, `${key} must be between 12 and 120`);
     else if (key === 'footerNumber' && typeof value !== 'boolean') fail(2, 'footerNumber must be boolean');
+    else if (metadataPositions.has(key) && (typeof value !== 'string' || !metadataValues.has(value))) fail(2, `Invalid metadata for ${key}`);
     else if (key === 'background' && !['solid', 'gradient', 'band'].includes(String(value))) fail(2, 'Unknown background');
     else if (key === 'backdrop' && !['off', 'drift'].includes(String(value))) fail(2, 'Unknown backdrop');
     else if (['logo', 'footer'].includes(key) && typeof value !== 'string') fail(2, `${key} must be text`);
-    else if (!['logo', 'footer', 'footerNumber', 'background', 'backdrop'].includes(key) && !colors.has(key) && !fonts.has(key) && !sizes.has(key)) fail(2, `Unknown master setting: ${key}`);
+    else if (!['logo', 'footer', 'footerNumber', 'background', 'backdrop'].includes(key) && !metadataPositions.has(key) && !colors.has(key) && !fonts.has(key) && !sizes.has(key)) fail(2, `Unknown master setting: ${key}`);
   }
   const configuredLayouts = record(options.layouts) ? options.layouts : {};
   if (options.layouts !== undefined && !record(options.layouts)) fail(2, 'slides.layouts must be a mapping');
@@ -212,7 +215,11 @@ export function compileDeck(source: string): Compilation {
     fail(slide.items[0]?.line ?? 1, `Cycle involving ${slide.id}`);
   }
   return {
-    deck: diagnostics.length ? null : { title: String(options.title || slides[0]?.title || 'Untitled deck'), master: { ...master, theme }, slides: ordered },
+    deck: diagnostics.length ? null : {
+      title: typeof options.title === 'string' && options.title.trim() && options.title !== 'Untitled presentation'
+        ? options.title : filenameTitle || slides[0]?.title || 'Untitled deck',
+      master: { ...master, theme }, slides: ordered
+    },
     diagnostics
   };
 }

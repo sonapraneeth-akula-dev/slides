@@ -62,6 +62,22 @@ describe('compiler and audience projection', () => {
     expect(compileDeck('::slide{id="a"}\n<img src=x onerror="alert(1)">').deck).toBeNull();
     expect(compileDeck('::slide{id="a"}\n```html\n<img src=x onerror="alert(1)">\n```').deck).not.toBeNull();
   });
+
+  test('uses filename for placeholder titles and validates metadata positions', () => {
+    const input = `---
+slides:
+  title: Untitled presentation
+  master:
+    footerNumber: true
+    metadataTopCenter: slideTitle
+    metadataBottomRight: slideNumber
+---
+::slide{id="one"}
+# First`;
+    expect(compileDeck(input, 'Quarterly report').deck?.title).toBe('Quarterly report');
+    expect(compileDeck(input.replace('Untitled presentation', 'My custom title'), 'Quarterly report').deck?.title).toBe('My custom title');
+    expect(compileDeck(input.replace('metadataTopCenter: slideTitle', 'metadataTopCenter: arbitrary'), 'Quarterly report').deck).toBeNull();
+  });
 });
 
 let dir: string;
@@ -118,6 +134,12 @@ describe('persistent library and presentation', () => {
       expect((error as InstanceType<typeof library.LibraryError>).details).toMatchObject({ diskText: source, draftText: 'draft not lost' });
     }
     expect(await readFile(join(dir, 'study.md'), 'utf8')).toBe(source);
+  });
+
+  test('names opened placeholder decks after their file', async () => {
+    const opened = await library.createDeck('from-file.md', source.replace('title: Journey', 'title: Untitled presentation'));
+    expect(opened.deck?.title).toBe('from-file');
+    expect((await library.openDeck(opened.id)).deck?.title).toBe('from-file');
   });
 
   test('rejects traversal, unsupported extension and duplicate creates', async () => {

@@ -12,7 +12,7 @@ bun run dev
 ```
 
 Open the `http://127.0.0.1:4321` URL printed as **Slides development** (or the printed port if `SLIDES_DEV_PORT` is set). This starts Astro with browser live reload and the loopback Bun API together, without a build. The UI shows a **DEV MODE** badge. API source edits hot-reload the Bun host automatically; reload the page after an API reload to obtain a fresh owner token, and save any draft first. Stop both servers with Ctrl+C. Running `astro dev` alone does not provide the application API.
-Stop any separately running Astro dev server in this project before starting the integrated command. LAN sharing in dev mode uses audience assets from the most recent `bun run build`; build once before testing LAN sharing.
+The integrated command can run alongside another Astro dev server on a different port; use `SLIDES_DEV_PORT` to choose one if needed. LAN sharing in dev mode uses audience assets from the most recent `bun run build`; build once before testing LAN sharing.
 
 For a built run without the development badge:
 
@@ -23,7 +23,7 @@ bun run start
 
 Open the loopback URL printed by the host on the same machine. Keep the Bun process running while editing or presenting. For development checks, run `bun run check`, `bun run build`, `bun run test`, and `bun run test:e2e` (requires the Playwright Chromium browser; install it with `bunx playwright install chromium` if missing). No cloud account, export pipeline, or CI is configured.
 
-The library can create a starter deck from a presentation name: `Test Presentation` becomes `Test-Presentation.md`, while the deck title remains `Test Presentation`. Spaces in new filenames become hyphens; enter a `.mdx` suffix to use that format instead of `.md`. The library can also open an existing absolute `.md`/`.mdx` file path, hide an entry without deleting its file, or relink a moved file. The local library index is stored under `library/`; the deck source stays at its chosen filesystem location. Save edits before presenting. Invalid source remains editable and reports diagnostics; presentation requires a current valid compiled deck.
+The library can create a starter deck from a presentation name: `Test Presentation` becomes `Test-Presentation.md`, while the deck title remains `Test Presentation`. Spaces in new filenames become hyphens; enter a `.mdx` suffix to use that format instead of `.md`. Opened files without a title (or with the starter placeholder `Untitled presentation`) display their filename without its extension as the title. Use the pencil beside the title in the editor and press Enter to set an independent title in the source. The library can also open an existing absolute `.md`/`.mdx` file path, hide an entry without deleting its file, or relink a moved file. The local library index is stored under `library/`; the deck source stays at its chosen filesystem location. Save edits before presenting. Invalid source remains editable and reports diagnostics; presentation requires a current valid compiled deck.
 
 ## Deck source
 
@@ -56,7 +56,7 @@ This appears after the first advance.
 ```
 ````
 
-Use `:::slot{name="..."}` for layout-specific regions. Layouts: `blank`, `title-content`, `two-columns`, `three-columns`, and `picture-text`. Themes: `signal`, `paper`, `midnight`, and `forest`. Master settings in the editor update theme, colors, typography, spacing, and footer fields in source. The preview supports direct edits to plain-text paragraphs when source is valid; edit Markdown structure and rich content in the source pane. Code fences display highlighted code but never run it; JSX, imports, and custom components are not supported.
+Use `:::slot{name="..."}` for layout-specific regions. Layouts: `blank`, `title-content`, `two-columns`, `three-columns`, `picture-text`. Themes: `signal`, `paper`, `midnight`, `forest`. Master settings update theme, colors, typography, footer text, and six metadata positions (top/bottom × left/center/right) in the source. Each position can show the slide number / total, presentation title, slide title, footer text, logo text, or nothing. Existing `footerNumber: true` still shows the count at bottom right unless overridden there; footer text defaults to bottom left. The preview supports direct edits to plain-text paragraphs when source is valid; edit Markdown structure and rich content in the source pane. Code fences display highlighted code but never run it; JSX, imports, and custom components are not supported.
 
 ## Present and share
 

@@ -54,6 +54,7 @@ export interface PublicState {
   stage: {
     title: string;
     master: Record<string, unknown>;
+    total: number;
     slide: Pick<SourceSlide, 'id' | 'index' | 'layout' | 'reveals'> & {
       items: Array<Pick<SlideItem, 'text' | 'step' | 'slot'>>;
     };
@@ -90,7 +91,7 @@ export function publicSnapshot(state: PublicState): Snapshot {
     slideId: state.slideId, step: state.step,
     stage: {
       title: state.stage.title, master: state.stage.master,
-      theme: String(state.stage.master.theme ?? 'signal'), slides: [slideContent],
+      theme: String(state.stage.master.theme ?? 'signal'), total: state.stage.total, slides: [slideContent],
     },
     overlay: overlay(state), ended: false,
   };

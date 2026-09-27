@@ -1,4 +1,4 @@
-import { addSlide, clearTheme, editableLine, layouts, replacePlainLine, setLayout, setMaster, setTheme, themeNames } from './source-edit';
+import { addSlide, clearTheme, editableLines, layouts, replacePlainLine, setDeckTitle, setLayout, setMaster, setTheme, themeNames } from './source-edit';
 import { markdown, overlayMode, renderStage, type Deck, type Slide, type Snapshot, type Stroke } from './render';
 import { drawStage } from './stage-view';
 
@@ -80,6 +80,9 @@ function show(next: Page): void {
   }
   $('editor-actions').hidden = next !== 'editor';
   $('presenter-actions').hidden = next !== 'presentation';
+  $('edit-title').hidden = next !== 'editor';
+  $('title-input').hidden = true;
+  $('page-title').hidden = false;
   $('app').setAttribute('aria-busy', 'false');
 }
 function errorNotice(error: unknown): void { notify(message(error)); }
@@ -238,6 +241,9 @@ function updateOutline(): void {
     else setView(view);
   });
   outline.append(settings);
+  const list = document.createElement('div');
+  list.className = 'outline-slides';
+  outline.append(list);
   const slides = compiled?.slides || [];
   const byId = new Map(slides.map(slide => [slide.id, slide]));
   for (const slide of slides) {
@@ -256,26 +262,34 @@ function updateOutline(): void {
     button.setAttribute('aria-current', slide.id === selected ? 'true' : 'false');
     button.textContent = `${slide.index + 1}. ${slide.body.match(/^#{1,3}\s+(.+)$/m)?.[1] || slide.id}`;
     button.addEventListener('click', () => selectSlide(slide.id));
-    outline.append(button);
+    list.append(button);
   }
-  const add = document.createElement('button');
-  add.type = 'button';
-  add.className = 'add-slide';
-  add.textContent = '+ Add slide';
-  add.addEventListener('click', () => editSource(addSlide(sourceInput.value)));
-  outline.append(add);
-  if (selected) {
-    const child = document.createElement('button');
-    child.type = 'button';
-    child.className = 'add-slide';
-    child.textContent = '+ Add child slide';
-    child.addEventListener('click', () => editSource(addSlide(sourceInput.value, selected)));
-    outline.append(child);
-  }
+  const actions = document.createElement('div');
+  actions.className = 'outline-actions';
+  const addButton = (label: string, parent?: string): HTMLButtonElement => {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'add-slide';
+    const icon = document.createElement('span');
+    icon.className = 'add-slide-icon';
+    icon.setAttribute('aria-hidden', 'true');
+    icon.textContent = '+';
+    button.append(icon, document.createTextNode(label));
+    button.addEventListener('click', () => {
+      try { editSource(addSlide(sourceInput.value, parent)); }
+      catch (error) { errorNotice(error); }
+    });
+    return button;
+  };
+  actions.append(addButton('Add slide'));
+  if (selected) actions.append(addButton('Add child slide', selected));
+  outline.append(actions);
 }
 
 async function updatePreview(): Promise<void> {
   const list = $('preview');
+  if (document.activeElement instanceof HTMLElement &&
+      document.activeElement.closest('#preview [contenteditable="plaintext-only"]')) return;
   list.replaceChildren();
   const deck = compiled;
   if (!deck) {
@@ -308,29 +322,44 @@ async function updatePreview(): Promise<void> {
     list.append(card);
     void renderStage(stage, deck, slide, slide.reveals.length).then(() => {
       if (!card.isConnected || compiled !== deck || !canEditPreview()) return;
-      const line = editableLine(sourceInput.value, slide.id, slide.body);
-      const paragraph = stage.querySelector<HTMLElement>('.slide-markdown > p');
-      if (!line || !paragraph || paragraph.textContent !== line.display) return;
-      paragraph.contentEditable = 'plaintext-only';
-      paragraph.setAttribute('role', 'textbox');
-      paragraph.setAttribute('aria-label', `Edit plain text on slide ${slide.index + 1}`);
-      paragraph.setAttribute('aria-multiline', 'false');
-      paragraph.title = 'Click to edit this plain-text paragraph';
-      let canceled = false;
-      paragraph.addEventListener('keydown', event => {
-        if (event.key === 'Escape') { canceled = true; paragraph.textContent = line.display; paragraph.blur(); }
-        if (event.key === 'Enter') { event.preventDefault(); paragraph.blur(); }
-        event.stopPropagation();
-      });
-      paragraph.addEventListener('blur', () => {
-        if (canceled || paragraph.textContent === line.display) return;
-        if (!canEditPreview() || sourceInput.value.slice(line.start, line.end) !== line.text) {
-          notify('Preview changed while editing; draft was not modified.');
-          return;
-        }
-        try { editSource(replacePlainLine(sourceInput.value, line, paragraph.textContent || '')); }
-        catch (error) { errorNotice(error); }
-      });
+      const sourceLines = editableLines(sourceInput.value, slide.id, slide.body);
+      const rendered = stage.firstElementChild;
+      if (!rendered?.classList.contains('slide-markdown')) return;
+      const paragraphs = new Map<string, HTMLElement[]>();
+      for (const element of rendered.children) {
+        if (!(element instanceof HTMLParagraphElement)) continue;
+        const value = element.textContent || '';
+        paragraphs.set(value, [...paragraphs.get(value) || [], element]);
+      }
+      const byText = new Map<string, typeof sourceLines>();
+      for (const line of sourceLines) byText.set(line.display, [...byText.get(line.display) || [], line]);
+      for (const [value, lines] of byText) {
+        const matches = paragraphs.get(value);
+        if (!matches || matches.length !== lines.length) continue;
+        matches.forEach((paragraph, index) => {
+          const line = lines[index];
+          paragraph.contentEditable = 'plaintext-only';
+          paragraph.setAttribute('role', 'textbox');
+          paragraph.setAttribute('aria-label', `Edit plain text on slide ${slide.index + 1}, paragraph ${sourceLines.indexOf(line) + 1}`);
+          paragraph.setAttribute('aria-multiline', 'false');
+          paragraph.title = 'Click to edit this plain-text paragraph';
+          let canceled = false;
+          paragraph.addEventListener('keydown', event => {
+            if (event.key === 'Escape') { canceled = true; paragraph.textContent = line.display; paragraph.blur(); }
+            if (event.key === 'Enter') { event.preventDefault(); paragraph.blur(); }
+            event.stopPropagation();
+          });
+          paragraph.addEventListener('blur', () => {
+            if (canceled || paragraph.textContent === line.display) return;
+            if (!canEditPreview() || sourceInput.value.slice(line.start, line.end) !== line.text) {
+              notify('Preview changed while editing; draft was not modified.');
+              return;
+            }
+            try { editSource(replacePlainLine(sourceInput.value, line, paragraph.textContent || '')); }
+            catch (error) { errorNotice(error); }
+          });
+        });
+      }
     }).catch(errorNotice);
   }
 }
@@ -354,13 +383,21 @@ function editSource(value: string): void {
 function scheduleCompile(): void {
   const generation = ++compileGeneration;
   validText = '';
+  for (const paragraph of $('preview').querySelectorAll<HTMLElement>('[contenteditable="plaintext-only"]')) {
+    paragraph.removeAttribute('contenteditable');
+    paragraph.removeAttribute('role');
+    paragraph.removeAttribute('aria-label');
+    paragraph.removeAttribute('aria-multiline');
+    paragraph.removeAttribute('title');
+  }
+  $('preview-label').textContent = 'Preview edits paused until source is valid and current';
   status('Compiling draft…', true);
   $('present').setAttribute('disabled', '');
   clearTimeout(compileTimer);
   compileTimer = setTimeout(async () => {
     const draft = sourceInput.value;
     try {
-      const result = await request<{ deck: Deck | null; diagnostics: Diagnostic[] }>('/api/compile', 'POST', { text: draft });
+      const result = await request<{ deck: Deck | null; diagnostics: Diagnostic[] }>('/api/compile', 'POST', { text: draft, deckId });
       if (generation !== compileGeneration || draft !== sourceInput.value || page !== 'editor') return;
       updateDiagnostics(result.diagnostics);
       if (result.deck && !result.diagnostics.some(item => item.severity === 'error')) {
@@ -429,7 +466,7 @@ function scheduleSave(): void {
   saveTimer = setTimeout(() => { if (page === 'editor' && !conflicted) void save(); }, 1500);
 }
 
-const masterFields: Array<{ name: string; label: string; type: 'color' | 'text' | 'number' | 'checkbox'; fallback?: string }> = [
+const masterFields: Array<{ name: string; label: string; type: 'color' | 'text' | 'number' | 'checkbox' | 'select'; fallback?: string }> = [
   { name: 'surface', label: 'Surface', type: 'color', fallback: '#ffffff' },
   { name: 'text', label: 'Text color', type: 'color', fallback: '#1b1f24' },
   { name: 'accent', label: 'Accent', type: 'color', fallback: '#2563eb' },
@@ -441,7 +478,13 @@ const masterFields: Array<{ name: string; label: string; type: 'color' | 'text' 
   { name: 'bodySize', label: 'Body size', type: 'number' },
   { name: 'codeSize', label: 'Code size', type: 'number' },
   { name: 'footer', label: 'Footer text', type: 'text' },
+  { name: 'logo', label: 'Logo text', type: 'text' },
   { name: 'footerNumber', label: 'Slide number in footer', type: 'checkbox' },
+  ...(['TopLeft', 'TopCenter', 'TopRight', 'BottomLeft', 'BottomCenter', 'BottomRight'] as const)
+    .map(position => ({
+      name: `metadata${position}`, label: position.replace(/(Top|Bottom)(Left|Center|Right)/, '$1 $2'),
+      type: 'select' as const
+    })),
 ];
 function openSettings(): void {
   $('editor-panes').hidden = true;
@@ -451,14 +494,27 @@ function openSettings(): void {
   for (const field of masterFields) {
     const label = document.createElement('label');
     label.textContent = field.label;
-    const input = document.createElement('input');
-    input.type = field.type;
-    input.value = String(compiled?.master?.[field.name] ?? field.fallback ?? '');
-    if (field.type === 'checkbox') input.checked = compiled?.master?.[field.name] === true;
-    if (field.type === 'number') { input.min = '12'; input.max = '120'; }
+    const input = field.type === 'select' ? document.createElement('select') : document.createElement('input');
+    if (input instanceof HTMLSelectElement) {
+      for (const [name, caption] of [
+        ['none', 'None'], ['slideNumber', 'Slide number / total'], ['deckTitle', 'Presentation title'],
+        ['slideTitle', 'Slide title'], ['footer', 'Footer text'], ['logo', 'Logo text']
+      ]) input.add(new Option(caption, name));
+    }
+    if (input instanceof HTMLInputElement) {
+      input.type = field.type;
+      if (field.type === 'checkbox') input.checked = compiled?.master?.[field.name] === true;
+      if (field.type === 'number') { input.min = '12'; input.max = '120'; }
+    }
+    input.value = String(compiled?.master?.[field.name] ?? (
+      field.name === 'metadataBottomLeft' && compiled?.master?.footer &&
+        !Object.entries(compiled.master).some(([key, value]) => key.startsWith('metadata') && value === 'footer') ? 'footer'
+        : field.name === 'metadataBottomRight' && compiled?.master?.footerNumber &&
+          !Object.entries(compiled.master).some(([key, value]) => key.startsWith('metadata') && value === 'slideNumber') ? 'slideNumber'
+          : field.fallback ?? (field.type === 'select' ? 'none' : '')));
     input.addEventListener('change', () => {
       try {
-        const value = field.type === 'checkbox' ? input.checked
+        const value = field.type === 'checkbox' && input instanceof HTMLInputElement ? input.checked
           : field.type === 'number' ? Number(input.value) : input.value;
         if (field.type === 'number' && (!Number.isFinite(Number(value)) || Number(value) < 12 || Number(value) > 120)) {
           throw new Error('Font size must be between 12 and 120.');
@@ -626,6 +682,26 @@ function wire(): void {
     show('library');
     text('page-title', 'Local presentations');
     $('save-status').hidden = true;
+  });
+  $('edit-title').addEventListener('click', () => {
+    const input = $<HTMLInputElement>('title-input');
+    input.value = compiled?.title || '';
+    $('edit-title').hidden = true;
+    $('page-title').hidden = true;
+    input.hidden = false;
+    input.focus();
+    input.select();
+  });
+  $<HTMLInputElement>('title-input').addEventListener('keydown', event => {
+    if (event.key === 'Escape') { $('title-input').hidden = true; $('page-title').hidden = false; $('edit-title').hidden = false; }
+    if (event.key === 'Enter') {
+      try {
+        editSource(setDeckTitle(sourceInput.value, $<HTMLInputElement>('title-input').value));
+        $('title-input').hidden = true;
+        $('page-title').hidden = false;
+        $('edit-title').hidden = false;
+      } catch (error) { errorNotice(error); }
+    }
   });
   for (const button of document.querySelectorAll<HTMLButtonElement>('[data-view]')) {
     button.addEventListener('click', () => setView(button.dataset.view as View));

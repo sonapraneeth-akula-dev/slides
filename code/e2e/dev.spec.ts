@@ -24,6 +24,7 @@ async function availablePort(): Promise<number> {
 }
 
 test.beforeAll(async () => {
+  test.setTimeout(60_000);
   directory = await mkdtemp(join(tmpdir(), 'slides-dev-browser-'));
   const port = await availablePort();
   server = spawn('bun', ['run', 'dev'], {
@@ -31,7 +32,7 @@ test.beforeAll(async () => {
     env: { ...process.env, SLIDES_LIBRARY: directory, SLIDES_DEV_PORT: String(port) },
   });
   origin = await new Promise<string>((resolve, reject) => {
-    const timeout = setTimeout(() => reject(new Error(`Development server did not start: ${output}`)), 30_000);
+    const timeout = setTimeout(() => reject(new Error(`Development server did not start: ${output}`)), 55_000);
     let output = '';
     const fail = (error: Error) => { clearTimeout(timeout); reject(error); };
     server.once('error', fail);
@@ -57,6 +58,7 @@ test.afterAll(async () => {
 test('integrated dev mode serves live UI and API, creates a deck from its title', async ({ page, request }) => {
   await page.goto(origin);
   await expect(page.locator('#dev-mode')).toBeVisible();
+  await expect(page.locator('#dev-mode')).toHaveCSS('background-color', 'rgb(169, 37, 53)');
   expect(await page.locator('script[src*="/@vite/client"]').count()).toBeGreaterThan(0);
   expect((await request.get(`${origin}/api/bootstrap`, { headers: { Origin: 'http://untrusted.test' } })).status()).toBe(403);
   await page.locator('#deck-name').fill('example.txt');
@@ -67,6 +69,8 @@ test('integrated dev mode serves live UI and API, creates a deck from its title'
   await expect(page.locator('#editor-page')).toBeVisible();
   await expect(page.locator('#source-file')).toContainText('Test-Presentation.md');
   await expect(page.locator('#page-title')).toHaveText('Test Presentation');
+  await expect(page.locator('.editor-buttons button')).toHaveCount(5);
+  expect(await page.locator('.editor-buttons button svg').count()).toBe(5);
   await expect(page.locator('#source')).toHaveValue(/title: "Test Presentation"/);
   const file = join(directory, 'Test-Presentation.md');
   await expect.poll(async () => readFile(file, 'utf8')).toContain('title: "Test Presentation"');

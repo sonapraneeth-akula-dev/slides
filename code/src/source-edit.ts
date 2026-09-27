@@ -79,12 +79,28 @@ export function clearTheme(source: string): string {
 }
 
 export function setMaster(source: string, field: string, value?: MasterValue): string {
-  if (!/^(surface|text|accent|muted|headingFont|bodyFont|codeFont|headingSize|bodySize|codeSize|background|backdrop|logo|footer|footerNumber)$/.test(field)) {
+  if (!/^(surface|text|accent|muted|headingFont|bodyFont|codeFont|headingSize|bodySize|codeSize|background|backdrop|logo|footer|footerNumber|metadata(Top|Bottom)(Left|Center|Right))$/.test(field)) {
     throw new Error(`Unknown master field: ${field}`);
   }
   return changeMapping(source, 'master', field, value);
 }
 
+export function setDeckTitle(source: string, title: string): string {
+  if (!title.trim() || title.length > 120 || /[\r\n]/.test(title)) throw new Error('Enter a title of 1–120 characters on one line.');
+  const newline = source.includes('\r\n') ? '\r\n' : '\n';
+  const normalized = source.replace(/\r\n/g, '\n');
+  const front = frontMatter(source);
+  const lines = front.value.split('\n');
+  const slides = lines.findIndex(line => /^slides:\s*$/.test(line));
+  if (slides < 0) throw new Error('Cannot change title: expected a slides: front matter section.');
+  const index = lines.findIndex(line => /^  title:/.test(line));
+  if (index >= 0) lines[index] = `  title: ${JSON.stringify(title.trim())}`;
+  else lines.splice(slides + 1, 0, `  title: ${JSON.stringify(title.trim())}`);
+  const result = front.end === 0
+    ? `---\n${lines.join('\n')}\n---\n\n${normalized}`
+    : `${normalized.slice(0, front.start)}${lines.join('\n')}${normalized.slice(front.end)}`;
+  return result.replace(/\n/g, newline);
+}
 export function setLayout(source: string, slideId: string, layout: string): string {
   if (!layouts.includes(layout as typeof layouts[number])) throw new Error(`Unknown layout: ${layout}`);
   if (!/^[\w.-]+$/.test(slideId)) throw new Error('Invalid slide ID.');
@@ -104,34 +120,51 @@ export function addSlide(source: string, parent?: string): string {
 
 export interface EditableLine { start: number; end: number; text: string; display: string }
 
-export function editableLine(source: string, slideId: string, body: string): EditableLine | null {
-  if (!/^[\w.-]+$/.test(slideId)) return null;
-  const escaped = slideId.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const match = new RegExp(`^::slide\\{id="${escaped}"[^\\n]*\\}\\r?\\n`, 'm').exec(source);
-  if (!match) return null;
-  const start = match.index + match[0].length;
-  const end = source.indexOf('\n::slide{', start);
-  const block = source.slice(start, end < 0 ? source.length : end);
-  if (block.includes(':::') || block.includes('```')) return null;
-  const lines = [...block.matchAll(/(?:^|\n)([^\r\n]+)/g)]
-    .map(hit => ({
-      text: hit[1],
-      start: start + hit.index! + (hit[0].startsWith('\n') ? 1 : 0),
-      display: hit[1].replace(/\\([\\`*_{}\[\]()#+.!|>~-])/g, '$1'),
-    }))
-    .filter(line => line.text.trim() &&
-      !/^\s*(?:#|>|-|\*|\d+\.|::|!|\|)/.test(line.text) &&
-      !/(^|[^\\])(?:\\\\)*[`*_![\]<>]/.test(line.text) &&
-      !/\\(?![\\`*_{}\[\]()#+.!|>~-])/.test(line.text));
-  const plain = body.trim().split(/\r?\n/).filter(line => line.trim() && !/^#/.test(line));
-  if (lines.length !== 1 || plain.length !== 1 || lines[0].display !== plain[0]) return null;
-  return { ...lines[0], end: lines[0].start + lines[0].text.length };
+export function editableLines(source: string, slideId: string, body: string): EditableLine[] {
+  if (!/^[\w.-]+$/.test(slideId)) return [];
+  const baseline: string[] = [];
+  const editable: EditableLine[] = [];
+  let active = false;
+  let found = false;
+  let container = false;
+  let fence = '';
+  for (const match of source.matchAll(/[^\r\n]*(?:\r?\n|$)/g)) {
+    const line = match[0].replace(/\r?\n$/, '');
+    const trimmed = line.trim();
+    const marker = /^(`{3,}|~{3,})/.exec(trimmed)?.[1];
+    const inFence = !!fence || !!marker;
+    if (marker) {
+      if (!fence) fence = marker;
+      else if (marker[0] === fence[0] && marker.length >= fence.length) fence = '';
+    }
+    if (!inFence && /^::slide\{/.test(trimmed)) {
+      if (active) break;
+      active = /\bid="([^"]+)"/.exec(trimmed)?.[1] === slideId;
+      found ||= active;
+      continue;
+    }
+    if (!active) continue;
+    if (!inFence && trimmed === ':::') { container = false; continue; }
+    if (!inFence && trimmed.startsWith(':::')) { container = true; continue; }
+    if (container) continue;
+    baseline.push(line);
+    if (inFence || !trimmed || /^\s*(?:#|>|[-*+]|\d+\.|::|!|\|)/.test(line) ||
+        /(^|[^\\])(?:\\\\)*[`*_![\]<>$~]/.test(line) ||
+        /\\(?![\\`*_{}\[\]()#+.!|>~:$-])/.test(line)) continue;
+    editable.push({
+      text: line,
+      start: match.index!,
+      end: match.index! + line.length,
+      display: line.replace(/\\([\\`*_{}\[\]()#+.!|>~:$-])/g, '$1'),
+    });
+  }
+  return found && baseline.join('\n').trim() === body.trim() ? editable : [];
 }
 
 export function replacePlainLine(source: string, line: EditableLine, replacement: string): string {
   if (source.slice(line.start, line.end) !== line.text || /[\r\n]/.test(replacement)) {
     throw new Error('Preview edit is stale or contains a newline.');
   }
-  const escaped = replacement.replace(/([\\`*_{}\[\]()#+.!|>~-])/g, '\\$1');
+  const escaped = replacement.replace(/([\\`*_{}\[\]()#+.!|>~:$-])/g, '\\$1');
   return source.slice(0, line.start) + escaped + source.slice(line.end);
 }

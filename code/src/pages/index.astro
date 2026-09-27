@@ -14,18 +14,20 @@ import '../styles.css';
       <header class="topbar">
         <a class="brand" href="/" id="home">Slides<span class="brand-dot">.</span></a>
         <span id="page-title" class="page-title">Local presentations</span>
+        <input id="title-input" aria-label="Presentation title" title="Press Enter to save, Escape to cancel" maxlength="120" hidden />
+        <button type="button" id="edit-title" class="title-edit" aria-label="Edit presentation title" title="Edit presentation title" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20l4.5-1 12-12a2 2 0 0 0-2.8-2.8l-12 12L4 20Z M15.7 6.3l2.8 2.8"/></svg></button>
         <span id="dev-mode" class="pill dev-mode" hidden>DEV MODE</span>
         <span id="save-status" class="pill" role="status" aria-live="polite" hidden></span>
         <span class="spacer"></span>
         <div id="editor-actions" class="actions" hidden>
           <label>Theme <select id="theme" aria-label="Deck theme"></select></label>
-          <div class="segmented" role="group" aria-label="Editor view">
-            <button type="button" data-view="source">Source</button>
-            <button type="button" data-view="split">Split</button>
-            <button type="button" data-view="preview">Preview</button>
+          <div class="editor-buttons" role="toolbar" aria-label="Editor actions">
+            <button type="button" data-view="source"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m8 5-6 7 6 7m8-14 6 7-6 7m-3-18-3 24"/></svg>Source</button>
+            <button type="button" data-view="split"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="3" width="20" height="18" rx="2"/><path d="M12 3v18"/></svg>Split</button>
+            <button type="button" data-view="preview"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg>Preview</button>
+            <button type="button" id="save"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 2h15l3 3v17H3zM7 2v7h10V2M6 22v-9h12v9"/></svg>Save</button>
+            <button type="button" id="present" class="primary"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="m10 7 5 4-5 4zm2 10v5m-5 0h10"/></svg>Present</button>
           </div>
-          <button type="button" id="save">Save</button>
-          <button type="button" id="present" class="primary">Present</button>
         </div>
         <div id="presenter-actions" class="actions" hidden>
           <span class="pill live">Live</span>

@@ -21,6 +21,7 @@ export interface Stage {
   theme: string;
   master: Record<string, unknown>;
   slides: Slide[];
+  total?: number;
 }
 
 export interface Deck extends Stage {
@@ -359,16 +360,24 @@ export async function renderStage(host: HTMLElement, stage: Stage, slide: Slide 
       host.append(element);
     }
   }
-  const footer = stage.master?.footer;
-  if (typeof footer === 'string' && footer) {
-    const element = document.createElement('footer');
-    element.textContent = footer;
-    host.append(element);
-  }
-  if (stage.master?.footerNumber === true) {
+  const master = stage.master || {};
+  const positions = ['TopLeft', 'TopCenter', 'TopRight', 'BottomLeft', 'BottomCenter', 'BottomRight'] as const;
+  const assigned = positions.map(position => master[`metadata${position}`]);
+  for (const position of positions) {
+    const configured = master[`metadata${position}`];
+    const kind = configured === undefined
+      ? position === 'BottomLeft' && master.footer && !assigned.includes('footer') ? 'footer'
+        : position === 'BottomRight' && master.footerNumber === true && !assigned.includes('slideNumber') ? 'slideNumber' : 'none'
+      : configured;
+    const value = kind === 'slideNumber' ? `${slide.index + 1} / ${stage.total ?? stage.slides.length}`
+      : kind === 'deckTitle' ? stage.title
+      : kind === 'slideTitle' ? slide.body.match(/^#{1,3}\s+(.+)$/m)?.[1] || slide.id
+      : kind === 'footer' || kind === 'logo' ? master[kind] : '';
+    if (typeof value !== 'string' || !value) continue;
     const element = document.createElement('span');
-    element.className = 'slide-number';
-    element.textContent = String(slide.index + 1);
+    element.className = 'slide-meta';
+    element.dataset.position = position;
+    element.textContent = value;
     host.append(element);
   }
   await renderFences(host);
