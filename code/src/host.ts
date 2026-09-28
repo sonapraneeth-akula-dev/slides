@@ -230,6 +230,7 @@ export function privateRouter(port: number) {
             return response(startShare(talk, requireString(data, 'host'), data.portStart as number, data.portEnd as number));
           }
           if (talkMatch[2] === 'share' && request.method === 'DELETE') { stopShare(talk); return response({ sharing: false }); }
+          if (talkMatch[2] === 'share' && request.method === 'GET') return response({ share: privateState(talk).share });
         }
         throw new LibraryError(404, 'API route not found');
       }

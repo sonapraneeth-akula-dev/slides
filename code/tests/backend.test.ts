@@ -630,7 +630,10 @@ describe('persistent library and presentation', () => {
       expect((await get('/api/other.svg')).status).toBe(404);
       expect((await get('/state')).status).toBe(403);
       expect((await get('/state', 'wrong')).status).toBe(403);
+      expect(session.privateState(talk).share?.viewers).toEqual([]);
       const state = await (await get('/state', talk.share!.key)).text();
+      expect(session.privateState(talk).share?.viewers).toEqual([address]);
+      expect(session.activeViewers(talk.share!.viewers, Date.now() + 6000)).toEqual([]);
       expect(state).toContain('"sessionId"');
       expect(state).not.toContain('PRIVATE SECRET');
       expect(state).not.toContain(talk.localKey);

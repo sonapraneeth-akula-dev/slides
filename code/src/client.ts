@@ -41,6 +41,7 @@ let diskConflict: { diskRevision: string; diskText: string; draftText: string } 
 let session: SessionResponse | null = null;
 let sharing = false;
 let shareUrl = '';
+let shareViewers: string[] = [];
 let tool: 'pen' | 'highlighter' | 'laser' | null = null;
 let drawing: { points: Array<{ x: number; y: number }>; pointer: number } | null = null;
 let eventPending = false;
@@ -891,6 +892,22 @@ function drawPresenter(): void {
     ? `Audience URL: ${shareUrl} — network reachability unverified. Share only with trusted viewers.`
     : 'Local only. Sharing is off.');
   text('share-label', sharing ? 'Stop LAN sharing' : 'Share on LAN…');
+  drawViewers();
+}
+function drawViewers(): void {
+  const element = $('share-viewers');
+  element.hidden = !sharing;
+  element.textContent = !shareViewers.length ? 'No LAN viewers connected.'
+    : `${shareViewers.length} LAN viewer${shareViewers.length === 1 ? '' : 's'}: ${shareViewers.join(', ')}`;
+}
+async function refreshViewers(): Promise<void> {
+  if (!session || !sharing) return;
+  try {
+    const { share } = await request<{ share: { viewers: string[] } | null }>(
+      `/api/sessions/${encodeURIComponent(session.sessionId)}/share`);
+    shareViewers = share?.viewers ?? [];
+    drawViewers();
+  } catch { /* the next poll retries; presenter errors surface through normal actions */ }
 }
 async function sendEvent(action: string, extra: Record<string, unknown> = {}): Promise<void> {
   if (!session || eventPending) return;
@@ -1185,6 +1202,7 @@ function wire(): void {
         `/api/sessions/${encodeURIComponent(session.sessionId)}/share`, 'POST', { host, portStart, portEnd });
       sharing = true;
       shareUrl = result.url;
+      shareViewers = [];
       dialog('share-dialog').close();
       drawPresenter();
     } catch (error) { errorNotice(error); }
@@ -1222,6 +1240,7 @@ function wire(): void {
     if (page !== 'presentation' || !session) return;
     const seconds = Math.floor((Date.now() - sessionStart) / 1000);
     text('timer', `${String(Math.floor(seconds / 60)).padStart(2, '0')}:${String(seconds % 60).padStart(2, '0')}`);
+    if (sharing && seconds % 3 === 0) void refreshViewers();
   }, 1000);
 }
 

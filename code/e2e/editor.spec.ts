@@ -832,6 +832,33 @@ test('presenter fits charts and Mermaid, shows private notes, and groups legible
   }
 });
 
+test('presenter lists LAN viewer IPs while sharing', async ({ page, context }) => {
+  const { networkInterfaces } = await import('node:os');
+  const address = Object.values(networkInterfaces()).flat()
+    .find(item => item?.family === 'IPv4' && !item.internal && !item.address.startsWith('169.254.'))?.address;
+  test.skip(!address, 'LAN interface required');
+  await page.goto(origin);
+  await page.locator('#open-demo').click();
+  await page.locator('#present').click();
+  await expect(page.locator('#share-viewers')).toBeHidden();
+  await page.locator('#share').click();
+  await page.locator('#share-host').fill(address!);
+  await page.locator('#port-start').fill('50200');
+  await page.locator('#port-end').fill('50300');
+  await page.locator('#start-share').click();
+  await expect(page.locator('#share-viewers')).toHaveText('No LAN viewers connected.');
+  const url = (await page.locator('#share-info').textContent())!.match(/http:\/\/\S+/)![0];
+  const viewer = await context.newPage();
+  await viewer.goto(url);
+  await expect(page.locator('#share-viewers')).toHaveText(`1 LAN viewer: ${address}`, { timeout: 10000 });
+  await viewer.close();
+  await expect(page.locator('#share-viewers')).toHaveText('No LAN viewers connected.', { timeout: 12000 });
+  await page.locator('#share').click();
+  await expect(page.locator('#share-viewers')).toBeHidden();
+  await page.locator('#end').click();
+  await page.locator('#confirm-end').click();
+});
+
 test('CRLF decks can present untouched and retain line endings after edits', async ({ page }) => {
   const path = join(directory, 'presentations', 'CRLF.md');
   await mkdir(join(directory, 'presentations'), { recursive: true });

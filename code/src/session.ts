@@ -14,7 +14,7 @@ export interface Talk {
   id: string; localKey: string; deckId: string; revision: string; deck: Deck; notes: Record<string, string[]>;
   slideId: string; step: number; sequence: number; started: number;
   marks: Mark[]; blackout: boolean; canvas: boolean;
-  share?: { server: ReturnType<typeof Bun.serve>; key: string; address: string; port: number };
+  share?: { server: ReturnType<typeof Bun.serve>; key: string; address: string; port: number; viewers: Map<string, number> };
 }
 const talks = new Map<string, Talk>();
 
@@ -47,11 +47,17 @@ export function publicState(talk: Talk) {
   };
 }
 
+// Audience pages poll /state about once per second, so recent polls mean an open viewer.
+export function activeViewers(viewers: Map<string, number>, now = Date.now()): string[] {
+  for (const [ip, seen] of viewers) if (now - seen > 5000) viewers.delete(ip);
+  return [...viewers.keys()].sort();
+}
+
 export function privateState(talk: Talk) {
   return {
     id: talk.id, localKey: talk.localKey, deckId: talk.deckId, revision: talk.revision, deck: talk.deck,
     notes: talk.notes, started: talk.started, ...publicState(talk),
-    share: talk.share ? { address: talk.share.address, port: talk.share.port, url: `http://${talk.share.address}:${talk.share.port}/audience/#${talk.share.key}`, reachability: 'unverified' } : null
+    share: talk.share ? { address: talk.share.address, port: talk.share.port, url: `http://${talk.share.address}:${talk.share.port}/audience/#${talk.share.key}`, reachability: 'unverified', viewers: activeViewers(talk.share.viewers) } : null
   };
 }
 
@@ -128,17 +134,20 @@ export function startShare(talk: Talk, address: string, start: number, end: numb
   const audienceAssets: string[] = JSON.parse(readFileSync(manifest, 'utf8'));
   const allowedAssets = new Set(audienceAssets);
   const key = randomBytes(32).toString('base64url');
+  const viewers = new Map<string, number>();
   let server: ReturnType<typeof Bun.serve> | undefined;
   let lastError: unknown;
   for (let port = start; port <= end; port++) {
     try {
       server = Bun.serve({
         hostname: address, port,
-        async fetch(request) {
+        async fetch(request, listener) {
           const url = new URL(request.url);
           if (request.method !== 'GET' && request.method !== 'HEAD') return new Response('Method not allowed', { status: 405 });
           if (url.pathname === '/state') {
             if (request.headers.get('X-Slides-Public') !== key) return new Response('Forbidden', { status: 403 });
+            const ip = listener.requestIP(request)?.address;
+            if (ip) viewers.set(ip.replace(/^::ffff:/, ''), Date.now());
             return Response.json(publicSnapshot(publicState(talk)), { headers: { 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' } });
           }
           if (url.pathname === sampleImageUrl) {
@@ -163,7 +172,7 @@ export function startShare(talk: Talk, address: string, start: number, end: numb
     } catch (error) { lastError = error; }
   }
   if (!server) throw new LibraryError(503, `Cannot bind LAN listener: ${String(lastError)}`);
-  talk.share = { server, key, address, port: server.port ?? start };
+  talk.share = { server, key, address, port: server.port ?? start, viewers };
   return privateState(talk).share;
 }
 
