@@ -622,6 +622,18 @@ describe('persistent library and presentation', () => {
       expect((await get(`/${audienceScript}`)).status).toBe(200);
       expect((await get('/')).status).toBe(404);
       expect((await get(`/${ownerScript}`)).status).toBe(404);
+      const manifestPath = join(process.cwd(), 'build', 'audience-assets.json');
+      const originalManifest = await readFile(manifestPath, 'utf8');
+      const rebuilt = '_astro/zz-rebuild-test.css';
+      await writeFile(join(process.cwd(), 'dist', rebuilt), 'body{}');
+      try {
+        expect((await get(`/${rebuilt}`)).status).toBe(404);
+        await writeFile(manifestPath, JSON.stringify([...manifest, rebuilt]));
+        expect((await get(`/${rebuilt}`)).status).toBe(200);
+      } finally {
+        await writeFile(manifestPath, originalManifest);
+        await rm(join(process.cwd(), 'dist', rebuilt), { force: true });
+      }
       expect((await get('/api/bootstrap')).status).toBe(404);
       const image = await get('/api/sample-image');
       expect(image.status).toBe(200);

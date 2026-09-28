@@ -1,5 +1,5 @@
 import { randomBytes, randomUUID } from 'node:crypto';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, statSync } from 'node:fs';
 import { networkInterfaces } from 'node:os';
 import { join } from 'node:path';
 import { publicAssetPath } from './asset-path';
@@ -143,8 +143,16 @@ export function startShare(talk: Talk, address: string, start: number, end: numb
   if (!Number.isSafeInteger(start) || !Number.isSafeInteger(end) || start < 1024 || end > 65535 || end < start || end - start > 100) throw new LibraryError(400, 'Invalid port range');
   const manifest = join(process.cwd(), 'build', 'audience-assets.json');
   if (!existsSync(manifest)) throw new LibraryError(409, 'Build audience assets with bun run build before sharing on LAN.');
-  const audienceAssets: string[] = JSON.parse(readFileSync(manifest, 'utf8'));
-  const allowedAssets = new Set(audienceAssets);
+  // Re-read on rebuild: new builds rename hashed assets, which would otherwise 404 for a running share.
+  let assets = { mtime: -1, allowed: new Set<string>() };
+  const allowedAssets = () => {
+    try {
+      const mtime = statSync(manifest).mtimeMs;
+      if (mtime !== assets.mtime) assets = { mtime, allowed: new Set(JSON.parse(readFileSync(manifest, 'utf8'))) };
+    } catch { /* keep the last good list while a build rewrites the manifest */ }
+    return assets.allowed;
+  };
+  allowedAssets();
   const key = randomBytes(32).toString('base64url');
   const viewers = new Map<string, Viewer>();
   let server: ReturnType<typeof Bun.serve> | undefined;
@@ -175,7 +183,7 @@ export function startShare(talk: Talk, address: string, start: number, end: numb
             }
           }
           const asset = publicAssetPath(url.pathname);
-          if (!asset || !allowedAssets.has(asset)) return new Response('Not found', { status: 404 });
+          if (!asset || !allowedAssets().has(asset)) return new Response('Not found', { status: 404 });
           const file = Bun.file(join(process.cwd(), 'dist', asset));
           if (!(await file.exists())) return new Response('Not found', { status: 404 });
           return new Response(request.method === 'HEAD' ? null : file, { headers: {
