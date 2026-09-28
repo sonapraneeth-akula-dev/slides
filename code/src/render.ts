@@ -64,16 +64,103 @@ md.renderer.rules.image = (tokens, index) => {
   }
   return `<span class="asset-fallback" role="img" aria-label="${md.utils.escapeHtml(alt)}">Image unavailable: ${md.utils.escapeHtml(alt)}</span>`;
 };
+const escapeHtml = md.utils.escapeHtml;
+
+// Code fence meta follows the MDX/rehype-pretty-code convention: ```ts title="app.ts" showLineNumbers {2,4-5}
+export function fenceMeta(info: string): { language: string; title?: string; lineNumbers: boolean; marked: Set<number> } {
+  const language = /^[^\s{]*/.exec(info.trim())![0].toLowerCase();
+  const marked = new Set<number>();
+  for (const range of /\{([\d,\s-]+)\}/.exec(info)?.[1].split(',') ?? []) {
+    const [from, to = from] = range.split('-').map(value => Number(value.trim()));
+    for (let line = from; line >= 1 && line <= Math.min(to, from + 500); line++) marked.add(line);
+  }
+  return { language, title: /\btitle="([^"]{1,120})"/.exec(info)?.[1], lineNumbers: /\bshowLineNumbers\b/.test(info), marked };
+}
+
+function terminal(content: string, title?: string): string {
+  const lines = content.replace(/\n$/, '').split('\n').map(line => line.startsWith('$ ')
+    ? `<span class="terminal-command"><span class="terminal-prompt" aria-hidden="true">$ </span>${escapeHtml(line.slice(2))}</span>`
+    : `<span class="terminal-output">${escapeHtml(line)}</span>`);
+  return `<figure class="terminal"><figcaption><span class="terminal-dots" aria-hidden="true"><i></i><i></i><i></i></span>${escapeHtml(title || 'Terminal')}</figcaption><pre><code>${lines.join('\n')}</code></pre></figure>`;
+}
+
 md.renderer.rules.fence = (tokens, index) => {
   const token = tokens[index];
-  const language = token.info.trim().split(/\s/)[0].toLowerCase();
+  const { language, title, lineNumbers, marked } = fenceMeta(token.info);
   if (language === 'mermaid' || language === 'chart') {
     return `<div class="special-fence" data-kind="${language}" data-source="${encodeURIComponent(token.content)}"></div>`;
   }
+  if (language === 'terminal') return terminal(token.content, title);
   const code = hljs.getLanguage(language) && token.content.length < 30_000
     ? hljs.highlight(token.content, { language, ignoreIllegals: true }).value
-    : md.utils.escapeHtml(token.content);
-  return `<pre><code class="hljs">${code}</code></pre>`;
+    : escapeHtml(token.content);
+  if (!title && !language && !lineNumbers && !marked.size) return `<pre><code class="hljs">${code}</code></pre>`;
+  const count = token.content.replace(/\n$/, '').split('\n').length;
+  const header = title || language
+    ? `<figcaption class="code-header">${title ? `<span class="code-file">${escapeHtml(title)}</span>` : ''}${language ? `<span class="code-lang">${escapeHtml(language)}</span>` : ''}</figcaption>`
+    : '';
+  const gutter = lineNumbers ? `<span class="code-gutter" aria-hidden="true">${Array.from({ length: count }, (_, line) => line + 1).join('\n')}</span>` : '';
+  const marks = [...marked].filter(line => line <= count).map(line => `<span class="code-mark" style="--line: ${line - 1}"></span>`).join('');
+  return `<figure class="code-block">${header}<pre>${gutter}<code class="hljs">${marks}${code}</code></pre></figure>`;
+};
+
+// Static MDX-style components: attributes are plain strings, never evaluated.
+const componentTag = /^<(Cards|Card|Callout)((?:\s+[a-z]+="[^"<>{}]*")*)\s*>$/;
+const calloutTypes: Record<string, string> = { note: 'Note', tip: 'Tip', warning: 'Warning' };
+md.block.ruler.before('fence', 'component', (state, start, end, silent) => {
+  const lineText = (line: number) => state.src.slice(state.bMarks[line] + state.tShift[line], state.eMarks[line]).trim();
+  const open = componentTag.exec(lineText(start));
+  if (!open) return false;
+  const name = open[1];
+  let depth = 1;
+  let next = start;
+  while (++next < end) {
+    const text = lineText(next);
+    if (componentTag.exec(text)?.[1] === name) depth++;
+    else if (text === `</${name}>` && --depth === 0) break;
+  }
+  if (next >= end) return false;
+  if (silent) return true;
+  const opening = state.push('component_open', 'div', 1);
+  opening.info = name;
+  opening.meta = Object.fromEntries([...open[2].matchAll(/([a-z]+)="([^"]*)"/g)].map(match => [match[1], match[2]]));
+  opening.map = [start, next + 1];
+  const { lineMax, parentType } = state;
+  state.lineMax = next;
+  state.parentType = 'blockquote';
+  state.md.block.tokenize(state, start + 1, next);
+  state.lineMax = lineMax;
+  state.parentType = parentType;
+  state.push('component_close', 'div', -1).info = name;
+  state.line = next + 1;
+  return true;
+}, { alt: ['paragraph', 'reference', 'blockquote', 'list'] });
+md.renderer.rules.component_open = (tokens, index) => {
+  const { info: name, meta } = tokens[index] as { info: string; meta: Record<string, string> };
+  if (name === 'Cards') return '<div class="component-cards">';
+  if (name === 'Card') return `<section class="component-card">${meta.title ? `<p class="component-title">${escapeHtml(meta.title)}</p>` : ''}`;
+  const type = calloutTypes[meta.type] ? meta.type : 'note';
+  return `<aside class="callout" data-type="${type}"><p class="component-title">${escapeHtml(meta.title || calloutTypes[type])}</p>`;
+};
+md.renderer.rules.component_close = (tokens, index) =>
+  tokens[index].info === 'Cards' ? '</div>' : tokens[index].info === 'Card' ? '</section>' : '</aside>';
+
+md.inline.ruler.before('escape', 'mark_note', (state, silent) => {
+  if (state.src.charCodeAt(state.pos) !== 0x3c) return false;
+  const match = /^<Mark(?:\s+note="([^"<>{}]{1,200})")?\s*>([^<]{1,500})<\/Mark>/.exec(state.src.slice(state.pos));
+  if (!match) return false;
+  if (!silent) {
+    const token = state.push('mark_note', '', 0);
+    token.content = match[2];
+    token.meta = { note: match[1] };
+  }
+  state.pos += match[0].length;
+  return true;
+});
+md.renderer.rules.mark_note = (tokens, index) => {
+  const { content, meta } = tokens[index];
+  const marked = `<mark class="highlight">${md.renderInline(content)}</mark>`;
+  return meta.note ? `<span class="highlight-group">${marked}<span class="highlight-note">${escapeHtml(meta.note)}</span></span>` : marked;
 };
 md.renderer.rules.link_open = (tokens, index, options, env, self) => {
   tokens[index].attrSet('rel', 'noopener noreferrer');

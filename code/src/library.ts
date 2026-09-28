@@ -122,7 +122,7 @@ export async function organizeLibrary(
         if (path !== userRoot && path !== toursRoot && path !== join(root, 'assets')) await walk(path, depth + 1);
       } else if (entry.isFile() && extensions.has(entry.name.slice(entry.name.lastIndexOf('.')).toLowerCase())) {
         const name = relative(root, path);
-        const tour = /^Slides-Feature-Tour(?:-\d+)?\.md$/.test(entry.name);
+        const tour = /^Slides-Feature-Tour(?:-\d+)?\.mdx?$/.test(entry.name);
         moves.push({
           source: path,
           target: join(tour ? toursRoot : userRoot, name),

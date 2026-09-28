@@ -128,16 +128,24 @@ slides:
   });
 
   test('bundled feature tour is a valid comprehensive authored deck', async () => {
-    const source = await readFile(join(process.cwd(), 'public', 'feature-tour.md'), 'utf8');
+    const source = await readFile(join(process.cwd(), 'public', 'feature-tour.mdx'), 'utf8');
     const compiled = compileDeck(source);
     expect(compiled.diagnostics).toEqual([]);
-    expect(compiled.deck?.slides.length).toBe(16);
+    expect(compiled.deck?.slides.length).toBe(18);
     expect(new Set(compiled.deck?.slides.map(slide => slide.layout))).toEqual(new Set([
       'title-content', 'title-image-left', 'title-image-right', 'two-columns',
       'three-columns', 'picture-text', 'image-full', 'blank'
     ]));
     expect(compiled.deck?.slides.find(slide => slide.id === 'key-ideas')?.parent).toBe('story');
     expect(compiled.deck?.slides.find(slide => slide.id === 'image-only')?.metadata.metadataBottomRight).toBe('none');
+  });
+
+  test('accepts only static built-in components with string attributes', async () => {
+    const source = await readFile(join(process.cwd(), 'public', 'feature-tour.mdx'), 'utf8');
+    const line = 'Plain **Markdown** inside every card.';
+    expect(compileDeck(source.replace(line, '<Mark note="tip">text</Mark> and <Mark>more</Mark>')).deck).not.toBeNull();
+    for (const unsafe of ['<div>html</div>', '<Card onClick={run}>', '<Mark note={x}>text</Mark>', '<Callout type="tip" {...props}>'])
+      expect(compileDeck(source.replace(line, unsafe)).deck, unsafe).toBeNull();
   });
 
   test('validates heading alignment and bounded slide spacing while retaining legacy footer numbers', () => {
@@ -302,7 +310,7 @@ describe('persistent library and presentation', () => {
   });
 
   test('reuses unchanged tour files, removes redundant copies, and preserves edits', async () => {
-    const current = (await readFile(join(process.cwd(), 'public', 'feature-tour.md'), 'utf8')).replace(/\r\n/g, '\n');
+    const current = (await readFile(join(process.cwd(), 'public', 'feature-tour.mdx'), 'utf8')).replace(/\r\n/g, '\n');
     const older = current.replace('# A reveal and private notes', '# A previous reveal and private notes');
     expect(older).not.toBe(current);
     const marker = createHash('sha256').update(older).digest('hex');
@@ -322,7 +330,7 @@ describe('persistent library and presentation', () => {
       expect(response.status).toBe(201);
       return (await response.json()) as { id: string };
     };
-    const canonicalId = library.featureTourDeckId('Slides-Feature-Tour.md');
+    const canonicalId = library.featureTourDeckId('Slides-Feature-Tour.mdx');
     expect((await demo()).id).toBe(canonicalId);
     const refreshed = await library.openDeck(canonicalId);
     expect(refreshed.text).toContain('# A reveal and private notes');
@@ -332,7 +340,7 @@ describe('persistent library and presentation', () => {
     const catalog = JSON.parse(await readFile(join(library.libraryRoot, '.slides-library.json'), 'utf8')) as {
       entries: Record<string, string>;
     };
-    expect(catalog.entries[canonicalId]).toBe(join(library.featureToursRoot, 'Slides-Feature-Tour.md'));
+    expect(catalog.entries[canonicalId]).toBe(join(library.featureToursRoot, 'Slides-Feature-Tour.mdx'));
     expect(catalog.entries[original.id]).toBeUndefined();
 
     const redundant = await library.createDeck('Slides-Feature-Tour-11.md', refreshed.text, 'tour');
@@ -351,7 +359,7 @@ describe('persistent library and presentation', () => {
   });
 
   test('normalizes a markerless numbered tour without replacing an edited canonical tour', async () => {
-    const current = await readFile(join(process.cwd(), 'public', 'feature-tour.md'), 'utf8');
+    const current = await readFile(join(process.cwd(), 'public', 'feature-tour.mdx'), 'utf8');
     const numbered = await library.createDeck('Slides-Feature-Tour-2.md', current, 'tour');
     const { privateRouter } = await import('../src/host');
     const route = privateRouter(12347);
@@ -367,7 +375,7 @@ describe('persistent library and presentation', () => {
       expect(response.status).toBe(201);
       return (await response.json()) as { id: string };
     };
-    const canonicalId = library.featureTourDeckId('Slides-Feature-Tour.md');
+    const canonicalId = library.featureTourDeckId('Slides-Feature-Tour.mdx');
     expect((await demo()).id).toBe(canonicalId);
     expect((await demo()).id).toBe(canonicalId);
     await expect(readFile(join(library.featureToursRoot, 'Slides-Feature-Tour-2.md')))
@@ -384,13 +392,14 @@ describe('persistent library and presentation', () => {
     const next = (await library.openDeck(canonicalId)).text.replace(
       /(# Bundled feature tour: )[a-f0-9]{64}/, `$1${'0'.repeat(64)}`);
     const changed = await library.saveDeck(canonicalId, (await library.openDeck(canonicalId)).revision, next);
-    expect((await demo()).id).toBe(numbered.id);
+    const numberedId = library.featureTourDeckId('Slides-Feature-Tour-2.mdx');
+    expect((await demo()).id).toBe(numberedId);
     expect((await library.openDeck(canonicalId)).text).toBe(next);
-    expect((await library.openDeck(numbered.id)).text).toContain('# A reveal and private notes');
-    expect((await demo()).id).toBe(numbered.id);
+    expect((await library.openDeck(numberedId)).text).toContain('# A reveal and private notes');
+    expect((await demo()).id).toBe(numberedId);
     await library.deleteDeck(canonicalId, changed.revision, true);
-    const latest = await library.openDeck(numbered.id);
-    await library.deleteDeck(numbered.id, latest.revision, true);
+    const latest = await library.openDeck(numberedId);
+    await library.deleteDeck(numberedId, latest.revision, true);
   });
 
   test('imports legacy decks and catalog without removing or overwriting existing files', async () => {
@@ -461,14 +470,14 @@ describe('persistent library and presentation', () => {
     const result = await create('Quarterly  Review');
     expect(result.status).toBe(201);
     const { id } = await result.json();
-    expect(id).toBe(library.deckId('Quarterly-Review.md'));
+    expect(id).toBe(library.deckId('Quarterly-Review.mdx'));
     expect((await library.openDeck(id)).deck?.title).toBe('Quarterly  Review');
-    expect(await readFile(join(library.presentationsRoot, 'Quarterly-Review.md'), 'utf8')).toContain('title: "Quarterly  Review"');
-    const mdx = await create('Team Plan.mdx');
-    expect(mdx.status).toBe(201);
-    expect((await mdx.json()).id).toBe(library.deckId('Team-Plan.mdx'));
-    expect((await library.openDeck(library.deckId('Team-Plan.mdx'))).deck?.title).toBe('Team Plan');
-    expect((await create('Quarterly Review.md')).status).toBe(409);
+    expect(await readFile(join(library.presentationsRoot, 'Quarterly-Review.mdx'), 'utf8')).toContain('title: "Quarterly  Review"');
+    const md = await create('Team Plan.md');
+    expect(md.status).toBe(201);
+    expect((await md.json()).id).toBe(library.deckId('Team-Plan.md'));
+    expect((await library.openDeck(library.deckId('Team-Plan.md'))).deck?.title).toBe('Team Plan');
+    expect((await create('Quarterly Review')).status).toBe(409);
     expect((await create('example.txt')).status).toBe(400);
   });
 

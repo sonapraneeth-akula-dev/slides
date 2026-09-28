@@ -518,18 +518,18 @@ test('one feature tour action opens the latest edition without overwriting edits
   await expect(page.locator('#open-demo')).toHaveText('Explore latest feature tour');
   await page.locator('#open-demo').click();
   await expect(page.locator('#editor-page')).toBeVisible();
-  await expect(page.locator('.preview-card')).toHaveCount(16);
+  await expect(page.locator('.preview-card')).toHaveCount(18);
   await expect(page.locator('#source')).toHaveValue(/# Bundled feature tour: [a-f0-9]{64}/);
   await expect(page.locator('.preview-card[data-slide-id="welcome"] .slide-cover-image img')).toBeVisible();
   await expect(page.locator('.preview-card[data-slide-id="diagram"] .special-fence svg')).toBeVisible();
-  await expect.poll(async () => readFile(join(directory, 'feature-tours', 'Slides-Feature-Tour.md'), 'utf8')).toContain('Slides feature tour');
+  await expect.poll(async () => readFile(join(directory, 'feature-tours', 'Slides-Feature-Tour.mdx'), 'utf8')).toContain('Slides feature tour');
   await page.locator('#home').click();
   await expect(page.locator('#library-page')).toBeVisible();
   await expect(page.locator('#tour-list .deck-card')).toHaveCount(1);
   await expect(page.locator('#deck-list .deck-card h3').filter({ hasText: /Slides-Feature-Tour/ })).toHaveCount(0);
   await page.locator('#open-demo').click();
   await expect(page.locator('#editor-page')).toBeVisible();
-  const original = join(directory, 'feature-tours', 'Slides-Feature-Tour.md');
+  const original = join(directory, 'feature-tours', 'Slides-Feature-Tour.mdx');
   const edited = (await page.locator('#source').inputValue()).replace('# A reveal and private notes', '# My personalized tour');
   await page.locator('#source').fill(edited);
   await expect.poll(async () => readFile(original, 'utf8')).toContain('# My personalized tour');
@@ -539,7 +539,7 @@ test('one feature tour action opens the latest edition without overwriting edits
   await page.locator('#open-demo').click();
   await expect(page.locator('#editor-page')).toBeVisible();
   await expect(page.locator('#source')).toHaveValue(/# My personalized tour/);
-  await expect(page.locator('.preview-card')).toHaveCount(16);
+  await expect(page.locator('.preview-card')).toHaveCount(18);
   await page.locator('#home').click();
   await expect(page.locator('#library-page')).toBeVisible();
   const olderText = (await readFile(original, 'utf8')).replace(
@@ -547,29 +547,29 @@ test('one feature tour action opens the latest edition without overwriting edits
   await writeFile(original, olderText);
   await page.locator('#open-demo').click();
   await expect(page.locator('#editor-page')).toBeVisible();
-  await expect(page.locator('.preview-card')).toHaveCount(16);
-  await expect(page.locator('#source-file')).toContainText('Slides-Feature-Tour-2.md');
+  await expect(page.locator('.preview-card')).toHaveCount(18);
+  await expect(page.locator('#source-file')).toContainText('Slides-Feature-Tour-2.mdx');
   await expect(page.locator('#source')).toHaveValue(/# A reveal and private notes/);
   await expect(page.locator('#source')).toHaveValue(/Mermaid renders this left-to-right flow from idea to presentation/);
-  expect((await page.locator('#source').inputValue()).match(/^:::notes$/gm)).toHaveLength(16);
+  expect((await page.locator('#source').inputValue()).match(/^:::notes$/gm)).toHaveLength(18);
   expect(await readFile(original, 'utf8')).toBe(olderText);
   await page.locator('#home').click();
   await expect(page.locator('#library-page')).toBeVisible();
   await page.locator('#open-demo').click();
   await expect(page.locator('#editor-page')).toBeVisible();
-  await expect(page.locator('#source-file')).toContainText('Slides-Feature-Tour-2.md');
+  await expect(page.locator('#source-file')).toContainText('Slides-Feature-Tour-2.mdx');
   await page.locator('#home').click();
   await expect(page.locator('#library-page')).toBeVisible();
-  const newest = join(directory, 'feature-tours', 'Slides-Feature-Tour-2.md');
+  const newest = join(directory, 'feature-tours', 'Slides-Feature-Tour-2.mdx');
   await writeFile(newest, (await readFile(newest, 'utf8')).replace(/^  # Bundled feature tour: [a-f0-9]{64}\r?\n/m, ''));
   await page.locator('#open-demo').click();
   await expect(page.locator('#editor-page')).toBeVisible();
-  await expect(page.locator('#source-file')).toContainText('Slides-Feature-Tour-2.md');
+  await expect(page.locator('#source-file')).toContainText('Slides-Feature-Tour-2.mdx');
   await expect(page.locator('#tour-list .deck-card h3').filter({
-    hasText: /^Slides-Feature-Tour(?:-2)?\.md$/,
+    hasText: /^Slides-Feature-Tour(?:-2)?\.mdx$/,
   })).toHaveCount(2);
   await expect(page.locator('#tour-list .deck-card h3').filter({
-    hasText: /^Slides-Feature-Tour-3\.md$/,
+    hasText: /^Slides-Feature-Tour-3\.mdx$/,
   })).toHaveCount(0);
   expect(await readFile(original, 'utf8')).toBe(olderText);
 });
@@ -686,11 +686,50 @@ test('Mermaid refits its viewBox to the live diagram in LR and TD flows', async 
   }
 });
 
+test('feature tour renders static components, code headers and terminal commands', async ({ page, context }) => {
+  await page.setViewportSize({ width: 1600, height: 1000 });
+  await page.goto(origin);
+  await page.locator('#open-demo').click();
+  const slide = (id: string) => page.locator(`.preview-card[data-slide-id="${id}"] .preview-stage`);
+  const code = slide('code');
+  await expect(code.locator('.code-file')).toHaveText('slides.ts');
+  await expect(code.locator('.code-lang')).toHaveText('typescript');
+  await expect(code.locator('.code-gutter')).toHaveText('1\n2\n3');
+  await expect(code.locator('.code-mark')).toHaveCount(1);
+  const gutter = await code.locator('.code-gutter').boundingBox();
+  const text = await code.locator('code.hljs').boundingBox();
+  expect(gutter!.x + gutter!.width).toBeLessThanOrEqual(text!.x);
+  expect(Math.abs(gutter!.y - text!.y)).toBeLessThan(2);
+  const mark = await code.locator('.code-mark').boundingBox();
+  expect(Math.abs(mark!.y - (text!.y + text!.height / 3))).toBeLessThan(2);
+  const cards = slide('cards');
+  await expect(cards.locator('.component-cards > .component-card')).toHaveCount(3);
+  await expect(cards.locator('.component-card').first().locator('.component-title')).toHaveText('Write');
+  await expect(cards.locator('.component-card strong')).toHaveText('Markdown');
+  await expect(cards.locator('aside.callout[data-type="tip"] .component-title')).toHaveText('MDX, kept static');
+  const terminal = slide('terminal');
+  await expect(terminal.locator('.terminal figcaption')).toHaveText('Start Slides');
+  await expect(terminal.locator('.terminal-command')).toHaveText(['$ bun install', '$ bun run dev']);
+  await expect(terminal.locator('.terminal-output')).toHaveText('Local Slides: http://127.0.0.1:4321');
+  await expect(terminal.locator('.highlight-group mark.highlight')).toHaveText('saved locally');
+  await expect(terminal.locator('.highlight-note')).toHaveText('no cloud');
+  await expect(page.locator('.preview-stage :is(script, [onclick])')).toHaveCount(0);
+
+  await page.locator('#present').click();
+  await page.locator('#jump').selectOption('cards');
+  const [viewer] = await Promise.all([context.waitForEvent('page'), page.locator('#local-audience').click()]);
+  await expect(viewer.locator('#audience-stage .component-card')).toHaveCount(3);
+  await expect(viewer.locator('#audience-stage .callout')).toHaveCount(1);
+  await viewer.close();
+  await page.locator('#end').click();
+  await page.locator('#confirm-end').click();
+});
+
 test('presenter fits charts and Mermaid, shows private notes, and groups legible controls', async ({ page }) => {
   await page.setViewportSize({ width: 1920, height: 1080 });
   await page.goto(origin);
   await page.locator('#open-demo').click();
-  await expect(page.locator('.preview-card')).toHaveCount(16);
+  await expect(page.locator('.preview-card')).toHaveCount(18);
   await expect(page.locator('#present')).toBeEnabled();
   await page.locator('#present').click();
   await page.locator('#jump').selectOption('diagram');
@@ -990,7 +1029,7 @@ slides:
   await expect(page.locator('#source')).not.toHaveValue(/footerNumber:|metadata:|metadataBottomRight:|background:|backdrop:/);
   await expect(page.locator('#diagnostics')).toHaveText('No diagnostics');
   await expect(page.getByLabel('Bottom Right')).toHaveValue('none');
-  await expect.poll(async () => readFile(join(directory, 'presentations', 'Legacy-settings.md'), 'utf8')).toContain('master: {}');
+  await expect.poll(async () => readFile(join(directory, 'presentations', 'Legacy-settings.mdx'), 'utf8')).toContain('master: {}');
 });
 
 test('sample image renders in the editor and audience without allowing arbitrary image paths', async ({ page, context }) => {
@@ -1080,7 +1119,7 @@ test('title pencil, slide buttons and multiple plain preview paragraphs work tog
     expect(await button.locator('.add-slide-icon').evaluate(icon => getComputedStyle(icon).backgroundColor)).toBe('rgb(35, 84, 173)');
   }
 
-  const original = await readFile(join(directory, 'presentations', 'Preview-editing.md'), 'utf8');
+  const original = await readFile(join(directory, 'presentations', 'Preview-editing.mdx'), 'utf8');
   await page.locator('#source').fill(original.replace('Edit this slide in Markdown.', 'Edit this slide in Markdown.\n\nTests'));
   const paragraphs = page.locator('.preview-card').first().locator('.stage > .slide-content > .slide-markdown > p[contenteditable="plaintext-only"]');
   await expect(paragraphs).toHaveCount(0);
@@ -1097,7 +1136,7 @@ test('title pencil, slide buttons and multiple plain preview paragraphs work tog
   await expect(page.locator('#source')).toHaveValue(/::slide\{id="slide-[\da-f]{8}" parent="welcome"\}/);
   await add.click();
   await expect(page.locator('.preview-card')).toHaveCount(3);
-  await expect.poll(async () => readFile(join(directory, 'presentations', 'Preview-editing.md'), 'utf8')).toContain('Updated tests');
+  await expect.poll(async () => readFile(join(directory, 'presentations', 'Preview-editing.mdx'), 'utf8')).toContain('Updated tests');
   await expect(page.locator('#save')).toBeDisabled();
 });
 

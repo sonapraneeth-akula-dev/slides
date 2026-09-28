@@ -228,6 +228,38 @@ a { color: #1752ad; }
 .stage h3 { font-size: calc(1.17em * var(--headingSize-scale, 1)); }
 .stage pre { max-width: 100%; overflow: auto; background: #e5e9f0; padding: .7em; border-radius: 6px; color: #1c2733; }
 .stage pre code { font-family: var(--codeFont, ui-monospace), monospace; font-size: calc(1em * var(--codeSize-scale, 1)); }
+.stage .code-block, .stage .terminal { margin: .6em 0; border-radius: 8px; overflow: hidden; }
+.stage .code-block { border: 1px solid #cbd3df; }
+.stage .code-block pre, .stage .terminal pre { margin: 0; border-radius: 0; }
+.stage .code-block pre:has(> .code-gutter) { display: grid; grid-template-columns: auto 1fr; column-gap: 1em; }
+.stage .code-block code { position: relative; isolation: isolate; grid-column: 2; display: block; padding: 0; overflow: visible; background: transparent; }
+.stage .code-header, .stage .terminal figcaption { display: flex; align-items: center; gap: .6em; padding: .3em .8em; font-size: .6em; font-family: var(--codeFont, ui-monospace), monospace; }
+.stage .code-header { background: #d5dbe5; color: #28323f; }
+.stage .code-lang { margin-left: auto; padding: .1em .5em; border-radius: 4px; background: #fff; color: #173e87; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; }
+.stage .code-gutter { grid-column: 1; color: #6a7686; text-align: right; user-select: none; font-family: var(--codeFont, ui-monospace), monospace; font-size: calc(1em * var(--codeSize-scale, 1)); }
+.stage .code-mark { position: absolute; z-index: -1; left: -.7em; right: -.7em; top: calc(var(--line) * 1lh); height: 1lh; background: #fde68a; }
+.stage .terminal { background: #10151f; color: #d8e0ea; box-shadow: 0 .3em 1em #0003; }
+.stage .terminal figcaption { color: #9aa7b8; background: #1d2533; }
+.stage .terminal-dots { display: inline-flex; gap: .35em; }
+.stage .terminal-dots i { width: .8em; height: .8em; border-radius: 50%; background: #ff5f57; }
+.stage .terminal-dots i:nth-child(2) { background: #febc2e; }
+.stage .terminal-dots i:nth-child(3) { background: #28c840; }
+.stage .terminal pre { background: transparent; color: inherit; }
+.stage .terminal-prompt { color: #4ade80; user-select: none; }
+.stage .terminal-command { color: #fff; font-weight: 600; }
+.stage .terminal-output { color: #aab6c6; }
+.stage .component-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 9em), 1fr)); gap: .7em; margin: .6em 0; }
+.stage .component-card { margin: .6em 0; padding: .7em 1em; border: 1px solid color-mix(in srgb, var(--slide-accent) 30%, var(--slide-surface)); border-top: .25em solid var(--slide-accent); border-radius: 8px; background: color-mix(in srgb, var(--slide-accent) 5%, var(--slide-surface)); }
+.stage .component-cards > .component-card { margin: 0; }
+.stage .component-title { margin: 0 0 .3em; font-weight: 800; font-family: var(--headingFont, system-ui); }
+.stage :is(.component-card, .callout) > :last-child { margin-bottom: 0; }
+.stage .callout { --callout: #2563eb; margin: .6em 0; padding: .6em 1em; border-left: .3em solid var(--callout); border-radius: 6px; background: color-mix(in srgb, var(--callout) 10%, var(--slide-surface)); }
+.stage .callout[data-type="tip"] { --callout: #15803d; }
+.stage .callout[data-type="warning"] { --callout: #b45309; }
+.stage .callout .component-title { color: var(--callout); }
+.stage mark.highlight { padding: 0 .15em; border-radius: .2em; color: inherit; background: linear-gradient(transparent 35%, #fde047 35%); }
+.stage .highlight-note { display: inline-block; margin-left: .35em; padding: .05em .45em; border-radius: .3em; font-size: .7em; vertical-align: .15em; color: #713f12; background: #fef3c7; border: 1px dashed #d97706; }
+.stage .highlight-note::before { content: "← " / ""; }
 .stage .slide-markdown { font-size: calc(1em * var(--bodySize-scale, 1)); }
 .stage .slide-content { padding: var(--slide-padding-top, 0%) var(--slide-padding-right, 0%) var(--slide-padding-bottom, 0%) var(--slide-padding-left, 0%); }
 .stage .slide-markdown > :is(h1, h2, h3) { text-align: var(--heading-align, left); }

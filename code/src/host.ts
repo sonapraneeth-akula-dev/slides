@@ -32,9 +32,9 @@ async function body(request: Request): Promise<Record<string, unknown>> {
 }
 
 async function featureTour(): Promise<{ id: string }> {
-  const filename = 'Slides-Feature-Tour.md';
-  const source = Bun.file(join(process.cwd(), 'public', 'feature-tour.md'));
-  const bundled = await source.exists() ? source : Bun.file(join(dist, 'feature-tour.md'));
+  const filename = 'Slides-Feature-Tour.mdx';
+  const source = Bun.file(join(process.cwd(), 'public', 'feature-tour.mdx'));
+  const bundled = await source.exists() ? source : Bun.file(join(dist, 'feature-tour.mdx'));
   if (!(await bundled.exists())) throw new LibraryError(500, 'Feature tour is missing from the application');
   const text = await bundled.text();
   const normalize = (value: string) => value.replace(/\r\n/g, '\n');
@@ -57,10 +57,10 @@ async function featureTour(): Promise<{ id: string }> {
   };
   const tours = (await listDecks())
     .filter(entry => entry.kind === 'tour' && !entry.missing &&
-      /^Slides-Feature-Tour(?:-\d+)?\.md$/.test(entry.name) &&
+      /^Slides-Feature-Tour(?:-\d+)?\.mdx?$/.test(entry.name) &&
       entry.path === join(featureToursRoot, entry.name))
-    .sort((a, b) => Number(/-(\d+)\.md$/.exec(b.name)?.[1] ?? 1) -
-      Number(/-(\d+)\.md$/.exec(a.name)?.[1] ?? 1));
+    .sort((a, b) => Number(/-(\d+)\.mdx?$/.exec(b.name)?.[1] ?? 1) -
+      Number(/-(\d+)\.mdx?$/.exec(a.name)?.[1] ?? 1));
   const installed = await Promise.all(tours.map(async tour => {
     const opened = await openDeck(tour.id);
     return { id: tour.id, revision: opened.revision, text: normalize(opened.text) };
@@ -90,7 +90,7 @@ async function featureTour(): Promise<{ id: string }> {
   }
   let candidate = filename;
   for (let number = 2; await Bun.file(join(featureToursRoot, candidate)).exists(); number++) {
-    candidate = `Slides-Feature-Tour-${number}.md`;
+    candidate = `Slides-Feature-Tour-${number}.mdx`;
   }
   const created = await createDeck(candidate, installText, 'tour');
   return { id: created.id };
@@ -113,7 +113,7 @@ function creationName(input: string): { title: string; filename: string } {
   if (!title || title.length > 120 || !/^[\w][\w .-]*$/.test(title)) {
     throw new LibraryError(400, 'Enter a title using letters, numbers, spaces, hyphens, underscores or dots');
   }
-  return { title, filename: `${title.replace(/ +/g, '-')}${extension ?? '.md'}` };
+  return { title, filename: `${title.replace(/ +/g, '-')}${extension ?? '.mdx'}` };
 }
 
 function starter(title: string): string {

@@ -23,6 +23,8 @@ const sizes = new Set(['headingSize', 'bodySize', 'codeSize']);
 const metadataKeys = new Set(metadataPositions.map(position => `metadata${position}`));
 const allowedMetadata = new Set(metadataValues);
 const insets = new Set(['marginTop', 'marginRight', 'marginBottom', 'marginLeft', 'paddingTop', 'paddingRight', 'paddingBottom', 'paddingLeft']);
+// Built-in static components (rendered in render.ts); any other tag remains rejected as executable JSX/HTML.
+const staticComponents = /<\/?(?:Cards|Card|Callout)(?:\s+[a-z]+="[^"<>{}]*")*\s*>|<Mark(?:\s+note="[^"<>{}]*")?\s*>|<\/Mark>/g;
 
 function attributes(raw: string): Record<string, string> | null {
   const result: Record<string, string> = {};
@@ -192,7 +194,7 @@ export function compileDeck(source: string, filenameTitle?: string): Compilation
       if (trimmed && !fence) fail(line, 'Content must follow a slide directive');
       continue;
     }
-    const prose = fence ? '' : outsideMath(text, math);
+    const prose = fence ? '' : outsideMath(text, math).replace(staticComponents, '');
     if (!fence && (/<\/?[a-z][^>]*>/i.test(prose) || /\{(?:[a-z_$][\w.$]*|\.\.\.)\}/i.test(prose))) {
       fail(line, 'Executable JSX/HTML is not supported');
     }

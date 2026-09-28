@@ -145,7 +145,7 @@ The table has bold headers and alternating row colors. Edit the Markdown cells t
 ::slide{id="code" section="Rich content"}
 # Code with highlighting
 
-```typescript
+```typescript title="slides.ts" showLineNumbers {2}
 type Slide = { id: string; title: string };
 const slides: Slide[] = [{ id: 'intro', title: 'Hello' }];
 console.log(slides[0].title);
@@ -154,7 +154,7 @@ console.log(slides[0].title);
 Code is highlighted, not executed.
 
 :::notes
-Fenced code gets syntax highlighting; it is displayed as text and never runs in the presentation.
+Fenced code gets syntax highlighting, a filename, a language badge, line numbers and highlighted lines from its fence meta. It is displayed as text and never runs in the presentation.
 :::
 
 ::slide{id="math" section="Rich content"}
@@ -166,6 +166,44 @@ $$E = mc^2$$
 
 :::notes
 Inline and block math are rendered from the Markdown source using KaTeX.
+:::
+
+::slide{id="cards" section="Components"}
+# Cards and callouts
+
+<Cards>
+<Card title="Write">
+Plain **Markdown** inside every card.
+</Card>
+<Card title="Rehearse">
+Private notes stay with you.
+</Card>
+<Card title="Present">
+Share read-only on your LAN.
+</Card>
+</Cards>
+
+<Callout type="tip" title="MDX, kept static">
+Components take string attributes only; nothing in the deck executes.
+</Callout>
+
+:::notes
+Cards, card grids and callouts are built-in MDX-style components. Their attributes are plain strings and they never run code.
+:::
+
+::slide{id="terminal" section="Components"}
+# Terminal and highlights
+
+```terminal title="Start Slides"
+$ bun install
+$ bun run dev
+Local Slides: http://127.0.0.1:4321
+```
+
+Every deck is <Mark note="no cloud">saved locally</Mark> as an MDX file.
+
+:::notes
+Terminal fences mark lines starting with a dollar prompt as commands. Mark highlights text and can attach a visible note.
 :::
 
 ::slide{id="bar-chart" section="Charts" metadataTopCenter="slideTitle"}

@@ -99,7 +99,7 @@ test('integrated dev mode serves live UI and API, creates a deck from its title'
   await page.locator('#deck-name').fill('Test Presentation');
   await page.locator('#create').click();
   await expect(page.locator('#editor-page')).toBeVisible();
-  await expect(page.locator('#source-file')).toContainText('Test-Presentation.md');
+  await expect(page.locator('#source-file')).toContainText('Test-Presentation.mdx');
   await expect(page.locator('#page-title')).toHaveText('Test Presentation');
   await page.locator('#settings-button').click();
   const samples = page.locator('#master-preview .sample-list button');
@@ -143,7 +143,7 @@ test('integrated dev mode serves live UI and API, creates a deck from its title'
   expect(await page.locator('#editor-actions').locator('.editor-buttons > button svg, .view-buttons > button svg').count()).toBe(5);
   await expect(page.locator('#save')).toBeDisabled();
   await expect(page.locator('#source')).toHaveValue(/title: "Test Presentation"/);
-  const file = join(directory, 'presentations', 'Test-Presentation.md');
+  const file = join(directory, 'presentations', 'Test-Presentation.mdx');
   await expect.poll(async () => readFile(file, 'utf8')).toContain('title: "Test Presentation"');
   await page.locator('#source').fill('::slide{id="welcome"}\n# Updated in development\n');
   await expect.poll(async () => readFile(file, 'utf8')).toContain('Updated in development');
