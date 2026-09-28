@@ -100,7 +100,29 @@ The home screen groups new/open actions beside the feature-tour introduction rat
 
 Start a presentation from a valid saved deck. Presenter controls include slide/reveal navigation, notes, a timer, pointer, drawing, blank canvas, blackout, and a local audience window. The audience URL is read-only; it receives a sanitized projection of the frozen deck and live presentation state, not speaker notes, local file paths, or the owner token. Audience reconnect requests current state. Ending a talk with ink requires explicit confirmation to discard the marks.
 
-To share over LAN, enter the machine's specific LAN address and a permitted port range in the presenter UI. The host starts a separate audience-only listener and returns its URL; allow that port through local firewall settings as needed. Reachability from another device is **not automatically verified**. Share links grant view access to the current session; use a trusted network, avoid posting the URL publicly, and stop sharing/end the session when finished. Owner editing/API access remains bound to loopback.
+To share over LAN, pick one of the machine's LAN interfaces and a port in the presenter UI. The host starts a separate audience-only listener and returns its URL; allow that port through local firewall settings as needed (see below). Reachability from another device is **not automatically verified**. Share links grant view access to the current session; use a trusted network, avoid posting the URL publicly, and stop sharing/end the session when finished. Owner editing/API access remains bound to loopback.
+
+### LAN troubleshooting (Windows)
+
+1. **Same network?** Run `ipconfig` on both machines, or run this on the host: `Get-NetIPAddress -AddressFamily IPv4 | Select-Object IPAddress,PrefixLength,InterfaceAlias`. The machines are on the same subnet when the address bits covered by the prefix length match. For example, `10.26.2.225/17` covers `10.26.0.0`–`10.26.127.255`, so `10.26.0.54` is on the same subnet.
+2. **Test from the other machine** while sharing: `Test-NetConnection <host-ip> -Port 50000`. `TcpTestSucceeded : True` means the port is reachable. Ping alone is unreliable because firewalls often drop it.
+3. **Network profile.** `Get-NetConnectionProfile` shows `Public` or `Private`. Public blocks inbound connections by default. Either add the port rule below, or mark a trusted network Private (admin): `Set-NetConnectionProfile -InterfaceAlias "<alias>" -NetworkCategory Private`.
+4. **Allow the port range** (admin PowerShell). Scope the rule to your subnet:
+
+   ```powershell
+   New-NetFirewallRule -DisplayName "Slides LAN" -Direction Inbound -Protocol TCP -LocalPort 50000-50100 -RemoteAddress 10.26.0.0/17 -Action Allow -Profile Any
+   ```
+
+5. **Remove app block rules.** If the Windows "Allow access?" prompt for `bun.exe` was dismissed or cancelled, Windows adds an inbound **Block** rule for `bun.exe`. Block rules override allow rules, so the port rule alone will not work. List and disable them (admin):
+
+   ```powershell
+   Get-NetFirewallRule -Direction Inbound -Action Block -Enabled True | Where-Object { ($_ | Get-NetFirewallApplicationFilter).Program -match '\\bun\.exe$' } | Disable-NetFirewallRule
+   ```
+
+6. **Confirm the listener** on the host: `Get-NetTCPConnection -State Listen -LocalPort 50000`. It should show the chosen LAN IP, owned by `bun.exe`.
+7. **Undo when finished:** `Remove-NetFirewallRule -DisplayName "Slides LAN"`. Re-enable the app rules with `Get-NetFirewallRule -DisplayName bun.exe | Enable-NetFirewallRule`.
+
+If the test still fails, the network may isolate clients (common on guest or corporate Wi‑Fi). Corporate and privacy VPNs usually route traffic away from the LAN. Mesh VPNs such as Tailscale or ZeroTier work: their `100.x`-style interface appears in the share interface list.
 
 Theme, view selection, Save, Present, and Export form one editor toolbar that wraps together on narrow screens. Save is enabled only while the deck has unsaved changes (including before autosave finishes). The Export dropdown is visible in editor and presenter modes with disabled PDF and HTML options; export is deferred by design. See [ASSUMPTIONS.md](ASSUMPTIONS.md) for scope decisions and [STATUS.md](STATUS.md) for evidence gaps.
 

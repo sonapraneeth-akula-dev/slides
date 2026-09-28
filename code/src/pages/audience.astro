@@ -20,10 +20,12 @@ import '../styles.css';
         <ul id="viewer-list" class="viewer-list" aria-label="Viewers"></ul>
       </div>
       <p id="audience-status" role="status" aria-live="polite">Connecting to presentation…</p>
-      <div id="audience-frame" class="stage-frame" aria-label="Audience slide">
-        <div id="audience-stage" class="stage"></div>
-        <svg id="audience-ink" class="ink" viewBox="0 0 1000 562.5" preserveAspectRatio="none" aria-hidden="true"></svg>
-        <div id="audience-mode" class="stage-mode" hidden></div>
+      <div class="audience-fit">
+        <div id="audience-frame" class="stage-frame" aria-label="Audience slide">
+          <div id="audience-stage" class="stage"></div>
+          <svg id="audience-ink" class="ink" viewBox="0 0 1000 562.5" preserveAspectRatio="none" aria-hidden="true"></svg>
+          <div id="audience-mode" class="stage-mode" hidden></div>
+        </div>
       </div>
     </main>
     <script>import '../audience.ts';</script>

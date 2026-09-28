@@ -361,13 +361,18 @@ a { color: #1752ad; }
 .private-tag { color: #a34605; font-size: 12px; }
 .share-info { color: #536275; font-size: 13px; overflow-wrap: anywhere; }
 .inert { display: block; margin-top: 8px; }
-.audience-page { display: grid; place-items: center; min-height: calc(100dvh - 72px); padding: 24px; background: #131925; }
-.audience-page .stage-frame { max-width: min(100%, 1400px); }
-#audience-status { color: #fff; }
-.audience-bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; width: min(100%, 1400px); }
-.viewer-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.audience-page { display: flex; flex-direction: column; gap: 8px; box-sizing: border-box; height: 100dvh; padding: 8px; overflow: hidden; background: #131925; }
+.audience-fit { flex: 1; min-height: 0; display: grid; place-items: center; container-type: size; }
+.audience-page .stage-frame { width: min(100cqw, 100cqh * 16 / 9); container-type: inline-size; }
+.audience-page .stage-frame > .stage { font-size: 2.3cqw; }
+#audience-status { margin: 0; color: #fff; text-align: center; }
+#audience-status:empty { display: none; }
+.audience-bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; }
+.audience-bar .viewer-list { margin: 0; }
+.viewer-bar { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.viewer-bar label, .viewer-bar button { white-space: nowrap; }
 .viewer-bar label { color: #fff; }
-.viewer-bar input { width: 14em; }
+.viewer-bar input { flex: 0 1 14em; min-width: 4em; }
 .viewer-list { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0 0; padding: 0; list-style: none; }
 .viewer-avatar { display: grid; place-items: center; width: 32px; height: 32px; border: 2px solid #fff; border-radius: 50%; background: hsl(var(--hue, 210) 60% 34%); color: #fff; font-weight: 700; font-size: 14px; cursor: default; }
 .toast { position: fixed; z-index: 20; bottom: 20px; right: 20px; max-width: min(420px, 90vw); padding: 14px 20px; border-radius: 8px; color: #fff; background: #9a2534; box-shadow: 0 4px 20px #0005; }

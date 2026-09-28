@@ -861,6 +861,10 @@ test('presenter lists LAN viewer IPs while sharing', async ({ page, context }) =
   const audienceAvatar = viewer.locator('#viewer-list .viewer-avatar');
   await expect(audienceAvatar).toHaveAttribute('title', 'alice');
   await expect(viewer.locator('#viewer-list')).not.toContainText(address!);
+  const frame = (await viewer.locator('#audience-frame').boundingBox())!;
+  const size = viewer.viewportSize()!;
+  expect(Math.min(size.width - frame.width, size.height - frame.y - frame.height)).toBeLessThanOrEqual(16);
+  expect(await viewer.evaluate(() => document.documentElement.scrollHeight)).toBeLessThanOrEqual(size.height);
   await viewer.close();
   await expect(page.locator('#share-viewer-count')).toHaveText('No LAN viewers connected.', { timeout: 12000 });
   await expect(avatars).toHaveCount(0);
