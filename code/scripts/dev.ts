@@ -1,9 +1,9 @@
 import { spawn } from 'node:child_process';
 import { createServer } from 'node:net';
 
-async function availablePort(exclude: number): Promise<number> {
+async function availablePort(exclude: number, preferred?: number): Promise<number> {
   for (let attempt = 0; attempt < 50; attempt++) {
-    const port = 20000 + Math.floor(Math.random() * 20000);
+    const port = attempt === 0 && preferred !== undefined ? preferred : 20000 + Math.floor(Math.random() * 20000);
     if (port === exclude) continue;
     const probe = createServer();
     try {
@@ -21,8 +21,12 @@ async function availablePort(exclude: number): Promise<number> {
   throw new Error('No available development API port.');
 }
 
-const uiPort = Number(process.env.SLIDES_DEV_PORT ?? 4321);
-if (!Number.isInteger(uiPort) || uiPort < 1024 || uiPort > 65535) throw new Error('Invalid development UI port.');
+const preferredUiPort = Number(process.env.SLIDES_DEV_PORT ?? 4321);
+if (!Number.isInteger(preferredUiPort) || preferredUiPort < 1024 || preferredUiPort > 65535) throw new Error('Invalid development UI port.');
+const uiPort = await availablePort(-1, preferredUiPort);
+if (process.env.SLIDES_DEV_PORT !== undefined && uiPort !== preferredUiPort) {
+  throw new Error(`Development UI port ${preferredUiPort} is already in use.`);
+}
 const requestedApiPort = await availablePort(uiPort);
 const env = { ...process.env, SLIDES_DEV_MODE: '1', SLIDES_DEV_API_PORT: String(requestedApiPort) };
 const children: ReturnType<typeof spawn>[] = [];
