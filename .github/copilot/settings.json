@@ -33,5 +33,8 @@
     "SCOPE (Cosmos)",
     "MAI Atlas (unofficial)",
     "StampManager"
+  ],
+  "disabledSkills": [
+    "gannet"
   ]
 }
