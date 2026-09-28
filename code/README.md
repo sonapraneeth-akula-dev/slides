@@ -100,7 +100,7 @@ The home screen groups new/open actions beside the feature-tour introduction rat
 
 Start a presentation from a valid saved deck. Presenter controls include slide/reveal navigation, notes, a timer, pointer, drawing, blank canvas, blackout, and a local audience window. The audience URL is read-only; it receives a sanitized projection of the frozen deck and live presentation state, not speaker notes, local file paths, or the owner token. Audience reconnect requests current state. Ending a talk with ink requires explicit confirmation to discard the marks.
 
-To share over LAN, pick one of the machine's LAN interfaces and a port in the presenter UI. The host starts a separate audience-only listener and returns its URL; allow that port through local firewall settings as needed (see below). Reachability from another device is **not automatically verified**. Share links grant view access to the current session; use a trusted network, avoid posting the URL publicly, and stop sharing/end the session when finished. Owner editing/API access remains bound to loopback.
+To share over LAN, pick one of the machine's LAN interfaces and a port in the presenter UI. The host starts a separate audience-only listener and returns its URL (**Copy audience URL** in the presenter panel copies it); allow that port through local firewall settings as needed (see below). Reachability from another device is **not automatically verified**. Share links grant view access to the current session; use a trusted network, avoid posting the URL publicly, and stop sharing/end the session when finished. Owner editing/API access remains bound to loopback.
 
 ### LAN troubleshooting (Windows)
 

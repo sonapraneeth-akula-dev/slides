@@ -1177,6 +1177,13 @@ function wire(): void {
     if (!session) return;
     window.open(`/audience/?session=${encodeURIComponent(session.sessionId)}#${encodeURIComponent(session.localKey)}`, '_blank', 'noopener');
   });
+  $('copy-share-url').addEventListener('click', async () => {
+    try {
+      await navigator.clipboard.writeText(shareUrl);
+      text('copy-share-label', 'Copied');
+      setTimeout(() => text('copy-share-label', 'Copy audience URL'), 2000);
+    } catch (error) { errorNotice(error); }
+  });
   $('share').addEventListener('click', async () => {
     if (!session) return;
     if (!sharing) { dialog('share-dialog').showModal(); return; }

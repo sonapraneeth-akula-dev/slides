@@ -81,7 +81,8 @@ a { color: #1752ad; }
 .editor-buttons button[aria-pressed="true"]:hover:not(:disabled) { background: #e9f0fe; }
 .editor-buttons > button.primary { color: #fff; background: #2354ad; }
 .editor-buttons > button.primary:hover:not(:disabled) { background: #173e87; }
-.editor-buttons svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+.editor-buttons svg, #copy-share-url svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+#copy-share-url { display: inline-flex; align-items: center; gap: 6px; }
 .editor-buttons .primary[aria-pressed="true"] { color: #fff; background: #2354ad; }
 .export-menu { position: relative; }
 .export-menu summary { display: flex; align-items: center; gap: 9px; min-height: 38px; padding: 7px 12px; border: 1px solid #bbc7d6; border-radius: 8px; background: #fff; cursor: pointer; list-style: none; }
