@@ -148,7 +148,7 @@ import '../styles.css';
           <h2>Speaker notes <span class="private-tag">Private</span></h2>
           <div id="speaker-notes" class="speaker-notes"></div>
           <p id="share-info" class="share-info">Local only. Sharing is off.</p>
-          <p id="share-viewers" class="share-info" aria-live="polite" hidden></p>
+          <div id="share-viewers" hidden><p id="share-viewer-count" class="share-info" aria-live="polite"></p><ul id="share-viewer-list" class="viewer-list" aria-label="LAN viewers"></ul></div>
           <details class="export-menu presenter-export"><summary>Export</summary><div class="export-options">
             <button type="button" disabled title="PDF export is coming later">Export To PDF (Coming Later)</button>
             <button type="button" disabled title="HTML export is coming later">Export To HTML (Coming Later)</button>
@@ -183,11 +183,9 @@ import '../styles.css';
     <dialog id="share-dialog" aria-labelledby="share-title">
       <h2 id="share-title">Share on your local network</h2>
       <p>Viewers get slides and ink only. Notes, source, and controls stay private. Network reachability is unverified.</p>
-      <label>Network interface to bind <input id="share-host" value="0.0.0.0" required /></label>
-      <div class="share-ports">
-        <label>First port <input id="port-start" type="number" min="1024" max="65535" value="50000" /></label>
-        <label>Last port <input id="port-end" type="number" min="1024" max="65535" value="50100" /></label>
-      </div>
+      <label>Network interface <select id="share-host" required></select></label>
+      <label>Port <input id="share-port" type="number" min="1024" max="65535" value="50000" /></label>
+      <p class="share-info">If this port is busy, the next free port (up to 100 higher) is used.</p>
       <div class="dialog-actions">
         <button type="button" data-close="share-dialog">Cancel</button>
         <button type="button" id="start-share" class="primary">Start sharing</button>

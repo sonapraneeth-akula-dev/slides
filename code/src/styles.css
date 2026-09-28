@@ -104,7 +104,7 @@ a { color: #1752ad; }
 .library-demo button { color: #194686; border-color: #a9c0e9; background: #edf3ff; font-weight: 600; }
 .library-start { padding: 24px; border: 1px solid #dae2ed; border-radius: 12px; background: #fff; }
 .library-open { margin-top: 24px; padding-top: 24px; border-top: 1px solid #dae2ed; }
-.library-create label, .library-open label, .share-ports label, .share-dialog label { display: block; margin-bottom: 8px; font-weight: 600; }
+.library-create label, .library-open label, .share-dialog label { display: block; margin-bottom: 8px; font-weight: 600; }
 .library-start .actions { flex-wrap: nowrap; }
 .library-start .actions button { white-space: nowrap; }
 .library-create input, .library-open input { flex: 1; min-width: 0; }
@@ -364,15 +364,19 @@ a { color: #1752ad; }
 .audience-page { display: grid; place-items: center; min-height: calc(100dvh - 72px); padding: 24px; background: #131925; }
 .audience-page .stage-frame { max-width: min(100%, 1400px); }
 #audience-status { color: #fff; }
+.audience-bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; width: min(100%, 1400px); }
+.viewer-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.viewer-bar label { color: #fff; }
+.viewer-bar input { width: 14em; }
+.viewer-list { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0 0; padding: 0; list-style: none; }
+.viewer-avatar { display: grid; place-items: center; width: 32px; height: 32px; border: 2px solid #fff; border-radius: 50%; background: hsl(var(--hue, 210) 60% 34%); color: #fff; font-weight: 700; font-size: 14px; cursor: default; }
 .toast { position: fixed; z-index: 20; bottom: 20px; right: 20px; max-width: min(420px, 90vw); padding: 14px 20px; border-radius: 8px; color: #fff; background: #9a2534; box-shadow: 0 4px 20px #0005; }
 dialog { width: min(92vw, 800px); max-height: 85dvh; overflow: auto; padding: 24px; border: 1px solid #cbd5e4; border-radius: 12px; box-shadow: 0 20px 70px #0007; }
 dialog::backdrop { background: #101c30a8; }
 dialog label { display: block; margin: 10px 0; }
-dialog input { display: block; width: 100%; margin-top: 5px; }
+dialog input, dialog select { display: block; width: 100%; margin-top: 5px; }
 .conflict-columns { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
 .conflict-columns textarea { display: block; width: 100%; height: 240px; margin-top: 6px; resize: vertical; font-family: ui-monospace, monospace; }
-.share-ports { display: flex; gap: 16px; }
-.share-ports label { flex: 1; }
 .dialog-actions { justify-content: flex-end; flex-wrap: wrap; margin-top: 20px; }
 @media (max-width: 960px) {
   .library-hero { grid-template-columns: 1fr; gap: 24px; }

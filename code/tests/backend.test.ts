@@ -632,7 +632,16 @@ describe('persistent library and presentation', () => {
       expect((await get('/state', 'wrong')).status).toBe(403);
       expect(session.privateState(talk).share?.viewers).toEqual([]);
       const state = await (await get('/state', talk.share!.key)).text();
-      expect(session.privateState(talk).share?.viewers).toEqual([address]);
+      expect(session.privateState(talk).share?.viewers).toEqual([{ name: 'Guest', ip: address }]);
+      const tab = 'a'.repeat(32);
+      const named = await (await fetch(`${base}/state`, { headers: {
+        'X-Slides-Public': talk.share!.key, 'X-Slides-Viewer': tab, 'X-Slides-Viewer-Name': encodeURIComponent('  Zoë\u0007 <b>  '),
+      } })).json() as { viewers: unknown[] };
+      expect(named.viewers).toEqual([{ name: 'Guest' }, { name: 'Zoë <b>' }]);
+      expect(JSON.stringify(named)).not.toContain(address);
+      expect(session.privateState(talk).share?.viewers).toEqual([{ name: 'Guest', ip: address }, { name: 'Zoë <b>', ip: address }]);
+      expect(session.viewerName('%E0%A4%A')).toBe('Guest');
+      expect(session.viewerName('x'.repeat(60))).toHaveLength(40);
       expect(session.activeViewers(talk.share!.viewers, Date.now() + 6000)).toEqual([]);
       expect(state).toContain('"sessionId"');
       expect(state).not.toContain('PRIVATE SECRET');

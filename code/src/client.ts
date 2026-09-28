@@ -4,12 +4,13 @@ import { drawStage } from './stage-view';
 import { masterSamples } from './master-samples';
 import { metadataPositions, metadataValues, type MetadataKey } from './slide-options';
 import { validFontFamily } from './font-family';
+import { renderViewers, type Viewer } from './viewers';
 
 type LibraryEntry = { id: string; name: string; path: string; kind: 'tour' | 'presentation'; missing?: boolean };
 type Diagnostic = { severity: string; message: string; code?: string; sourceSpan?: { start?: number; end?: number }; slideId?: string };
 type DeckResponse = { text: string; revision: string; deck: Deck | null; diagnostics: Diagnostic[] };
 type SessionResponse = { sessionId: string; localKey: string; snapshot: Snapshot; notes: Record<string, string> };
-type BootstrapResponse = { token: string; library: LibraryEntry[]; devMode: boolean };
+type BootstrapResponse = { token: string; library: LibraryEntry[]; devMode: boolean; interfaces: string[] };
 type Page = 'library' | 'editor' | 'presentation';
 type View = 'source' | 'split' | 'preview';
 
@@ -41,7 +42,7 @@ let diskConflict: { diskRevision: string; diskText: string; draftText: string } 
 let session: SessionResponse | null = null;
 let sharing = false;
 let shareUrl = '';
-let shareViewers: string[] = [];
+let shareViewers: Viewer[] = [];
 let tool: 'pen' | 'highlighter' | 'laser' | null = null;
 let drawing: { points: Array<{ x: number; y: number }>; pointer: number } | null = null;
 let eventPending = false;
@@ -895,15 +896,15 @@ function drawPresenter(): void {
   drawViewers();
 }
 function drawViewers(): void {
-  const element = $('share-viewers');
-  element.hidden = !sharing;
-  element.textContent = !shareViewers.length ? 'No LAN viewers connected.'
-    : `${shareViewers.length} LAN viewer${shareViewers.length === 1 ? '' : 's'}: ${shareViewers.join(', ')}`;
+  $('share-viewers').hidden = !sharing;
+  text('share-viewer-count', !shareViewers.length ? 'No LAN viewers connected.'
+    : `${shareViewers.length} LAN viewer${shareViewers.length === 1 ? '' : 's'}`);
+  renderViewers($('share-viewer-list'), shareViewers);
 }
 async function refreshViewers(): Promise<void> {
   if (!session || !sharing) return;
   try {
-    const { share } = await request<{ share: { viewers: string[] } | null }>(
+    const { share } = await request<{ share: { viewers: Viewer[] } | null }>(
       `/api/sessions/${encodeURIComponent(session.sessionId)}/share`);
     shareViewers = share?.viewers ?? [];
     drawViewers();
@@ -1189,12 +1190,11 @@ function wire(): void {
   });
   $('start-share').addEventListener('click', async () => {
     if (!session) return;
-    const host = $<HTMLInputElement>('share-host').value.trim();
-    const portStart = Number($<HTMLInputElement>('port-start').value);
-    const portEnd = Number($<HTMLInputElement>('port-end').value);
-    if (!host || !Number.isInteger(portStart) || !Number.isInteger(portEnd) ||
-      portStart < 1024 || portEnd > 65535 || portStart > portEnd) {
-      notify('Enter a host and a valid port range (1024–65535).');
+    const host = $<HTMLSelectElement>('share-host').value;
+    const portStart = Number($<HTMLInputElement>('share-port').value);
+    const portEnd = Math.min(65535, portStart + 100);
+    if (!host || !Number.isInteger(portStart) || portStart < 1024 || portStart > 65535) {
+      notify('Choose a network interface and a port from 1024 to 65535.');
       return;
     }
     try {
@@ -1251,6 +1251,10 @@ async function init(): Promise<void> {
     token = response.token;
     library = response.library;
     $('dev-mode').hidden = response.devMode !== true;
+    const hosts = $<HTMLSelectElement>('share-host');
+    hosts.replaceChildren(...(response.interfaces ?? []).map(address => new Option(address, address)));
+    if (!hosts.options.length) hosts.add(new Option('No LAN interface found', ''));
+    $<HTMLButtonElement>('start-share').disabled = !hosts.value;
     renderLibrary();
     show('library');
   } catch (error) {

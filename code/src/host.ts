@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import { publicAssetPath } from './asset-path';
 import { compileDeck } from './deck';
 import { createDeck, deleteDeck, duplicateDeck, featureTourDeckId, featureToursRoot, filenameTitle, grantDeck, LibraryError, libraryRoot, listDecks, openDeck, removeDeck, renameDeck, saveDeck } from './library';
-import { createTalk, endTalk, event, getTalk, privateState, publicState, shareOptions, startShare, stopShare } from './session';
+import { createTalk, endTalk, event, getTalk, privateState, publicState, publicViewers, shareOptions, startShare, stopShare } from './session';
 import { presenterSession, publicSnapshot, renderCompilation } from './presentation-model';
 import { ensureSampleImage, sampleImageResponse } from './sample-image';
 import { sampleImageUrl } from './sample-image-reference';
@@ -153,7 +153,7 @@ export function privateRouter(port: number) {
         if (audienceMatch && request.method === 'GET') {
           const talk = getTalk(audienceMatch[1]);
           if (request.headers.get('X-Slides-Public') !== talk.localKey) throw new LibraryError(403, 'Audience key required');
-          return response(publicSnapshot(publicState(talk)));
+          return response({ ...publicSnapshot(publicState(talk)), viewers: publicViewers(talk) });
         }
         if (request.headers.get('X-Slides-Token') !== ownerToken) throw new LibraryError(403, 'Owner token required');
         if (path === '/api/library' && request.method === 'GET') return response({ library: await listDecks() });

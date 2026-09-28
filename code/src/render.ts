@@ -159,8 +159,9 @@ md.inline.ruler.before('escape', 'mark_note', (state, silent) => {
 });
 md.renderer.rules.mark_note = (tokens, index) => {
   const { content, meta } = tokens[index];
+  const note = (meta as { note?: string } | null)?.note;
   const marked = `<mark class="highlight">${md.renderInline(content)}</mark>`;
-  return meta.note ? `<span class="highlight-group">${marked}<span class="highlight-note">${escapeHtml(meta.note)}</span></span>` : marked;
+  return note ? `<span class="highlight-group">${marked}<span class="highlight-note">${escapeHtml(note)}</span></span>` : marked;
 };
 md.renderer.rules.link_open = (tokens, index, options, env, self) => {
   tokens[index].attrSet('rel', 'noopener noreferrer');

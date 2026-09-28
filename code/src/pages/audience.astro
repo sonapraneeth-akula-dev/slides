@@ -11,6 +11,14 @@ import '../styles.css';
   </head>
   <body>
     <main class="audience-page">
+      <div class="audience-bar">
+        <form id="viewer-form" class="viewer-bar" hidden>
+          <label for="viewer-name">Your name</label>
+          <input id="viewer-name" maxlength="40" autocomplete="nickname" placeholder="Guest" />
+          <button type="submit">Set name</button>
+        </form>
+        <ul id="viewer-list" class="viewer-list" aria-label="Viewers"></ul>
+      </div>
       <p id="audience-status" role="status" aria-live="polite">Connecting to presentation…</p>
       <div id="audience-frame" class="stage-frame" aria-label="Audience slide">
         <div id="audience-stage" class="stage"></div>

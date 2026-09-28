@@ -14,8 +14,9 @@ export interface Talk {
   id: string; localKey: string; deckId: string; revision: string; deck: Deck; notes: Record<string, string[]>;
   slideId: string; step: number; sequence: number; started: number;
   marks: Mark[]; blackout: boolean; canvas: boolean;
-  share?: { server: ReturnType<typeof Bun.serve>; key: string; address: string; port: number; viewers: Map<string, number> };
+  share?: { server: ReturnType<typeof Bun.serve>; key: string; address: string; port: number; viewers: Map<string, Viewer> };
 }
+interface Viewer { name: string; ip: string; seen: number }
 const talks = new Map<string, Talk>();
 
 export async function createTalk(deckId: string, revision: string): Promise<Talk> {
@@ -48,9 +49,20 @@ export function publicState(talk: Talk) {
 }
 
 // Audience pages poll /state about once per second, so recent polls mean an open viewer.
-export function activeViewers(viewers: Map<string, number>, now = Date.now()): string[] {
-  for (const [ip, seen] of viewers) if (now - seen > 5000) viewers.delete(ip);
-  return [...viewers.keys()].sort();
+export function activeViewers(viewers: Map<string, Viewer>, now = Date.now()): { name: string; ip: string }[] {
+  for (const [id, viewer] of viewers) if (now - viewer.seen > 5000) viewers.delete(id);
+  return [...viewers.values()].map(({ name, ip }) => ({ name, ip }))
+    .sort((a, b) => a.name.localeCompare(b.name) || a.ip.localeCompare(b.ip));
+}
+
+export function publicViewers(talk: Talk): { name: string }[] {
+  return talk.share ? activeViewers(talk.share.viewers).map(({ name }) => ({ name })) : [];
+}
+
+export function viewerName(value: string | null): string {
+  let name = '';
+  try { name = decodeURIComponent(value ?? ''); } catch { /* malformed names fall back to Guest */ }
+  return [...name.replace(/\p{C}+/gu, ' ').replace(/\s+/g, ' ').trim()].slice(0, 40).join('').trim() || 'Guest';
 }
 
 export function privateState(talk: Talk) {
@@ -134,7 +146,7 @@ export function startShare(talk: Talk, address: string, start: number, end: numb
   const audienceAssets: string[] = JSON.parse(readFileSync(manifest, 'utf8'));
   const allowedAssets = new Set(audienceAssets);
   const key = randomBytes(32).toString('base64url');
-  const viewers = new Map<string, number>();
+  const viewers = new Map<string, Viewer>();
   let server: ReturnType<typeof Bun.serve> | undefined;
   let lastError: unknown;
   for (let port = start; port <= end; port++) {
@@ -146,9 +158,14 @@ export function startShare(talk: Talk, address: string, start: number, end: numb
           if (request.method !== 'GET' && request.method !== 'HEAD') return new Response('Method not allowed', { status: 405 });
           if (url.pathname === '/state') {
             if (request.headers.get('X-Slides-Public') !== key) return new Response('Forbidden', { status: 403 });
-            const ip = listener.requestIP(request)?.address;
-            if (ip) viewers.set(ip.replace(/^::ffff:/, ''), Date.now());
-            return Response.json(publicSnapshot(publicState(talk)), { headers: { 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' } });
+            const ip = (listener.requestIP(request)?.address ?? '').replace(/^::ffff:/, '');
+            const tab = request.headers.get('X-Slides-Viewer');
+            const id = tab && /^[a-f0-9]{32}$/.test(tab) ? tab : ip;
+            activeViewers(viewers);
+            if (id && (viewers.has(id) || viewers.size < 200)) {
+              viewers.set(id, { name: viewerName(request.headers.get('X-Slides-Viewer-Name')), ip, seen: Date.now() });
+            }
+            return Response.json({ ...publicSnapshot(publicState(talk)), viewers: publicViewers(talk) }, { headers: { 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' } });
           }
           if (url.pathname === sampleImageUrl) {
             try { return await sampleImageResponse(request.method); }
