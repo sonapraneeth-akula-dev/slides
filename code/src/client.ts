@@ -770,7 +770,7 @@ function openSettings(): void {
     fontStatus.textContent = installedFontFamilies
       ? `${installedFontFamilies.length} installed font families available.`
       : 'Choose Browse to allow access to installed fonts for the heading, body, and code lists.';
-    browseFonts.addEventListener('click', async () => {
+    const loadFonts = async () => {
       browseFonts.disabled = true;
       try {
         const families = [...new Set((await fontWindow.queryLocalFonts!())
@@ -783,7 +783,11 @@ function openSettings(): void {
       } catch (error) {
         if (browseFonts.isConnected) fontStatus.textContent = `Unable to list installed fonts: ${message(error)}`;
       } finally { browseFonts.disabled = false; }
-    });
+    };
+    browseFonts.addEventListener('click', loadFonts);
+    // Permission persists per origin, but the list does not survive reloads; refill it without another click.
+    if (!installedFontFamilies) navigator.permissions?.query({ name: 'local-fonts' as PermissionName })
+      .then(status => { if (status.state === 'granted' && browseFonts.isConnected) void loadFonts(); }, () => {});
   }
   fontPicker.append(browseFonts, fontStatus);
   sections.get('Heading')!.append(fontPicker);
@@ -886,7 +890,7 @@ function drawPresenter(): void {
   text('share-info', sharing
     ? `Audience URL: ${shareUrl} — network reachability unverified. Share only with trusted viewers.`
     : 'Local only. Sharing is off.');
-  text('share', sharing ? 'Stop LAN sharing' : 'Share on LAN…');
+  text('share-label', sharing ? 'Stop LAN sharing' : 'Share on LAN…');
 }
 async function sendEvent(action: string, extra: Record<string, unknown> = {}): Promise<void> {
   if (!session || eventPending) return;

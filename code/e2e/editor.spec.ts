@@ -826,6 +826,7 @@ test('presenter fits charts and Mermaid, shows private notes, and groups legible
   await expect(actions).toHaveCSS('border-radius', '8px');
   const headerButtons = await actions.locator('button').evaluateAll(elements => elements.map(element => element.getBoundingClientRect()));
   expect(headerButtons).toHaveLength(3);
+  await expect(actions.locator('button > svg')).toHaveCount(3);
   for (let index = 1; index < headerButtons.length; index++) {
     expect(Math.abs(headerButtons[index].left - headerButtons[index - 1].right)).toBeLessThan(1);
   }
@@ -915,6 +916,24 @@ test('font permission errors leave saved fonts and fractional settings intact', 
   await page.getByLabel('Heading font').selectOption('');
   await expect(page.locator('#source')).not.toHaveValue(/headingFont:/);
   await expect(page.getByLabel('Top padding (%)')).toHaveValue('3.5');
+});
+
+test('granted font permission lists installed fonts without another click', async ({ page }) => {
+  await page.addInitScript(() => {
+    Object.defineProperty(window, 'queryLocalFonts', {
+      configurable: true, value: async () => [{ family: 'Zeta Sans' }, { family: 'Alpha Serif' }, { family: 'Alpha Serif' }],
+    });
+    const query = navigator.permissions.query.bind(navigator.permissions);
+    navigator.permissions.query = (descriptor: PermissionDescriptor) => descriptor.name === 'local-fonts' as PermissionName
+      ? Promise.resolve({ state: 'granted' } as PermissionStatus) : query(descriptor);
+  });
+  await page.goto(origin);
+  await page.locator('#deck-name').fill('Granted fonts');
+  await page.locator('#create').click();
+  await expect(page.locator('#editor-page')).toBeVisible();
+  await page.locator('#settings-button').click();
+  await expect(page.locator('.font-picker [role="status"]')).toHaveText('2 installed font families available.');
+  await expect(page.getByLabel('Body font').locator('option')).toHaveText(['System font (default)', 'Alpha Serif', 'Zeta Sans']);
 });
 
 test('master settings announces the active view and matches editor control typography', async ({ page }) => {
