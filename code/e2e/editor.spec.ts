@@ -91,7 +91,7 @@ test('author, persist, present and share only read-only public state', async ({ 
   await expect(page.locator('#editor-actions .export-options button:enabled')).toHaveCount(0);
   await page.locator('#editor-actions .export-menu summary').click();
   await expect(page.locator('#save')).toHaveCSS('border-radius', '0px');
-  await expect(page.locator('.editor-buttons')).toHaveCSS('border-radius', '8px');
+  await expect(page.locator('#editor-actions .editor-buttons')).toHaveCSS('border-radius', '8px');
   await expect(page.locator('#page-title')).toHaveText('browser-acceptance');
   await expect(page.locator('.outline-actions')).toBeVisible();
   const outline = await page.locator('#outline').boundingBox();
@@ -647,6 +647,45 @@ test('Mermaid stays centered and unclipped in draft preview and public stages', 
   }
 });
 
+test('Mermaid refits its viewBox to the live diagram in LR and TD flows', async ({ page }) => {
+  // Simulate Mermaid's scratch-container measurement disagreeing with the live render (fonts, extensions, timing).
+  await page.addInitScript(() => {
+    const measure = SVGGraphicsElement.prototype.getBBox;
+    SVGGraphicsElement.prototype.getBBox = function (this: SVGGraphicsElement) {
+      const box = measure.call(this);
+      return this instanceof SVGSVGElement && !this.closest('.special-fence')
+        ? new DOMRect(box.x + 90, box.y + 20, box.width * .8, box.height * .8) : box;
+    };
+  });
+  await page.setViewportSize({ width: 1600, height: 1000 });
+  await page.goto(origin);
+  await page.locator('#open-demo').click();
+  const source = page.locator('#source');
+  await expect(source).toHaveValue(/```mermaid/);
+  const contained = (surface: import('@playwright/test').Locator) => surface.evaluate(element => {
+    const svg = element.querySelector('.special-fence[data-kind="mermaid"] svg')!;
+    const box = svg.getBoundingClientRect();
+    const nodes = [...svg.querySelectorAll('.node')].map(node => node.getBoundingClientRect());
+    return nodes.length === 4 && nodes.every(node => node.left >= box.left - 1 && node.right <= box.right + 1 &&
+      node.top >= box.top - 1 && node.bottom <= box.bottom + 1);
+  });
+  for (const direction of ['LR', 'TD']) {
+    await source.fill((await source.inputValue()).replace(/flowchart (LR|TD)/, `flowchart ${direction}`));
+    await expect(page.locator('#save-status')).toHaveText('Saved');
+    const preview = page.locator('.preview-card[data-slide-id="diagram"] .preview-stage');
+    await expect(preview.locator('.special-fence svg')).toBeVisible();
+    await preview.scrollIntoViewIfNeeded();
+    expect(await contained(preview), `${direction} preview`).toBe(true);
+    await page.locator('#present').click();
+    await page.locator('#jump').selectOption('diagram');
+    await expect(page.locator('#stage .special-fence svg')).toBeVisible();
+    expect(await contained(page.locator('#stage')), `${direction} presenter`).toBe(true);
+    await page.locator('#end').click();
+    await page.locator('#confirm-end').click();
+    await expect(page.locator('#editor-page')).toBeVisible();
+  }
+});
+
 test('presenter fits charts and Mermaid, shows private notes, and groups legible controls', async ({ page }) => {
   await page.setViewportSize({ width: 1920, height: 1080 });
   await page.goto(origin);
@@ -741,6 +780,16 @@ test('presenter fits charts and Mermaid, shows private notes, and groups legible
     }
   }
   await expect(page.locator('.tree-nav [data-nav="parent"]')).toHaveCSS('white-space', 'nowrap');
+  await expect(page.locator('#presenter-side .navigation svg, #presenter-side .tree-nav svg')).toHaveCount(6);
+  await expect(page.locator('#presenter-side')).not.toContainText(/[←→↑↓]/);
+  await page.setViewportSize({ width: 1600, height: 1000 });
+  const actions = page.locator('#presenter-actions .editor-buttons');
+  await expect(actions).toHaveCSS('border-radius', '8px');
+  const headerButtons = await actions.locator('button').evaluateAll(elements => elements.map(element => element.getBoundingClientRect()));
+  expect(headerButtons).toHaveLength(3);
+  for (let index = 1; index < headerButtons.length; index++) {
+    expect(Math.abs(headerButtons[index].left - headerButtons[index - 1].right)).toBeLessThan(1);
+  }
 });
 
 test('CRLF decks can present untouched and retain line endings after edits', async ({ page }) => {

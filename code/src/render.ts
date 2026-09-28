@@ -215,6 +215,18 @@ function cleanCharts(): void {
   if (!mountedCharts.size) chartCleanup?.disconnect();
 }
 
+// Mermaid measures its viewBox in a detached scratch container; re-measure the live SVG so drawn content is never clipped.
+// ponytail: fits once at insertion; diagrams inserted while hidden keep Mermaid's viewBox.
+function fitViewBox(svg: SVGSVGElement | null): void {
+  try {
+    const box = svg?.getBBox();
+    if (svg && box && box.width > 0 && box.height > 0) {
+      const pad = 8;
+      svg.setAttribute('viewBox', `${box.x - pad} ${box.y - pad} ${box.width + pad * 2} ${box.height + pad * 2}`);
+    }
+  } catch { /* Not rendered yet; keep Mermaid's viewBox. */ }
+}
+
 async function renderFences(root: HTMLElement): Promise<void> {
   const fences = [...root.querySelectorAll<HTMLElement>('.special-fence')];
   for (const fence of fences) {
@@ -239,6 +251,7 @@ async function renderFences(root: HTMLElement): Promise<void> {
         const { svg } = await mermaid.render(`slides-diagram-${++diagramCounter}`, source);
         if (!fence.isConnected) continue;
         fence.innerHTML = DOMPurify.sanitize(svg, { USE_PROFILES: { svg: true, svgFilters: true }, FORBID_TAGS: ['foreignObject', 'script'] });
+        fitViewBox(fence.querySelector('svg'));
         fence.setAttribute('role', 'img');
         fence.setAttribute('aria-label', `Diagram: ${source.slice(0, 250)}`);
       } catch {

@@ -37,9 +37,11 @@ import '../styles.css';
         </div>
         <div id="presenter-actions" class="actions" hidden>
           <span class="pill live">Live</span>
-          <button type="button" id="local-audience">Audience window</button>
-          <button type="button" id="share">Share on LAN…</button>
-          <button type="button" id="end">End</button>
+          <div class="editor-buttons" role="group" aria-label="Presentation actions">
+            <button type="button" id="local-audience">Audience window</button>
+            <button type="button" id="share">Share on LAN…</button>
+            <button type="button" id="end">End</button>
+          </div>
         </div>
       </header>
 
@@ -131,15 +133,15 @@ import '../styles.css';
         <aside id="presenter-side" class="presenter-side">
           <div class="progress"><strong id="slide-progress"></strong><span id="reveal-progress"></span><time id="timer">00:00</time></div>
           <div class="navigation" role="group" aria-label="Previous and next slide">
-            <button type="button" id="previous">← Previous</button>
-            <button type="button" id="next" class="primary">Next →</button>
+            <button type="button" id="previous"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5m6-6-6 6 6 6"/></svg>Previous</button>
+            <button type="button" id="next" class="primary">Next<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14m-6-6 6 6-6 6"/></svg></button>
           </div>
           <div class="tree-nav" role="group" aria-label="Slide tree navigation">
-            <button type="button" data-nav="up" aria-label="Up">↑</button>
-            <button type="button" data-nav="left" aria-label="Left">←</button>
+            <button type="button" data-nav="up" aria-label="Up"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5m-6 6 6-6 6 6"/></svg></button>
+            <button type="button" data-nav="left" aria-label="Left"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5m6-6-6 6 6 6"/></svg></button>
             <button type="button" data-nav="parent" aria-label="Parent slide">Parent</button>
-            <button type="button" data-nav="right" aria-label="Right">→</button>
-            <button type="button" data-nav="down" aria-label="Down">↓</button>
+            <button type="button" data-nav="right" aria-label="Right"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14m-6-6 6 6-6 6"/></svg></button>
+            <button type="button" data-nav="down" aria-label="Down"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14m-6-6 6 6 6-6"/></svg></button>
           </div>
           <label for="jump">Jump to slide</label><select id="jump"></select>
           <h2>Up next</h2><div id="up-next" class="up-next"></div>

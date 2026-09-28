@@ -139,8 +139,8 @@ test('integrated dev mode serves live UI and API, creates a deck from its title'
     }
   }
   await page.locator('button[data-view="split"]').click();
-  await expect(page.locator('.editor-buttons > button, .view-buttons > button')).toHaveCount(5);
-  expect(await page.locator('.editor-buttons > button svg, .view-buttons > button svg').count()).toBe(5);
+  await expect(page.locator('#editor-actions').locator('.editor-buttons > button, .view-buttons > button')).toHaveCount(5);
+  expect(await page.locator('#editor-actions').locator('.editor-buttons > button svg, .view-buttons > button svg').count()).toBe(5);
   await expect(page.locator('#save')).toBeDisabled();
   await expect(page.locator('#source')).toHaveValue(/title: "Test Presentation"/);
   const file = join(directory, 'presentations', 'Test-Presentation.md');
