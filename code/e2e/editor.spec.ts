@@ -846,6 +846,7 @@ test('presenter lists LAN viewer IPs while sharing', async ({ page, context }) =
   await page.locator('#share-host').selectOption(address!);
   await page.locator('#share-port').fill('50200');
   await page.locator('#start-share').click();
+  await expect(page.locator('#share-info')).toContainText(/http:\/\/\S+/);
   await expect(page.locator('#share-viewer-count')).toHaveText('No LAN viewers connected.');
   const url = (await page.locator('#share-info').textContent())!.match(/http:\/\/\S+/)![0];
   await context.grantPermissions(['clipboard-read', 'clipboard-write'], { origin });
