@@ -17,11 +17,12 @@ function slide(source: Pick<SourceSlide, 'id' | 'parent' | 'index' | 'layout' | 
   };
 }
 
-export function renderDeck(source: SourceDeck): Deck {
+export function renderDeck(source: SourceDeck, assetBase?: string): Deck {
   return {
     schemaVersion: 1, title: source.title, theme: String(source.master.theme ?? 'signal'),
     master: source.master, slides: source.slides.map(slide),
     order: source.slides.map(slide => slide.id),
+    ...(assetBase ? { assetBase } : {}),
   };
 }
 
@@ -39,9 +40,9 @@ export function renderDiagnostics(source: string, diagnostics: SourceDiagnostic[
   });
 }
 
-export function renderCompilation(source: string, compilation: Compilation) {
+export function renderCompilation(source: string, compilation: Compilation, assetBase?: string) {
   return {
-    deck: compilation.deck ? renderDeck(compilation.deck) : null,
+    deck: compilation.deck ? renderDeck(compilation.deck, assetBase) : null,
     diagnostics: renderDiagnostics(source, compilation.diagnostics),
   };
 }
@@ -82,7 +83,7 @@ function overlay(state: PublicState): Snapshot['overlay'] {
   return { strokes, mode: state.overlay.blackout ? 'blackout' : state.overlay.canvas ? 'canvas' : 'normal' };
 }
 
-export function publicSnapshot(state: PublicState): Snapshot {
+export function publicSnapshot(state: PublicState, assetBase?: string): Snapshot {
   const current = state.stage.slide;
   const slideContent = slide({
     ...current, parent: null, items: current.items.map(item => ({ ...item, line: 0 })),
@@ -93,13 +94,14 @@ export function publicSnapshot(state: PublicState): Snapshot {
     stage: {
       title: state.stage.title, master: state.stage.master,
       theme: String(state.stage.master.theme ?? 'signal'), total: state.stage.total, slides: [slideContent],
+      ...(assetBase ? { assetBase } : {}),
     },
     overlay: overlay(state), ended: false,
   };
 }
 
-export function presenterSession(state: PrivateState) {
-  const deck = renderDeck(state.deck);
+export function presenterSession(state: PrivateState, assetBase?: string) {
+  const deck = renderDeck(state.deck, assetBase);
   return {
     sessionId: state.id, localKey: state.localKey, snapshot: {
       schemaVersion: state.schemaVersion, sessionId: state.id, sequence: state.sequence,

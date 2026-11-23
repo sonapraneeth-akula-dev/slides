@@ -1,6 +1,7 @@
 import YAML from 'yaml';
 import { layouts, metadataPositions, metadataValues } from './slide-options';
 import { validFontFamily } from './font-family';
+import { parseAssetReference, sampleImageReference } from './sample-image-reference';
 
 export { layouts };
 export type Layout = typeof layouts[number];
@@ -262,4 +263,29 @@ export function audienceProjection(deck: Deck, slideId: string, step: number) {
     },
     total: deck.slides.length, step
   };
+}
+
+export function referencedAssets(deck: Deck): string[] {
+  const found = new Set<string>();
+  const imagePattern = /!\[[^\]]*\]\(([^)\s]+)(?:\s+"[^"]*")?\)/g;
+  for (const slide of deck.slides) {
+    let fence: string | undefined;
+    for (const item of slide.items) {
+      const trimmed = item.text.trim();
+      const fenceMatch = /^(`{3,}|~{3,})/.exec(trimmed);
+      if (fenceMatch) {
+        if (!fence) fence = fenceMatch[1];
+        else if (trimmed.startsWith(fence[0].repeat(fence.length))) fence = undefined;
+        continue;
+      }
+      if (fence) continue;
+      const withoutInlineCode = item.text.replace(/`+[^`]*`+/g, '');
+      for (const match of withoutInlineCode.matchAll(imagePattern)) {
+        if (match[1] === sampleImageReference) continue;
+        const rel = parseAssetReference(match[1]);
+        if (rel) found.add(rel);
+      }
+    }
+  }
+  return [...found];
 }

@@ -1127,6 +1127,45 @@ test('sample image renders in the editor and audience without allowing arbitrary
   await expect(audience.locator('#audience-stage img.slide-image')).toHaveCount(1);
   await expect.poll(() => audience.locator('#audience-stage img').evaluate(image => (image as HTMLImageElement).naturalWidth)).toBeGreaterThan(0);
   await expect(audience.locator('#audience-stage .asset-fallback')).toContainText('Not available');
+  await audience.close();
+});
+
+test('authorized local deck assets render in editor, presenter and audience while rejecting traversal and remote URLs', async ({ page, context }) => {
+  await mkdir(join(directory, 'presentations', 'assets'), { recursive: true });
+  await writeFile(
+    join(directory, 'presentations', 'assets', 'custom-architecture.svg'),
+    '<svg xmlns="http://www.w3.org/2000/svg" width="160" height="90" viewBox="0 0 160 90"><rect width="160" height="90" fill="#2563eb"/><circle cx="80" cy="45" r="24" fill="#ffffff"/></svg>',
+  );
+  await page.goto(origin);
+  await page.locator('#deck-name').fill('Custom Assets');
+  await page.locator('#create').click();
+  await expect(page.locator('#editor-page')).toBeVisible();
+  await page.locator('#source').fill(`::slide{id="first"}
+# Architecture
+
+![Custom diagram](assets/custom-architecture.svg)
+
+![Missing asset](assets/missing.png)
+
+![Traversal](../secret.png)
+
+![Remote](https://example.invalid/remote.png)`);
+  const preview = page.locator('#preview .preview-card').first();
+  await expect(preview.locator('img.slide-image')).toHaveCount(1);
+  await expect.poll(() => preview.locator('img.slide-image').evaluate(image => (image as HTMLImageElement).naturalWidth)).toBe(160);
+  await expect(preview.locator('.asset-fallback')).toHaveCount(3);
+  await page.locator('#save').click();
+  await expect(page.locator('#save')).toBeDisabled();
+  await page.locator('#present').click();
+  await expect(page.locator('#stage img.slide-image')).toHaveCount(1);
+  await expect.poll(() => page.locator('#stage img.slide-image').evaluate(image => (image as HTMLImageElement).naturalWidth)).toBe(160);
+  const audiencePromise = context.waitForEvent('page');
+  await page.locator('#local-audience').click();
+  const audience = await audiencePromise;
+  await expect(audience.locator('#audience-stage img.slide-image')).toHaveCount(1);
+  await expect.poll(() => audience.locator('#audience-stage img.slide-image').evaluate(image => (image as HTMLImageElement).naturalWidth)).toBe(160);
+  await expect(audience.locator('#audience-stage .asset-fallback')).toHaveCount(3);
+  await audience.close();
 });
 
 test('external edit opens conflict dialog without overwriting either version', async ({ page }) => {

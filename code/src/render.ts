@@ -4,7 +4,7 @@ import hljs from 'highlight.js/lib/common';
 import DOMPurify from 'dompurify';
 import 'katex/dist/katex.min.css';
 import 'highlight.js/styles/github.css';
-import { sampleImageReference, sampleImageUrl } from './sample-image-reference';
+import { parseAssetReference, sampleImageReference, sampleImageUrl } from './sample-image-reference';
 import { metadataPositions } from './slide-options';
 import { validFontFamily } from './font-family';
 
@@ -27,6 +27,7 @@ export interface Stage {
   master: Record<string, unknown>;
   slides: Slide[];
   total?: number;
+  assetBase?: string;
 }
 
 export interface Deck extends Stage {
@@ -56,11 +57,19 @@ export interface Snapshot {
 }
 
 const md = new MarkdownIt({ html: false, linkify: false, breaks: true });
-md.renderer.rules.image = (tokens, index) => {
+const safeAssetBase = /^\/(?:api\/(?:deck-assets|public)\/|assets\/)[A-Za-z0-9/_-]+$/;
+md.renderer.rules.image = (tokens, index, _options, env) => {
   const token = tokens[index];
   const alt = token.content || 'Unlabelled image';
-  if (token.attrGet('src') === sampleImageReference) {
+  const src = String(token.attrGet('src') ?? '');
+  if (src === sampleImageReference) {
     return `<img class="slide-image" src="${sampleImageUrl}" alt="${md.utils.escapeHtml(alt)}" loading="lazy">`;
+  }
+  const rel = parseAssetReference(src);
+  const assetBase = (env as { assetBase?: string } | undefined)?.assetBase;
+  if (rel && assetBase && safeAssetBase.test(assetBase)) {
+    const encoded = rel.split('/').map(encodeURIComponent).join('/');
+    return `<img class="slide-image" src="${assetBase}/${encoded}" alt="${md.utils.escapeHtml(alt)}" data-asset-alt="${md.utils.escapeHtml(alt)}">`;
   }
   return `<span class="asset-fallback" role="img" aria-label="${md.utils.escapeHtml(alt)}">Image unavailable: ${md.utils.escapeHtml(alt)}</span>`;
 };
@@ -215,12 +224,24 @@ md.renderer.rules.math_block = (tokens, index) => {
   }
 };
 
-export function markdown(source: string): HTMLElement {
+export function markdown(source: string, assetBase?: string): HTMLElement {
   const element = document.createElement('div');
   element.className = 'slide-markdown';
-  element.innerHTML = DOMPurify.sanitize(md.render(source), {
+  element.innerHTML = DOMPurify.sanitize(md.render(source, { assetBase }), {
     FORBID_TAGS: ['iframe', 'object', 'form', 'script', 'style'],
   });
+  for (const img of element.querySelectorAll<HTMLImageElement>('img.slide-image[data-asset-alt]')) {
+    const label = img.getAttribute('data-asset-alt') || 'Unlabelled image';
+    img.removeAttribute('data-asset-alt');
+    img.addEventListener('error', () => {
+      const fallback = document.createElement('span');
+      fallback.className = 'asset-fallback';
+      fallback.setAttribute('role', 'img');
+      fallback.setAttribute('aria-label', label);
+      fallback.textContent = `Image unavailable: ${label}`;
+      img.replaceWith(fallback);
+    }, { once: true });
+  }
   return element;
 }
 
@@ -471,14 +492,14 @@ export async function renderStage(host: HTMLElement, stage: Stage, slide: Slide 
     const content = document.createElement('div');
     content.className = 'slide-content';
     if (slide.layout === 'title-image-left' || slide.layout === 'title-image-right') {
-      const text = markdown(slide.body);
+      const text = markdown(slide.body, stage.assetBase);
       text.classList.add('slide-cover-text');
-      const image = markdown(slide.slots?.image || '');
+      const image = markdown(slide.slots?.image || '', stage.assetBase);
       image.classList.add('slide-cover-image');
       image.setAttribute('aria-label', 'Cover image');
       content.append(text, image);
     } else {
-      const body = markdown(slide.body);
+      const body = markdown(slide.body, stage.assetBase);
       if (slide.layout === 'image-full') body.classList.add('slide-full-image');
       content.append(body);
     }
@@ -488,7 +509,7 @@ export async function renderStage(host: HTMLElement, stage: Stage, slide: Slide 
       const columns = document.createElement('div');
       columns.className = 'slide-columns';
       for (const name of names) {
-        const column = markdown(slide.slots?.[name] || '');
+        const column = markdown(slide.slots?.[name] || '', stage.assetBase);
         column.classList.add('slide-column');
         column.setAttribute('aria-label', `${name} column`);
         columns.append(column);
@@ -497,7 +518,7 @@ export async function renderStage(host: HTMLElement, stage: Stage, slide: Slide 
     }
     for (const [index, reveal] of (slide.reveals || []).entries()) {
       if (index >= step) break;
-      const element = markdown(reveal);
+      const element = markdown(reveal, stage.assetBase);
       element.classList.add('slide-reveal');
       content.append(element);
     }

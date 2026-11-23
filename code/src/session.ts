@@ -3,15 +3,16 @@ import { existsSync, readFileSync, statSync } from 'node:fs';
 import { networkInterfaces } from 'node:os';
 import { join } from 'node:path';
 import { publicAssetPath } from './asset-path';
-import { sampleImageResponse } from './sample-image';
+import { assetResponse, readDeckAsset, sampleImageResponse } from './sample-image';
 import { sampleImageUrl } from './sample-image-reference';
-import { audienceProjection, type Deck } from './deck';
+import { audienceProjection, referencedAssets, type Deck } from './deck';
 import { LibraryError, openDeck } from './library';
 import { publicSnapshot } from './presentation-model';
 
 interface Mark { slideId: string; step: number; tool: 'pen' | 'highlight'; color: string; width: number; points: { x: number; y: number }[] }
 export interface Talk {
-  id: string; localKey: string; deckId: string; revision: string; deck: Deck; notes: Record<string, string[]>;
+  id: string; localKey: string; assetToken: string; deckId: string; revision: string; deck: Deck; notes: Record<string, string[]>;
+  assets: Map<string, { bytes: Uint8Array<ArrayBuffer>; mime: string }>;
   slideId: string; step: number; sequence: number; started: number;
   marks: Mark[]; blackout: boolean; canvas: boolean;
   share?: { server: ReturnType<typeof Bun.serve>; key: string; address: string; port: number; viewers: Map<string, Viewer> };
@@ -24,13 +25,33 @@ export async function createTalk(deckId: string, revision: string): Promise<Talk
   if (source.revision !== revision) throw new LibraryError(409, 'Deck revision changed', { diskRevision: source.revision, diskText: source.text });
   if (!source.deck) throw new LibraryError(422, 'Deck has errors', source.diagnostics);
   const deck = structuredClone(source.deck);
+  const assets = new Map<string, { bytes: Uint8Array<ArrayBuffer>; mime: string }>();
+  let totalAssetBytes = 0;
+  for (const rel of referencedAssets(deck)) {
+    const asset = await readDeckAsset(deckId, rel);
+    if (!asset) continue;
+    totalAssetBytes += asset.bytes.byteLength;
+    if (totalAssetBytes > 30_000_000) throw new LibraryError(400, 'Deck image assets exceed 30 MB total');
+    assets.set(rel, asset);
+  }
   const first = deck.slides[0];
   const talk: Talk = {
-    id: randomUUID(), localKey: randomBytes(32).toString('base64url'), deckId, revision, deck, notes: Object.fromEntries(deck.slides.map(slide => [slide.id, slide.notes])),
+    id: randomUUID(), localKey: randomBytes(32).toString('base64url'), assetToken: randomBytes(24).toString('base64url'),
+    deckId, revision, deck, assets, notes: Object.fromEntries(deck.slides.map(slide => [slide.id, slide.notes])),
     slideId: first.id, step: 0, sequence: 0, started: Date.now(), marks: [], blackout: false, canvas: false
   };
   talks.set(talk.id, talk);
   return talk;
+}
+
+export function talkAssetResponse(talk: Talk, token: string, encodedRelPath: string, method: 'GET' | 'HEAD'): Response {
+  if (token !== talk.assetToken) throw new LibraryError(403, 'Asset key required');
+  let relPath: string;
+  try { relPath = encodedRelPath.split('/').map(segment => decodeURIComponent(segment)).join('/'); }
+  catch { throw new LibraryError(400, 'Invalid asset path'); }
+  const asset = talk.assets.get(relPath);
+  if (!asset) throw new LibraryError(404, 'Asset not found');
+  return assetResponse(asset, method);
 }
 
 export function getTalk(id: string): Talk {
@@ -173,7 +194,15 @@ export function startShare(talk: Talk, address: string, start: number, end: numb
             if (id && (viewers.has(id) || viewers.size < 200)) {
               viewers.set(id, { name: viewerName(request.headers.get('X-Slides-Viewer-Name')), ip, seen: Date.now() });
             }
-            return Response.json({ ...publicSnapshot(publicState(talk)), viewers: publicViewers(talk) }, { headers: { 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' } });
+            return Response.json({ ...publicSnapshot(publicState(talk), `/assets/${talk.assetToken}`), viewers: publicViewers(talk) }, { headers: { 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' } });
+          }
+          const talkAssetMatch = /^\/assets\/([A-Za-z0-9_-]+)\/(.+)$/.exec(url.pathname);
+          if (talkAssetMatch) {
+            try { return talkAssetResponse(talk, talkAssetMatch[1], talkAssetMatch[2], request.method); }
+            catch (error) {
+              if (error instanceof LibraryError) return new Response(error.message, { status: error.status });
+              throw error;
+            }
           }
           if (url.pathname === sampleImageUrl) {
             try { return await sampleImageResponse(request.method); }

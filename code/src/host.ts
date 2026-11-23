@@ -3,13 +3,21 @@ import { join } from 'node:path';
 import { publicAssetPath } from './asset-path';
 import { compileDeck } from './deck';
 import { createDeck, deleteDeck, duplicateDeck, featureTourDeckId, featureToursRoot, filenameTitle, grantDeck, LibraryError, libraryRoot, listDecks, openDeck, removeDeck, renameDeck, saveDeck } from './library';
-import { createTalk, endTalk, event, getTalk, privateState, publicState, publicViewers, shareOptions, startShare, stopShare } from './session';
+import { createTalk, endTalk, event, getTalk, privateState, publicState, publicViewers, shareOptions, startShare, stopShare, talkAssetResponse, type Talk } from './session';
 import { presenterSession, publicSnapshot, renderCompilation } from './presentation-model';
-import { ensureSampleImage, sampleImageResponse } from './sample-image';
+import { assetResponse, ensureSampleImage, readDeckAsset, sampleImageResponse } from './sample-image';
 import { sampleImageUrl } from './sample-image-reference';
 
 const dist = join(process.cwd(), 'dist');
 const ownerToken = randomBytes(32).toString('base64url');
+const deckAssetToken = randomBytes(24).toString('base64url');
+const editorAssetBase = (id: string) => `/api/deck-assets/${deckAssetToken}/${encodeURIComponent(id)}`;
+const publicTalkAssetBase = (talk: Talk) => `/api/public/${talk.id}/assets/${talk.assetToken}`;
+
+function rejectCrossSite(request: Request): void {
+  const site = request.headers.get('sec-fetch-site');
+  if (site && site !== 'same-origin' && site !== 'none') throw new LibraryError(403, 'Cross-site request rejected');
+}
 
 async function body(request: Request): Promise<Record<string, unknown>> {
   if (request.headers.get('Content-Type')?.split(';')[0] !== 'application/json') throw new LibraryError(415, 'Expected application/json');
@@ -141,6 +149,7 @@ export function privateRouter(port: number) {
       }
       const path = url.pathname;
       if (path === sampleImageUrl && (request.method === 'GET' || request.method === 'HEAD')) {
+        rejectCrossSite(request);
         return await sampleImageResponse(request.method);
       }
       if (path.startsWith('/api/')) {
@@ -149,11 +158,27 @@ export function privateRouter(port: number) {
           await ensureSampleImage();
           return response({ token: ownerToken, library, interfaces: shareOptions(), devMode: process.env.SLIDES_DEV_MODE === '1' });
         }
+        const deckAssetMatch = /^\/api\/deck-assets\/([A-Za-z0-9_-]+)\/([A-Za-z0-9_-]+)\/(.+)$/.exec(path);
+        if (deckAssetMatch && (request.method === 'GET' || request.method === 'HEAD')) {
+          rejectCrossSite(request);
+          if (deckAssetMatch[1] !== deckAssetToken) throw new LibraryError(403, 'Owner asset token required');
+          let relPath: string;
+          try { relPath = deckAssetMatch[3].split('/').map(segment => decodeURIComponent(segment)).join('/'); }
+          catch { throw new LibraryError(400, 'Invalid asset path'); }
+          const asset = await readDeckAsset(deckAssetMatch[2], relPath);
+          if (!asset) throw new LibraryError(404, 'Asset not found');
+          return assetResponse(asset, request.method);
+        }
+        const talkAssetMatch = /^\/api\/public\/([a-f0-9-]+)\/assets\/([A-Za-z0-9_-]+)\/(.+)$/.exec(path);
+        if (talkAssetMatch && (request.method === 'GET' || request.method === 'HEAD')) {
+          rejectCrossSite(request);
+          return talkAssetResponse(getTalk(talkAssetMatch[1]), talkAssetMatch[2], talkAssetMatch[3], request.method);
+        }
         const audienceMatch = /^\/api\/public\/([a-f0-9-]+)$/.exec(path);
         if (audienceMatch && request.method === 'GET') {
           const talk = getTalk(audienceMatch[1]);
           if (request.headers.get('X-Slides-Public') !== talk.localKey) throw new LibraryError(403, 'Audience key required');
-          return response({ ...publicSnapshot(publicState(talk)), viewers: publicViewers(talk) });
+          return response({ ...publicSnapshot(publicState(talk), publicTalkAssetBase(talk)), viewers: publicViewers(talk) });
         }
         if (request.headers.get('X-Slides-Token') !== ownerToken) throw new LibraryError(403, 'Owner token required');
         if (path === '/api/library' && request.method === 'GET') return response({ library: await listDecks() });
@@ -194,28 +219,30 @@ export function privateRouter(port: number) {
         const deckMatch = /^\/api\/decks\/([A-Za-z0-9_-]+)$/.exec(path);
         if (deckMatch && request.method === 'GET') {
           const opened = await openDeck(deckMatch[1]);
-          return response({ ...opened, ...renderCompilation(opened.text, opened) });
+          return response({ ...opened, ...renderCompilation(opened.text, opened, editorAssetBase(deckMatch[1])) });
         }
         if (deckMatch && request.method === 'PUT') {
           const data = await body(request);
           const text = requireString(data, 'text');
           const saved = await saveDeck(deckMatch[1], requireString(data, 'baseRevision'), text);
-          return response({ ...saved, ...renderCompilation(text, saved) });
+          return response({ ...saved, ...renderCompilation(text, saved, editorAssetBase(deckMatch[1])) });
         }
         if (path === '/api/compile' && request.method === 'POST') {
           const data = await body(request);
           const text = requireString(data, 'text');
-          const title = data.deckId === undefined ? undefined : await filenameTitle(requireString(data, 'deckId'));
-          return response(renderCompilation(text, compileDeck(text, title)));
+          const id = data.deckId === undefined ? undefined : requireString(data, 'deckId');
+          const title = id === undefined ? undefined : await filenameTitle(id);
+          return response(renderCompilation(text, compileDeck(text, title), id ? editorAssetBase(id) : undefined));
         }
         if (path === '/api/sessions' && request.method === 'POST') {
           const data = await body(request);
-          return response(presenterSession(privateState(await createTalk(requireString(data, 'deckId'), requireString(data, 'revision')))), 201);
+          const talk = await createTalk(requireString(data, 'deckId'), requireString(data, 'revision'));
+          return response(presenterSession(privateState(talk), publicTalkAssetBase(talk)), 201);
         }
         const talkMatch = /^\/api\/sessions\/([a-f0-9-]+)(?:\/(events|share))?$/.exec(path);
         if (talkMatch) {
           const talk = getTalk(talkMatch[1]);
-          if (!talkMatch[2] && request.method === 'GET') return response(presenterSession(privateState(talk)));
+          if (!talkMatch[2] && request.method === 'GET') return response(presenterSession(privateState(talk), publicTalkAssetBase(talk)));
           if (!talkMatch[2] && request.method === 'DELETE') {
             const data = await body(request);
             endTalk(talk, data.discardMarks === true);
@@ -223,7 +250,7 @@ export function privateRouter(port: number) {
           }
           if (talkMatch[2] === 'events' && request.method === 'POST') {
             event(talk, await body(request));
-            return response(presenterSession(privateState(talk)));
+            return response(presenterSession(privateState(talk), publicTalkAssetBase(talk)));
           }
           if (talkMatch[2] === 'share' && request.method === 'POST') {
             const data = await body(request);

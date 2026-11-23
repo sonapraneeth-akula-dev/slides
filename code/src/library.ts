@@ -279,6 +279,10 @@ export async function filenameTitle(id: string): Promise<string> {
   return basename(await pathFor(id)).replace(/\.(md|mdx)$/i, '');
 }
 
+export async function deckDirectory(id: string): Promise<string> {
+  return dirname(await pathFor(id));
+}
+
 export async function openDeck(id: string) {
   const { text, revision } = await read(id);
   return { id, text, revision, ...compileDeck(text, await filenameTitle(id)) };

@@ -3,7 +3,7 @@ import { mkdtemp, mkdir, readFile, realpath, rm, symlink, writeFile } from 'node
 import { homedir, tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createHash } from 'node:crypto';
-import { compileDeck, audienceProjection } from '../src/deck';
+import { compileDeck, audienceProjection, referencedAssets } from '../src/deck';
 import { publicSnapshot } from '../src/presentation-model';
 
 const source = `---
@@ -690,6 +690,65 @@ describe('persistent library and presentation', () => {
       expect(state).not.toContain(talk.localKey);
     } finally {
       session.endTalk(talk, true);
+    }
+  });
+
+  test('serves authorized local deck assets across editor, presenter and LAN while isolating unreferenced files', async () => {
+    const svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 20"><rect width="40" height="20" fill="#2563eb"/></svg>';
+    const deckAssetsDir = join(library.presentationsRoot, 'assets');
+    await mkdir(deckAssetsDir, { recursive: true });
+    await writeFile(join(deckAssetsDir, 'diagram.svg'), svg);
+    await writeFile(join(deckAssetsDir, 'secret.svg'), svg);
+    await writeFile(join(deckAssetsDir, 'notes-only.svg'), svg);
+    const deckText = `::slide{id="one"}
+# Visuals
+![Diagram](assets/diagram.svg)
+\`\`\`markdown
+![Ignored](assets/secret.svg)
+\`\`\`
+:::notes
+![Notes](assets/notes-only.svg)
+:::`;
+    const compiled = compileDeck(deckText);
+    expect(referencedAssets(compiled.deck!)).toEqual(['diagram.svg']);
+    const created = await library.createDeck('asset-deck.mdx', deckText);
+    const { privateRouter } = await import('../src/host');
+    const route = privateRouter(12349);
+    const headers = { host: '127.0.0.1:12349' };
+    const { token } = await (await route(new Request('http://127.0.0.1:12349/api/bootstrap', { headers }))).json() as { token: string };
+    const deckRes = await (await route(new Request(`http://127.0.0.1:12349/api/decks/${created.id}`, {
+      headers: { ...headers, 'X-Slides-Token': token },
+    }))).json() as { deck: { assetBase?: string } };
+    expect(deckRes.deck.assetBase).toMatch(/^\/api\/deck-assets\//);
+    const editorImg = await route(new Request(`http://127.0.0.1:12349${deckRes.deck.assetBase}/diagram.svg`, { headers }));
+    expect(editorImg.status).toBe(200);
+    expect(editorImg.headers.get('content-security-policy')).toContain('sandbox');
+    expect((await route(new Request(`http://127.0.0.1:12349${deckRes.deck.assetBase}/diagram.svg`, {
+      headers: { ...headers, 'sec-fetch-site': 'cross-site' },
+    }))).status).toBe(403);
+    expect((await route(new Request(`http://127.0.0.1:12349/api/deck-assets/wrong/${created.id}/diagram.svg`, { headers }))).status).toBe(403);
+
+    const talk = await session.createTalk(created.id, created.revision);
+    try {
+      await rm(join(deckAssetsDir, 'diagram.svg'), { force: true });
+      const pubImg = await route(new Request(`http://127.0.0.1:12349/api/public/${talk.id}/assets/${talk.assetToken}/diagram.svg`, { headers }));
+      expect(pubImg.status).toBe(200);
+      expect(await pubImg.text()).toBe(svg);
+      expect((await route(new Request(`http://127.0.0.1:12349/api/public/${talk.id}/assets/${talk.assetToken}/secret.svg`, { headers }))).status).toBe(404);
+      expect((await route(new Request(`http://127.0.0.1:12349/api/public/${talk.id}/assets/${talk.assetToken}/notes-only.svg`, { headers }))).status).toBe(404);
+      expect((await route(new Request(`http://127.0.0.1:12349/api/public/${talk.id}/assets/wrong/diagram.svg`, { headers }))).status).toBe(403);
+      const address = session.shareOptions()[0];
+      if (address) {
+        const share = session.startShare(talk, address, 49260, 49360);
+        const lanBase = `http://${address}:${share?.port}`;
+        expect((await fetch(`${lanBase}/assets/${talk.assetToken}/diagram.svg`)).status).toBe(200);
+        expect((await fetch(`${lanBase}/assets/${talk.assetToken}/secret.svg`)).status).toBe(404);
+        expect((await fetch(`${lanBase}/assets/wrong/diagram.svg`)).status).toBe(403);
+      }
+    } finally {
+      session.endTalk(talk, true);
+      await library.deleteDeck(created.id, created.revision, true);
+      await rm(deckAssetsDir, { recursive: true, force: true });
     }
   });
 });
