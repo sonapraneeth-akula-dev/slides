@@ -1,26 +1,29 @@
 import { constants } from 'node:fs';
-import { copyFile, mkdir, readFile, stat } from 'node:fs/promises';
+import { copyFile, mkdir, readFile, stat, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { deckDirectory, hasSymlink, LibraryError, libraryRoot } from './library';
+import { readBundledSampleSvg } from './runtime-assets';
 import { assetMimeType, parseAssetReference, sampleImageReference } from './sample-image-reference';
 
-async function bundledImage(): Promise<{ path: string; bytes: Buffer }> {
-  for (const directory of ['public', 'dist']) {
-    const path = join(process.cwd(), directory, 'sample-landscape.svg');
-    try { return { path, bytes: await readFile(path) }; }
-    catch (error) {
-      if (!(error instanceof Error) || !('code' in error) || error.code !== 'ENOENT') throw error;
-    }
-  }
-  throw new LibraryError(500, 'Sample image is missing from the application');
+async function bundledImage(): Promise<Buffer> {
+  const bytes = await readBundledSampleSvg();
+  if (!bytes) throw new LibraryError(500, 'Sample image is missing from the application');
+  return bytes;
 }
 
 export async function ensureSampleImage(root = libraryRoot): Promise<Buffer> {
-  const { path: source, bytes } = await bundledImage();
+  const bytes = await bundledImage();
   const destination = join(root, sampleImageReference);
   await mkdir(join(root, 'assets'), { recursive: true });
-  try { await copyFile(source, destination, constants.COPYFILE_EXCL); }
-  catch (error) {
+  let sourcePath: string | null = null;
+  for (const directory of ['public', 'dist']) {
+    const candidate = join(process.cwd(), directory, 'sample-landscape.svg');
+    try { await stat(candidate); sourcePath = candidate; break; } catch { /* fallback to embedded bytes */ }
+  }
+  try {
+    if (sourcePath) await copyFile(sourcePath, destination, constants.COPYFILE_EXCL);
+    else await writeFile(destination, bytes, { flag: 'wx' });
+  } catch (error) {
     if (!(error instanceof Error) || !('code' in error) || error.code !== 'EEXIST') throw error;
   }
   const installed = await readFile(destination);

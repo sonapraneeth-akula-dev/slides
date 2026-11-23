@@ -8,9 +8,11 @@
     "format:check": "bun fmt --no-script --check",
     "typecheck:ts": "bun check --no-script",
     "lint": "bun ./scripts/lint.ts",
+    "cli": "bun ./src/cli.ts",
     "dev": "bun ./scripts/dev.ts",
     "check": "astro check",
     "build": "astro build && bun ./scripts/audience-assets.ts && bun ./scripts/build-export.ts && bun build ./src/host.ts --target=bun --external playwright-core --outfile ./build/host.js",
+    "build:bin": "bun run build && bun ./scripts/build-binary.ts",
     "start": "bun ./build/host.js",
     "test": "bun test ./tests",
     "test:e2e": "bun run build && playwright test"

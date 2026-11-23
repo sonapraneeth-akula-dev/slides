@@ -7,10 +7,17 @@ import { checkAssetAtDirectory, lintDeck } from './lint';
 import { createTalk, endTalk, event, getTalk, localAudienceStream, presenterStream, privateState, publicState, publicViewers, setPointer, shareOptions, startShare, stopShare, talkAssetResponse, type Talk } from './session';
 import { exportDeckArtifact, exportTalkArtifact, type ExportFormat, type RevealExportMode } from './export';
 import { presenterSession, publicSnapshot, renderDeck } from './presentation-model';
+import { hasUiAssets, readFeatureTourBundle, readPublicDistAsset } from './runtime-assets';
 import { assetResponse, ensureSampleImage, readDeckAsset, sampleImageResponse } from './sample-image';
 import { sampleImageUrl } from './sample-image-reference';
 
-const dist = join(process.cwd(), 'dist');
+export interface RouterOptions {
+  requireTicket?: boolean;
+  launchTicket?: string;
+  ticketExpiresAt?: number;
+  initialDeckId?: string;
+}
+
 const ownerToken = randomBytes(32).toString('base64url');
 const deckAssetToken = randomBytes(24).toString('base64url');
 const editorAssetBase = (id: string) => `/api/deck-assets/${deckAssetToken}/${encodeURIComponent(id)}`;
@@ -56,10 +63,8 @@ async function body(request: Request): Promise<Record<string, unknown>> {
 
 async function featureTour(): Promise<{ id: string }> {
   const filename = 'Slides-Feature-Tour.mdx';
-  const source = Bun.file(join(process.cwd(), 'public', 'feature-tour.mdx'));
-  const bundled = await source.exists() ? source : Bun.file(join(dist, 'feature-tour.mdx'));
-  if (!(await bundled.exists())) throw new LibraryError(500, 'Feature tour is missing from the application');
-  const text = await bundled.text();
+  const text = await readFeatureTourBundle();
+  if (!text) throw new LibraryError(500, 'Feature tour is missing from the application');
   const normalize = (value: string) => value.replace(/\r\n/g, '\n');
   const hash = (value: string) => createHash('sha256').update(value).digest('hex');
   const current = normalize(text);
@@ -177,7 +182,8 @@ Edit this slide in Markdown.
 `;
 }
 
-export function privateRouter(port: number) {
+export function privateRouter(port: number, options?: RouterOptions) {
+  let ticketConsumed = false;
   return async (request: Request): Promise<Response> => {
     try {
       const url = new URL(request.url);
@@ -192,9 +198,34 @@ export function privateRouter(port: number) {
       }
       if (path.startsWith('/api/')) {
         if (path === '/api/bootstrap' && request.method === 'GET') {
+          let includeInitialDeck = Boolean(options?.initialDeckId);
+          if (options?.requireTicket) {
+            const presentedTicket = request.headers.get('X-Slides-Ticket');
+            const presentedToken = request.headers.get('X-Slides-Token');
+            const validTicket = Boolean(
+              presentedTicket &&
+              !ticketConsumed &&
+              options.launchTicket &&
+              presentedTicket === options.launchTicket &&
+              Date.now() <= (options.ticketExpiresAt ?? Infinity),
+            );
+            if (validTicket) {
+              ticketConsumed = true;
+            } else if (presentedToken === ownerToken) {
+              includeInitialDeck = false;
+            } else {
+              throw new LibraryError(403, 'Launch ticket required or expired');
+            }
+          }
           const library = await listDecks();
           await ensureSampleImage();
-          return response({ token: ownerToken, library, interfaces: shareOptions(), devMode: process.env.SLIDES_DEV_MODE === '1' });
+          return response({
+            token: ownerToken,
+            library,
+            interfaces: shareOptions(),
+            devMode: process.env.SLIDES_DEV_MODE === '1',
+            ...(includeInitialDeck && options?.initialDeckId ? { initialDeckId: options.initialDeckId } : {}),
+          });
         }
         const deckAssetMatch = /^\/api\/deck-assets\/([A-Za-z0-9_-]+)\/([A-Za-z0-9_-]+)\/(.+)$/.exec(path);
         if (deckAssetMatch && (request.method === 'GET' || request.method === 'HEAD')) {
@@ -324,11 +355,11 @@ export function privateRouter(port: number) {
       if (request.method !== 'GET' && request.method !== 'HEAD') throw new LibraryError(405, 'Method not allowed');
       const asset = publicAssetPath(path);
       if (!asset) throw new LibraryError(404, 'Not found');
-      const file = Bun.file(join(dist, asset));
-      if (!(await file.exists())) throw new LibraryError(404, 'Not found');
-      return new Response(request.method === 'HEAD' ? null : file, {
+      const distAsset = await readPublicDistAsset(asset);
+      if (!distAsset) throw new LibraryError(404, 'Not found');
+      return new Response(request.method === 'HEAD' ? null : distAsset.body, {
         headers: {
-          'Content-Type': file.type, 'X-Content-Type-Options': 'nosniff',
+          'Content-Type': distAsset.type, 'X-Content-Type-Options': 'nosniff',
           'Content-Security-Policy': "default-src 'self'; connect-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'"
         }
       });
@@ -342,16 +373,16 @@ export function privateRouter(port: number) {
   };
 }
 
-export function startHost(port = 0) {
+export function startHost(port = 0, options?: RouterOptions) {
   let router: ReturnType<typeof privateRouter>;
   const server = Bun.serve({ hostname: '127.0.0.1', port, idleTimeout: 30, fetch(request: Request): Promise<Response> { return router(request); } });
   if (!server.port) throw new Error('Owner listener has no port');
-  router = privateRouter(server.port);
+  router = privateRouter(server.port, options);
   return server;
 }
 
 if (import.meta.main) {
-  if (process.env.SLIDES_DEV_MODE !== '1' && !(await Bun.file(join(dist, 'index.html')).exists())) {
+  if (process.env.SLIDES_DEV_MODE !== '1' && !(await hasUiAssets())) {
     throw new Error('Static UI missing; run bun run build from the code directory first.');
   }
   const port = process.env.SLIDES_DEV_MODE === '1' ? Number(process.env.SLIDES_DEV_API_PORT) : 0;

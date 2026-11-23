@@ -298,6 +298,8 @@ export async function openDeck(id: string) {
 
 export async function listDecks() {
   await prepareLibrary();
+  await mkdir(presentationsRoot, { recursive: true });
+  await mkdir(featureToursRoot, { recursive: true });
   const found: Record<string, string> = {};
   async function walk(dir: string, root: string, tour: boolean, depth: number) {
     if (depth > 8 || Object.keys(found).length >= 1000) return;

@@ -11,7 +11,7 @@ type LibraryEntry = { id: string; name: string; path: string; kind: 'tour' | 'pr
 type Diagnostic = { severity: string; message: string; code?: string; sourceSpan?: { start?: number; end?: number }; slideId?: string };
 type DeckResponse = { text: string; revision: string; deck: Deck | null; diagnostics: Diagnostic[] };
 type SessionResponse = { sessionId: string; localKey: string; hasMarks?: boolean; snapshot: Snapshot; notes: Record<string, string> };
-type BootstrapResponse = { token: string; library: LibraryEntry[]; devMode: boolean; interfaces: string[] };
+type BootstrapResponse = { token: string; library: LibraryEntry[]; devMode: boolean; interfaces: string[]; initialDeckId?: string };
 type Page = 'library' | 'editor' | 'presentation';
 type View = 'source' | 'split' | 'preview';
 
@@ -60,7 +60,18 @@ class ApiError extends Error {
 }
 
 async function loadBootstrap(): Promise<BootstrapResponse> {
-  const response = await fetch('/api/bootstrap', { cache: 'no-store' });
+  const headers: Record<string, string> = {};
+  const ticketMatch = /^#ticket=([A-Za-z0-9_-]+)$/.exec(location.hash);
+  if (ticketMatch) {
+    headers['X-Slides-Ticket'] = ticketMatch[1];
+    try { history.replaceState(null, '', `${location.pathname}${location.search}`); } catch { /* keep loading */ }
+  } else {
+    try {
+      const saved = sessionStorage.getItem('slides-owner-token');
+      if (saved) headers['X-Slides-Token'] = saved;
+    } catch { /* sessionStorage unavailable */ }
+  }
+  const response = await fetch('/api/bootstrap', { cache: 'no-store', headers });
   if (!response.ok) throw new Error(`Bootstrap failed (${response.status}). Start with bun run dev or bun run start.`);
   const data: unknown = await response.json();
   if (!data || typeof data !== 'object' || !('token' in data) || typeof data.token !== 'string' ||
@@ -68,6 +79,7 @@ async function loadBootstrap(): Promise<BootstrapResponse> {
       !('devMode' in data) || typeof data.devMode !== 'boolean') {
     throw new Error('Application bootstrap returned invalid data.');
   }
+  try { sessionStorage.setItem('slides-owner-token', data.token); } catch { /* ignore */ }
   return data as BootstrapResponse;
 }
 
@@ -1411,7 +1423,11 @@ async function init(): Promise<void> {
     if (!hosts.options.length) hosts.add(new Option('No LAN interface found', ''));
     $<HTMLButtonElement>('start-share').disabled = !hosts.value;
     renderLibrary();
-    show('library');
+    if (response.initialDeckId && library.some(item => item.id === response.initialDeckId)) {
+      await openDeck(response.initialDeckId);
+    } else {
+      show('library');
+    }
   } catch (error) {
     show('library');
     $<HTMLButtonElement>('create').disabled = true;

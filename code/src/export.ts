@@ -1,12 +1,16 @@
+import { spawn } from 'node:child_process';
 import { existsSync } from 'node:fs';
-import { readFile } from 'node:fs/promises';
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import type { Deck as SourceDeck } from './deck';
 import { referencedAssets } from './deck';
 import type { ExportDocumentData, ExportFrame } from './export-player';
 import { LibraryError, openDeck } from './library';
 import { renderDeck } from './presentation-model';
 import type { Stroke } from './render';
+import { getEmbeddedBundle } from './runtime-assets';
 import { ensureSampleImage, readDeckAsset } from './sample-image';
 import { sampleImageReference } from './sample-image-reference';
 import type { Talk } from './session';
@@ -92,6 +96,11 @@ async function loadExportCss(): Promise<string> {
     cachedCss = `${await readFile(prebuilt, 'utf8')}\n${exportLayoutCss}`;
     return cachedCss;
   }
+  const embedded = getEmbeddedBundle();
+  if (embedded?.exportCss) {
+    cachedCss = `${embedded.exportCss}\n${exportLayoutCss}`;
+    return cachedCss;
+  }
   const [appCss, hljsCss, katexRawCss] = await Promise.all([
     readFile(join(process.cwd(), 'src', 'styles.css'), 'utf8'),
     readFile(join(process.cwd(), 'node_modules', 'highlight.js', 'styles', 'github.css'), 'utf8'),
@@ -106,6 +115,11 @@ async function loadExportPlayerJs(): Promise<string> {
   const prebuilt = join(process.cwd(), 'build', 'export-player.js');
   if (existsSync(prebuilt)) {
     cachedPlayerJs = await readFile(prebuilt, 'utf8');
+    return cachedPlayerJs;
+  }
+  const embedded = getEmbeddedBundle();
+  if (embedded?.exportPlayerJs) {
+    cachedPlayerJs = embedded.exportPlayerJs;
     return cachedPlayerJs;
   }
   const built = await Bun.build({
@@ -212,29 +226,65 @@ function wrapStaticHtml(title: string, css: string, renderedInnerHtml: string): 
 </html>`;
 }
 
-async function resolveChromiumExecutable(): Promise<{ chromium: typeof import('playwright-core').chromium; executablePath: string } | null> {
+const systemBrowserPaths = [
+  'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe',
+  'C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe',
+  'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
+  '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
+  '/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge',
+  '/usr/bin/google-chrome',
+  '/usr/bin/chromium',
+  '/usr/bin/chromium-browser',
+  '/usr/bin/microsoft-edge',
+];
+
+async function resolveChromiumExecutable(): Promise<{ chromium?: typeof import('playwright-core').chromium; executablePath: string } | null> {
   const override = process.env.SLIDES_CHROMIUM_PATH;
   if (override !== undefined) {
     if (!override || override === 'none' || !existsSync(override)) return null;
-    const { chromium } = await import('playwright-core');
-    return { chromium, executablePath: override };
+    try {
+      const { chromium } = await import('playwright-core');
+      return { chromium, executablePath: override };
+    } catch {
+      return { executablePath: override };
+    }
   }
   let pwMod: typeof import('playwright-core') | undefined;
-  try { pwMod = await import('playwright-core'); } catch { return null; }
+  try { pwMod = await import('playwright-core'); } catch { /* standalone binary without node_modules */ }
   const candidates = [
-    (() => { try { return pwMod.chromium.executablePath(); } catch { return ''; } })(),
-    'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe',
-    'C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe',
-    'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
-    '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
-    '/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge',
-    '/usr/bin/google-chrome',
-    '/usr/bin/chromium',
-    '/usr/bin/chromium-browser',
-    '/usr/bin/microsoft-edge',
+    pwMod ? (() => { try { return pwMod.chromium.executablePath(); } catch { return ''; } })() : '',
+    ...systemBrowserPaths,
   ];
   const executablePath = candidates.find(candidate => candidate && existsSync(candidate));
-  return executablePath ? { chromium: pwMod.chromium, executablePath } : null;
+  return executablePath ? { chromium: pwMod?.chromium, executablePath } : null;
+}
+
+async function printPdfViaBrowserCli(executablePath: string, html: string): Promise<Uint8Array<ArrayBuffer>> {
+  const dir = await mkdtemp(join(tmpdir(), 'slides-pdf-'));
+  const htmlPath = join(dir, 'deck.html');
+  const pdfPath = join(dir, 'deck.pdf');
+  const profileDir = join(dir, 'profile');
+  try {
+    await writeFile(htmlPath, html, 'utf8');
+    await new Promise<void>((resolve, reject) => {
+      const child = spawn(executablePath, [
+        '--headless=new', '--disable-gpu', '--no-first-run', '--no-default-browser-check',
+        '--no-pdf-header-footer', '--virtual-time-budget=4000',
+        `--user-data-dir=${profileDir}`, `--print-to-pdf=${pdfPath}`,
+        pathToFileURL(htmlPath).href,
+      ], { stdio: 'ignore' });
+      const timer = setTimeout(() => { child.kill(); reject(new Error('Browser PDF export timed out')); }, 25_000);
+      child.once('error', err => { clearTimeout(timer); reject(err); });
+      child.once('exit', code => {
+        clearTimeout(timer);
+        if (code === 0 && existsSync(pdfPath)) resolve();
+        else reject(new Error(`Browser PDF export exited with code ${code}`));
+      });
+    });
+    return new Uint8Array(await readFile(pdfPath));
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
 }
 
 async function renderArtifact(data: ExportDocumentData, format: ExportFormat, annotated: boolean): Promise<{ bytes: Uint8Array<ArrayBuffer>; mime: string; filename: string }> {
@@ -250,6 +300,14 @@ async function renderArtifact(data: ExportDocumentData, format: ExportFormat, an
     }
     const fallbackHtml = bootstrapRenderHtml(data.stage.title, css, playerJs, data, true);
     return { bytes: new Uint8Array(Buffer.from(fallbackHtml, 'utf8')), mime: 'text/html; charset=utf-8', filename };
+  }
+  if (!browserInfo.chromium) {
+    if (format === 'html') {
+      const fallbackHtml = bootstrapRenderHtml(data.stage.title, css, playerJs, data, true);
+      return { bytes: new Uint8Array(Buffer.from(fallbackHtml, 'utf8')), mime: 'text/html; charset=utf-8', filename };
+    }
+    const pdfBytes = await printPdfViaBrowserCli(browserInfo.executablePath, bootstrapRenderHtml(data.stage.title, css, playerJs, data, false));
+    return { bytes: pdfBytes, mime: 'application/pdf', filename };
   }
   const browser = await browserInfo.chromium.launch({ executablePath: browserInfo.executablePath, headless: true });
   try {
