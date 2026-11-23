@@ -1,7 +1,7 @@
 {
   "name": "slides-chart-spike",
   "private": true,
-  "packageManager": "bun@1.4.4",
+  "packageManager": "bun@1.4.5",
   "type": "module",
   "scripts": {
     "format": "bun fmt --no-script",
@@ -16,20 +16,20 @@
     "@nivo/line": "0.99.0",
     "@nivo/pie": "0.99.0",
     "@nivo/scatterplot": "0.99.0",
-    "@astrojs/react": "7.1.0",
-    "astro": "7.4.0",
-    "papaparse": "5.7.0",
+    "@astrojs/react": "7.1.9",
+    "astro": "7.4.12",
+    "papaparse": "5.7.1",
     "react": "19.3.1",
     "react-dom": "19.3.1"
   },
   "devDependencies": {
-    "@astrojs/check": "0.9.10",
+    "@astrojs/check": "0.9.12",
     "@types/papaparse": "^5.5.2",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
-    "playwright-core": "1.64.1",
-    "prettier": "3.9.10",
-    "prettier-plugin-astro": "1.1.1",
+    "playwright-core": "1.65.1",
+    "prettier": "3.10.1",
+    "prettier-plugin-astro": "1.1.2",
     "typescript": "~6.0.3"
   }
 }
