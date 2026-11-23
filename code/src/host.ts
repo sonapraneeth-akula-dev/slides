@@ -2,10 +2,11 @@ import { createHash, randomBytes } from 'node:crypto';
 import { join } from 'node:path';
 import { publicAssetPath } from './asset-path';
 import { compileDeck } from './deck';
-import { createDeck, deleteDeck, duplicateDeck, featureTourDeckId, featureToursRoot, filenameTitle, grantDeck, LibraryError, libraryRoot, listDecks, openDeck, removeDeck, renameDeck, saveDeck } from './library';
+import { createDeck, deckDirectory, deleteDeck, duplicateDeck, featureTourDeckId, featureToursRoot, filenameTitle, grantDeck, LibraryError, libraryRoot, listDecks, openDeck, removeDeck, renameDeck, saveDeck } from './library';
+import { checkAssetAtDirectory, lintDeck } from './lint';
 import { createTalk, endTalk, event, getTalk, localAudienceStream, presenterStream, privateState, publicState, publicViewers, setPointer, shareOptions, startShare, stopShare, talkAssetResponse, type Talk } from './session';
 import { exportDeckArtifact, exportTalkArtifact, type ExportFormat, type RevealExportMode } from './export';
-import { presenterSession, publicSnapshot, renderCompilation } from './presentation-model';
+import { presenterSession, publicSnapshot, renderDeck } from './presentation-model';
 import { assetResponse, ensureSampleImage, readDeckAsset, sampleImageResponse } from './sample-image';
 import { sampleImageUrl } from './sample-image-reference';
 
@@ -18,6 +19,19 @@ const publicTalkAssetBase = (talk: Talk) => `/api/public/${talk.id}/assets/${tal
 function rejectCrossSite(request: Request): void {
   const site = request.headers.get('sec-fetch-site');
   if (site && site !== 'same-origin' && site !== 'none') throw new LibraryError(403, 'Cross-site request rejected');
+}
+
+async function compileWithLint(text: string, id?: string) {
+  const title = id === undefined ? undefined : await filenameTitle(id);
+  const deckDir = id === undefined ? undefined : await deckDirectory(id);
+  const { compilation, diagnostics } = await lintDeck(text, {
+    filenameTitle: title,
+    checkAsset: deckDir ? rel => checkAssetAtDirectory(deckDir, rel) : undefined,
+  });
+  return {
+    deck: compilation.deck ? renderDeck(compilation.deck, id ? editorAssetBase(id) : undefined) : null,
+    diagnostics,
+  };
 }
 
 async function body(request: Request): Promise<Record<string, unknown>> {
@@ -254,20 +268,19 @@ export function privateRouter(port: number) {
         const deckMatch = /^\/api\/decks\/([A-Za-z0-9_-]+)$/.exec(path);
         if (deckMatch && request.method === 'GET') {
           const opened = await openDeck(deckMatch[1]);
-          return response({ ...opened, ...renderCompilation(opened.text, opened, editorAssetBase(deckMatch[1])) });
+          return response({ ...opened, ...(await compileWithLint(opened.text, deckMatch[1])) });
         }
         if (deckMatch && request.method === 'PUT') {
           const data = await body(request);
           const text = requireString(data, 'text');
           const saved = await saveDeck(deckMatch[1], requireString(data, 'baseRevision'), text);
-          return response({ ...saved, ...renderCompilation(text, saved, editorAssetBase(deckMatch[1])) });
+          return response({ ...saved, ...(await compileWithLint(text, deckMatch[1])) });
         }
         if (path === '/api/compile' && request.method === 'POST') {
           const data = await body(request);
           const text = requireString(data, 'text');
           const id = data.deckId === undefined ? undefined : requireString(data, 'deckId');
-          const title = id === undefined ? undefined : await filenameTitle(id);
-          return response(renderCompilation(text, compileDeck(text, title), id ? editorAssetBase(id) : undefined));
+          return response(await compileWithLint(text, id));
         }
         if (path === '/api/sessions' && request.method === 'POST') {
           const data = await body(request);

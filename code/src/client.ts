@@ -50,6 +50,7 @@ let eventPending = false;
 let sessionStart = 0;
 let presenterStreamAbort: AbortController | null = null;
 let lastPointerSent = 0;
+let lastUpNextKey = '';
 let toastTimer: ReturnType<typeof setTimeout> | undefined;
 const outlineCollapsed = new Set<string>();
 const previewCollapsed = new Set<string>();
@@ -870,9 +871,31 @@ function drawPresenter(): void {
   text('reveal-progress', slide?.reveals.length ? `Reveal ${snapshot.step} / ${slide.reveals.length}` : 'No reveals');
   $('previous').toggleAttribute('disabled', index <= 0 && snapshot.step === 0);
   $('next').toggleAttribute('disabled', index >= slides.length - 1 && snapshot.step >= (slide?.reveals.length || 0));
-  const next = snapshot.step < (slide?.reveals.length || 0) ? `Next reveal on ${slide?.id}`
-    : slides[index + 1]?.body.match(/^#{1,3}\s+(.+)$/m)?.[1] || slides[index + 1]?.id || 'End of deck';
-  text('up-next', next);
+  const nextSlide = snapshot.step < (slide?.reveals.length || 0) ? slide : slides[index + 1];
+  const nextStep = snapshot.step < (slide?.reveals.length || 0) ? snapshot.step + 1 : 0;
+  const nextLabel = snapshot.step < (slide?.reveals.length || 0)
+    ? `Next reveal (${snapshot.step + 1} / ${slide!.reveals.length}) on ${slide?.id}`
+    : slides[index + 1]
+      ? `${index + 2}. ${slides[index + 1].body.match(/^#{1,3}\s+(.+)$/m)?.[1] || slides[index + 1].id}`
+      : 'End of deck';
+  const upNext = $('up-next');
+  const nextKey = nextSlide ? `${session.sessionId}:${nextSlide.id}:${nextStep}` : `${session.sessionId}:end`;
+  if (lastUpNextKey !== nextKey || !upNext.childElementCount) {
+    lastUpNextKey = nextKey;
+    const label = document.createElement('p');
+    label.className = 'up-next-label';
+    label.textContent = nextLabel;
+    if (nextSlide) {
+      const miniStage = document.createElement('div');
+      miniStage.id = 'up-next-stage';
+      miniStage.className = 'stage up-next-stage';
+      miniStage.setAttribute('aria-label', 'Next slide preview');
+      upNext.replaceChildren(label, miniStage);
+      void renderStage(miniStage, snapshot.stage, nextSlide, nextStep).catch(errorNotice);
+    } else {
+      upNext.replaceChildren(label);
+    }
+  }
   const notes = session.notes?.[snapshot.slideId] || slide?.notes || '';
   $('speaker-notes').replaceChildren(markdown(notes));
   const jump = $<HTMLSelectElement>('jump');
@@ -1352,6 +1375,7 @@ function wire(): void {
     }
     presenterStreamAbort?.abort();
     presenterStreamAbort = null;
+    lastUpNextKey = '';
     session = null;
     sharing = false;
     shareUrl = '';

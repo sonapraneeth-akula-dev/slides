@@ -7,6 +7,7 @@
     "format": "bun fmt --no-script",
     "format:check": "bun fmt --no-script --check",
     "typecheck:ts": "bun check --no-script",
+    "lint": "bun ./scripts/lint.ts",
     "dev": "bun ./scripts/dev.ts",
     "check": "astro check",
     "build": "astro build && bun ./scripts/audience-assets.ts && bun ./scripts/build-export.ts && bun build ./src/host.ts --target=bun --external playwright-core --outfile ./build/host.js",

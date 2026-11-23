@@ -320,6 +320,8 @@ Audience sees this.
   await page.locator('#present').click();
   await expect(page.locator('#presentation-page')).toBeVisible();
   await expect(page.locator('#speaker-notes')).toContainText('PRIVATE SPEAKER NOTES');
+  await expect(page.locator('#up-next .up-next-label')).toContainText('Next reveal (1 / 1)');
+  await expect(page.locator('#up-next-stage')).toContainText('Revealed text');
   await expect(page.locator('#stage .slide-meta[data-position="BottomRight"]')).toHaveText('1 / 2');
   await expect(page.locator('#stage h1')).toHaveCSS('text-align', 'center');
   await expect(page.locator('#stage')).toHaveCSS('--slide-margin-left', '8%');
@@ -361,9 +363,12 @@ Audience sees this.
 
   await page.locator('#next').click();
   await expect(page.locator('#reveal-progress')).toHaveText('Reveal 1 / 1');
+  await expect(page.locator('#up-next-stage')).toContainText('Updated audience paragraph');
   await expect(audience.locator('#audience-stage')).toContainText('Revealed text');
   await page.locator('#next').click();
   await expect(page.locator('#slide-progress')).toHaveText('Slide 2 / 2');
+  await expect(page.locator('#up-next .up-next-label')).toHaveText('End of deck');
+  await expect(page.locator('#up-next-stage')).toHaveCount(0);
   await expect(audience.locator('#audience-stage .slide-meta[data-position="BottomRight"]')).toHaveText('2 / 2');
   await expect(audience.locator('#audience-stage')).toContainText('Updated audience paragraph');
   await page.locator('#previous').click();
