@@ -2,7 +2,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import { copyFile, link, lstat, mkdir, open, readFile, readdir, realpath, rename, stat, unlink } from 'node:fs/promises';
 import { constants } from 'node:fs';
 import { homedir } from 'node:os';
-import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
+import { basename, dirname, isAbsolute, join, parse, relative, resolve, sep } from 'node:path';
 import { compileDeck } from './deck';
 
 const extensions = new Set(['.md', '.mdx']);
@@ -15,6 +15,17 @@ const locks = new Map<string, Promise<unknown>>();
 const indexPath = join(libraryRoot, '.slides-library.json');
 type Catalog = { entries: Record<string, string>; hidden: string[] };
 let indexLock: Promise<unknown> = Promise.resolve();
+
+export async function hasSymlink(target: string): Promise<boolean> {
+  const resolved = resolve(target);
+  const { root } = parse(resolved);
+  let current = root;
+  for (const segment of resolved.slice(root.length).split(sep).filter(Boolean)) {
+    current = join(current, segment);
+    if ((await lstat(current)).isSymbolicLink()) return true;
+  }
+  return false;
+}
 async function catalogAt(path: string): Promise<Catalog> {
   let content: string;
   try { content = await readFile(path, 'utf8'); }
@@ -39,13 +50,13 @@ export async function migrateLegacyLibrary(legacyRoot: string, destination: stri
   const marker = join(destination, '.legacy-library-imported');
   try { await stat(marker); return; }
   catch (error) { if (!(error instanceof Error) || !('code' in error) || error.code !== 'ENOENT') throw error; }
-  let oldRoot: string;
-  try { oldRoot = await realpath(legacyRoot); }
+  let legacyIsSymlink: boolean;
+  try { legacyIsSymlink = await hasSymlink(legacyRoot); }
   catch (error) {
     if (error instanceof Error && 'code' in error && error.code === 'ENOENT') return;
     throw error;
   }
-  if (oldRoot !== legacyRoot) throw new LibraryError(403, 'Legacy library is a symlink; import it manually');
+  if (legacyIsSymlink) throw new LibraryError(403, 'Legacy library is a symlink; import it manually');
   const previous = await catalogAt(join(legacyRoot, '.slides-library.json'));
   const current = await catalogAt(join(destination, '.slides-library.json'));
   const files = new Map<string, string>();
@@ -110,7 +121,7 @@ export async function organizeLibrary(
   await mkdir(root, { recursive: true });
   await mkdir(userRoot, { recursive: true });
   await mkdir(toursRoot, { recursive: true });
-  if (await realpath(userRoot) !== userRoot || await realpath(toursRoot) !== toursRoot) {
+  if (await hasSymlink(userRoot) || await hasSymlink(toursRoot)) {
     throw new LibraryError(403, 'Presentation storage must not be a symlink');
   }
   const moves: Array<{ source: string; target: string; id: string }> = [];
@@ -152,7 +163,7 @@ export async function organizeLibrary(
   }
   for (const move of moves) {
     await mkdir(dirname(move.target), { recursive: true });
-    if (await realpath(dirname(move.target)) !== dirname(move.target)) {
+    if (await hasSymlink(dirname(move.target))) {
       throw new LibraryError(403, 'Presentation destination must not be a symlink');
     }
     try { await copyFile(move.source, move.target, constants.COPYFILE_EXCL); }
@@ -240,9 +251,8 @@ async function pathFor(id: string, mustExist = true): Promise<string> {
     const path = value.entries[id];
     if (!path || value.hidden.includes(id)) throw new LibraryError(404, 'File is not in the library');
     if (!isAbsolute(path) || !extensions.has(path.slice(path.lastIndexOf('.')).toLowerCase())) throw new LibraryError(500, 'Invalid library path');
-    const canonical = await realpath(path);
-    if (canonical !== path) throw new LibraryError(403, 'Granted file moved or became a symlink; relink it');
-    return canonical;
+    if (await hasSymlink(path)) throw new LibraryError(403, 'Granted file moved or became a symlink; relink it');
+    return path;
   }
   const name = decode(id);
   const tourPrefix = `feature-tours${sep}`;
@@ -251,8 +261,7 @@ async function pathFor(id: string, mustExist = true): Promise<string> {
   if (!validName(filename)) throw new LibraryError(400, 'Invalid deck name');
   const root = tour ? featureToursRoot : presentationsRoot;
   await mkdir(root, { recursive: true });
-  const canonical = await realpath(root);
-  if (canonical !== root) throw new LibraryError(403, 'Presentation storage must not be a symlink');
+  if (await hasSymlink(root)) throw new LibraryError(403, 'Presentation storage must not be a symlink');
   return join(root, filename);
 }
 
@@ -322,18 +331,28 @@ export async function grantDeck(path: string, relinkId?: string) {
   if (typeof path !== 'string' || !isAbsolute(path) || !extensions.has(path.slice(path.lastIndexOf('.')).toLowerCase())) {
     throw new LibraryError(400, 'Enter an absolute .md or .mdx file path');
   }
-  const canonical = await realpath(path);
-  if (canonical !== resolve(path) || !(await stat(canonical)).isFile()) throw new LibraryError(403, 'Select a regular file, not a symlink');
-  if ((await stat(canonical)).size > 2_000_000) throw new LibraryError(400, 'Deck exceeds 2 MB');
+  const resolved = resolve(path);
+  if (await hasSymlink(resolved) || !(await stat(resolved)).isFile()) throw new LibraryError(403, 'Select a regular file, not a symlink');
+  if ((await stat(resolved)).size > 2_000_000) throw new LibraryError(400, 'Deck exceeds 2 MB');
   await prepareLibrary();
-  const id = relinkId || (within(featureToursRoot, canonical) ? featureTourDeckId(relative(featureToursRoot, canonical))
-    : within(presentationsRoot, canonical) ? deckId(relative(presentationsRoot, canonical)) : `ext-${randomUUID()}`);
-  await updateCatalog(value => {
+  const canonical = await realpath(resolved);
+  const canonicalTours = await realpath(featureToursRoot).catch(() => featureToursRoot);
+  const canonicalPresentations = await realpath(presentationsRoot).catch(() => presentationsRoot);
+  const inTours = within(canonicalTours, canonical);
+  const inPresentations = !inTours && within(canonicalPresentations, canonical);
+  const id = relinkId || (inTours ? featureTourDeckId(relative(canonicalTours, canonical))
+    : inPresentations ? deckId(relative(canonicalPresentations, canonical)) : `ext-${randomUUID()}`);
+  const storedPath = inTours ? join(featureToursRoot, relative(canonicalTours, canonical))
+    : inPresentations ? join(presentationsRoot, relative(canonicalPresentations, canonical)) : resolved;
+  await updateCatalog(async value => {
     if (relinkId && !Object.hasOwn(value.entries, relinkId)) throw new LibraryError(404, 'Library entry not found');
-    if (Object.entries(value.entries).some(([other, item]) => other !== id && item === canonical && !value.hidden.includes(other))) {
-      throw new LibraryError(409, 'File is already in the library');
+    for (const [other, item] of Object.entries(value.entries)) {
+      if (other === id || value.hidden.includes(other)) continue;
+      if (item === storedPath || (await realpath(item).catch(() => item)) === canonical) {
+        throw new LibraryError(409, 'File is already in the library');
+      }
     }
-    value.entries[id] = canonical;
+    value.entries[id] = storedPath;
     value.hidden = value.hidden.filter(item => item !== id);
   });
   return { id };

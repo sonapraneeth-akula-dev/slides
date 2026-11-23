@@ -41,12 +41,12 @@ function stop(): void {
 process.once('SIGINT', stop);
 process.once('SIGTERM', stop);
 
-async function waitFor(url: string, child: ReturnType<typeof spawn>, check: (response: Response) => Promise<boolean>): Promise<void> {
+async function waitFor(url: string, child: ReturnType<typeof spawn>, check: (response: Response) => Promise<boolean>, timeoutMs = 500): Promise<void> {
   for (let attempt = 0; attempt < 300; attempt++) {
     if (stopping) throw new Error('Development servers stopped.');
     if (child.exitCode !== null || child.signalCode !== null) throw new Error(`Development server exited before becoming ready: ${url}`);
     try {
-      const response = await fetch(url, { signal: AbortSignal.timeout(500) });
+      const response = await fetch(url, { signal: AbortSignal.timeout(timeoutMs) });
       if (await check(response)) return;
     } catch (error) {
       if (!(error instanceof TypeError) && !(error instanceof DOMException)) throw error;
@@ -104,6 +104,8 @@ try {
   ui.on('error', error => console.error('Astro dev server failed:', error));
   const url = `http://127.0.0.1:${uiPort}`;
   await waitFor(`${url}/api/bootstrap`, ui, async response => response.ok && (await response.json()).devMode === true);
+  await waitFor(`${url}/`, ui, async response => response.ok, 25_000);
+  await waitFor(`${url}/src/client.ts`, ui, async response => response.ok, 25_000);
   console.log(`Slides development: ${url}`);
   await Promise.race([
     stopped,

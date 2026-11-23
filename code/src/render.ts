@@ -1,6 +1,6 @@
 import MarkdownIt from 'markdown-it';
 import katex from 'katex';
-import hljs from 'highlight.js';
+import hljs from 'highlight.js/lib/common';
 import DOMPurify from 'dompurify';
 import 'katex/dist/katex.min.css';
 import 'highlight.js/styles/github.css';
@@ -374,7 +374,13 @@ async function renderFences(root: HTMLElement): Promise<void> {
         canvas.className = 'chart-visual';
         canvas.setAttribute('aria-hidden', 'true');
         fence.replaceChildren(canvas, accessibleData);
-        const echarts = await import('echarts');
+        const [echarts, { BarChart, LineChart, PieChart, ScatterChart }, { GridComponent, LegendComponent, TooltipComponent }, { CanvasRenderer }] = await Promise.all([
+          import('echarts/core'),
+          import('echarts/charts'),
+          import('echarts/components'),
+          import('echarts/renderers'),
+        ]);
+        echarts.use([BarChart, LineChart, PieChart, ScatterChart, GridComponent, LegendComponent, TooltipComponent, CanvasRenderer]);
         if (!fence.isConnected) continue;
         const instance = echarts.init(canvas, undefined, { renderer: 'canvas' });
         try {

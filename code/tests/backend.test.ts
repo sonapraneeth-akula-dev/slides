@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
-import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, mkdir, readFile, realpath, rm, symlink, writeFile } from 'node:fs/promises';
 import { homedir, tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createHash } from 'node:crypto';
@@ -512,6 +512,36 @@ describe('persistent library and presentation', () => {
     await expect(library.openDeck(library.deckId('x.js'))).rejects.toThrow();
     await expect(library.createDeck('../escape.md', source)).rejects.toThrow();
     await expect(library.createDeck('study.md', source)).rejects.toThrow();
+  });
+
+  test('rejects directory junctions/symlinks while accepting canonical aliases', async () => {
+    const workspace = await mkdtemp(join(tmpdir(), 'slides-symlink-'));
+    try {
+      const target = join(workspace, 'real');
+      const linked = join(workspace, 'linked');
+      await mkdir(target);
+      await writeFile(join(target, 'external.mdx'), source);
+      await symlink(target, linked, process.platform === 'win32' ? 'junction' : 'dir');
+      expect(await library.hasSymlink(join(linked, 'external.mdx'))).toBe(true);
+      expect(await library.hasSymlink(join(target, 'external.mdx'))).toBe(false);
+      await library.grantDeck(join(linked, 'external.mdx')).then(
+        () => { throw new Error('Expected symlink rejection'); },
+        error => expect((error as InstanceType<typeof library.LibraryError>).status).toBe(403),
+      );
+      await library.organizeLibrary(join(workspace, '.slides'), linked, join(workspace, '.slides', 'feature-tours')).then(
+        () => { throw new Error('Expected storage symlink rejection'); },
+        error => expect((error as InstanceType<typeof library.LibraryError>).status).toBe(403),
+      );
+      const granted = await library.grantDeck(join(target, 'external.mdx'));
+      const canonicalFile = await realpath(join(target, 'external.mdx'));
+      await library.grantDeck(canonicalFile).then(
+        () => { throw new Error('Expected duplicate rejection'); },
+        error => expect((error as InstanceType<typeof library.LibraryError>).status).toBe(409),
+      );
+      await library.removeDeck(granted.id);
+    } finally {
+      await rm(workspace, { recursive: true, force: true });
+    }
   });
 
   test('duplicates, renames and deletes only the confirmed revision', async () => {

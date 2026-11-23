@@ -5,8 +5,18 @@ const apiOrigin = apiPort && `http://127.0.0.1:${apiPort}`;
 
 export default defineConfig({
   output: 'static',
-  ...(apiOrigin ? {
-    vite: {
+  vite: {
+    build: {
+      // Mermaid's lazy-loaded ELK diagram layout engine chunk exceeds 500 kB on its own.
+      chunkSizeWarningLimit: 1600,
+    },
+    optimizeDeps: {
+      include: [
+        'markdown-it', 'katex', 'highlight.js/lib/common', 'dompurify',
+        'echarts/core', 'echarts/charts', 'echarts/components', 'echarts/renderers',
+      ],
+    },
+    ...(apiOrigin ? {
       server: {
         strictPort: true,
         proxy: {
@@ -24,6 +34,6 @@ export default defineConfig({
           },
         },
       },
-    },
-  } : {}),
+    } : {}),
+  },
 });
