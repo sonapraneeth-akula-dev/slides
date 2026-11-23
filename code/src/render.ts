@@ -45,6 +45,11 @@ export interface Stroke {
   slideId?: string;
 }
 
+export interface PointerPosition {
+  x: number;
+  y: number;
+}
+
 export interface Snapshot {
   schemaVersion: number;
   sessionId: string;
@@ -52,7 +57,7 @@ export interface Snapshot {
   slideId: string;
   step: number;
   stage: Stage;
-  overlay: { strokes: Stroke[]; mode: unknown };
+  overlay: { strokes: Stroke[]; mode: unknown; laser?: PointerPosition | null };
   ended: boolean;
 }
 

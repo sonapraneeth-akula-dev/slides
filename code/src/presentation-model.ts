@@ -65,6 +65,7 @@ export interface PublicState {
     marks: Array<{ slideId: string; step: number; tool: 'pen' | 'highlight'; color: string; width: number; points: Array<{ x: number; y: number }> }>;
     blackout: boolean;
     canvas: boolean;
+    laser?: { x: number; y: number } | null;
   };
 }
 
@@ -80,7 +81,11 @@ function overlay(state: PublicState): Snapshot['overlay'] {
   const strokes: Stroke[] = state.overlay.marks.map(mark => ({
     ...mark, tool: mark.tool === 'highlight' ? 'highlighter' : 'pen',
   }));
-  return { strokes, mode: state.overlay.blackout ? 'blackout' : state.overlay.canvas ? 'canvas' : 'normal' };
+  return {
+    strokes,
+    mode: state.overlay.blackout ? 'blackout' : state.overlay.canvas ? 'canvas' : 'normal',
+    laser: state.overlay.laser ?? null,
+  };
 }
 
 export function publicSnapshot(state: PublicState, assetBase?: string): Snapshot {

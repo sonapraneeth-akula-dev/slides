@@ -4,6 +4,7 @@ import { drawStage } from './stage-view';
 import { masterSamples } from './master-samples';
 import { metadataPositions, metadataValues, type MetadataKey } from './slide-options';
 import { validFontFamily } from './font-family';
+import { consumeEventStream } from './sse';
 import { renderViewers, type Viewer } from './viewers';
 
 type LibraryEntry = { id: string; name: string; path: string; kind: 'tour' | 'presentation'; missing?: boolean };
@@ -47,6 +48,8 @@ let tool: 'pen' | 'highlighter' | 'laser' | null = null;
 let drawing: { points: Array<{ x: number; y: number }>; pointer: number } | null = null;
 let eventPending = false;
 let sessionStart = 0;
+let presenterStreamAbort: AbortController | null = null;
+let lastPointerSent = 0;
 let toastTimer: ReturnType<typeof setTimeout> | undefined;
 const outlineCollapsed = new Set<string>();
 const previewCollapsed = new Set<string>();
@@ -937,13 +940,44 @@ async function startPresentation(): Promise<void> {
   if (isDirty() && !(await save())) return;
   if (!canEditPreview()) { notify('Fix diagnostics before presenting.'); return; }
   try {
+    presenterStreamAbort?.abort();
     session = await request<SessionResponse>('/api/sessions', 'POST', { deckId, revision });
     sharing = false;
+    shareViewers = [];
     sessionStart = Date.now();
     text('page-title', session.snapshot.stage.title);
     show('presentation');
     drawPresenter();
+    const activeSessionId = session.sessionId;
+    const streamController = new AbortController();
+    presenterStreamAbort = streamController;
+    void (async () => {
+      while (!streamController.signal.aborted && session?.sessionId === activeSessionId) {
+        try {
+          const outcome = await consumeEventStream(
+            `/api/sessions/${encodeURIComponent(activeSessionId)}/stream`,
+            { 'X-Slides-Token': token },
+            streamController.signal,
+            (eventName, payload) => {
+              if (eventName === 'viewers' && payload && typeof payload === 'object' && 'viewers' in payload) {
+                shareViewers = (payload as { viewers?: Viewer[] }).viewers ?? [];
+                if (page === 'presentation') drawViewers();
+              }
+            },
+          );
+          if (outcome === 'ended') break;
+        } catch { /* fallback poll in timer handles transient stream drops */ }
+        if (!streamController.signal.aborted) await new Promise(resolve => setTimeout(resolve, 1500));
+      }
+    })();
   } catch (error) { errorNotice(error); }
+}
+function sendPointer(pointer: { x: number; y: number } | null, force = false): void {
+  if (!session || page !== 'presentation') return;
+  const now = Date.now();
+  if (!force && pointer !== null && now - lastPointerSent < 35) return;
+  lastPointerSent = now;
+  void request(`/api/sessions/${encodeURIComponent(session.sessionId)}/pointer`, 'POST', { pointer }).catch(() => {});
 }
 function point(event: PointerEvent): { x: number; y: number } {
   const box = $('stage-frame').getBoundingClientRect();
@@ -953,14 +987,20 @@ function point(event: PointerEvent): { x: number; y: number } {
   };
 }
 function toggleTool(value: typeof tool): void {
+  const wasLaser = tool === 'laser';
   tool = tool === value ? null : value;
   $('stage-frame').dataset.tool = tool || '';
   $('laser').hidden = true;
+  if (wasLaser && tool !== 'laser') sendPointer(null, true);
   drawPresenter();
 }
 function presenterKeys(event: KeyboardEvent): void {
   if (page !== 'presentation' || dialog('shortcuts-dialog').open || dialog('share-dialog').open ||
     dialog('end-dialog').open || drawing) return;
+  if (event.key === 'Escape' && tool) {
+    toggleTool(null);
+    return;
+  }
   if (event.target instanceof HTMLElement && (event.target.closest('input, textarea, select, button, [contenteditable]'))) return;
   const shortcut = event.key;
   if ((event.ctrlKey || event.metaKey) && shortcut.toLowerCase() === 'z') {
@@ -1156,10 +1196,14 @@ function wire(): void {
       const position = point(event);
       laser.style.left = `${position.x * 100}%`;
       laser.style.top = `${position.y * 100}%`;
+      sendPointer(position);
     }
     if (drawing?.pointer === event.pointerId && drawing.points.length < 2000) drawing.points.push(point(event));
   });
-  frame.addEventListener('pointerleave', () => { $('laser').hidden = true; });
+  frame.addEventListener('pointerleave', () => {
+    $('laser').hidden = true;
+    if (tool === 'laser') sendPointer(null, true);
+  });
   frame.addEventListener('pointerup', event => {
     if (!drawing || drawing.pointer !== event.pointerId) return;
     const points = drawing.points;
@@ -1229,9 +1273,12 @@ function wire(): void {
         alreadyStopped = true;
       } else { errorNotice(error); return; }
     }
+    presenterStreamAbort?.abort();
+    presenterStreamAbort = null;
     session = null;
     sharing = false;
     shareUrl = '';
+    shareViewers = [];
     tool = null;
     dialog('end-dialog').close();
     show('editor');

@@ -104,8 +104,17 @@ try {
   ui.on('error', error => console.error('Astro dev server failed:', error));
   const url = `http://127.0.0.1:${uiPort}`;
   await waitFor(`${url}/api/bootstrap`, ui, async response => response.ok && (await response.json()).devMode === true);
-  await waitFor(`${url}/`, ui, async response => response.ok, 25_000);
-  await waitFor(`${url}/src/client.ts`, ui, async response => response.ok, 25_000);
+  void (async () => {
+    try {
+      const rootRes = await fetch(`${url}/`, { signal: AbortSignal.timeout(15_000) });
+      const html = await rootRes.text();
+      const scriptUrl = /<script[^>]+src="([^"]+)"/.exec(html)?.[1];
+      if (scriptUrl?.startsWith('/')) {
+        const modRes = await fetch(`${url}${scriptUrl}`, { signal: AbortSignal.timeout(20_000) });
+        await modRes.text();
+      }
+    } catch { /* best-effort background dev bundle warm-up */ }
+  })();
   console.log(`Slides development: ${url}`);
   await Promise.race([
     stopped,

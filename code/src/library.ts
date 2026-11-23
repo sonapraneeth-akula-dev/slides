@@ -16,13 +16,21 @@ const indexPath = join(libraryRoot, '.slides-library.json');
 type Catalog = { entries: Record<string, string>; hidden: string[] };
 let indexLock: Promise<unknown> = Promise.resolve();
 
+const systemPrefix = dirname(libraryRoot);
+const verifiedAncestors = new Set<string>();
 export async function hasSymlink(target: string): Promise<boolean> {
   const resolved = resolve(target);
+  const canonical = await realpath(resolved);
+  if (canonical === resolved) return false;
   const { root } = parse(resolved);
   let current = root;
   for (const segment of resolved.slice(root.length).split(sep).filter(Boolean)) {
     current = join(current, segment);
+    if (verifiedAncestors.has(current)) continue;
     if ((await lstat(current)).isSymbolicLink()) return true;
+    if (current === systemPrefix || systemPrefix.startsWith(`${current}${sep}`)) {
+      verifiedAncestors.add(current);
+    }
   }
   return false;
 }

@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import { publicAssetPath } from './asset-path';
 import { compileDeck } from './deck';
 import { createDeck, deleteDeck, duplicateDeck, featureTourDeckId, featureToursRoot, filenameTitle, grantDeck, LibraryError, libraryRoot, listDecks, openDeck, removeDeck, renameDeck, saveDeck } from './library';
-import { createTalk, endTalk, event, getTalk, privateState, publicState, publicViewers, shareOptions, startShare, stopShare, talkAssetResponse, type Talk } from './session';
+import { createTalk, endTalk, event, getTalk, localAudienceStream, presenterStream, privateState, publicState, publicViewers, setPointer, shareOptions, startShare, stopShare, talkAssetResponse, type Talk } from './session';
 import { presenterSession, publicSnapshot, renderCompilation } from './presentation-model';
 import { assetResponse, ensureSampleImage, readDeckAsset, sampleImageResponse } from './sample-image';
 import { sampleImageUrl } from './sample-image-reference';
@@ -174,6 +174,12 @@ export function privateRouter(port: number) {
           rejectCrossSite(request);
           return talkAssetResponse(getTalk(talkAssetMatch[1]), talkAssetMatch[2], talkAssetMatch[3], request.method);
         }
+        const audienceStreamMatch = /^\/api\/public\/([a-f0-9-]+)\/stream$/.exec(path);
+        if (audienceStreamMatch && request.method === 'GET') {
+          const talk = getTalk(audienceStreamMatch[1]);
+          if (request.headers.get('X-Slides-Public') !== talk.localKey) throw new LibraryError(403, 'Audience key required');
+          return localAudienceStream(talk, publicTalkAssetBase(talk), request);
+        }
         const audienceMatch = /^\/api\/public\/([a-f0-9-]+)$/.exec(path);
         if (audienceMatch && request.method === 'GET') {
           const talk = getTalk(audienceMatch[1]);
@@ -239,7 +245,7 @@ export function privateRouter(port: number) {
           const talk = await createTalk(requireString(data, 'deckId'), requireString(data, 'revision'));
           return response(presenterSession(privateState(talk), publicTalkAssetBase(talk)), 201);
         }
-        const talkMatch = /^\/api\/sessions\/([a-f0-9-]+)(?:\/(events|share))?$/.exec(path);
+        const talkMatch = /^\/api\/sessions\/([a-f0-9-]+)(?:\/(events|share|pointer|stream))?$/.exec(path);
         if (talkMatch) {
           const talk = getTalk(talkMatch[1]);
           if (!talkMatch[2] && request.method === 'GET') return response(presenterSession(privateState(talk), publicTalkAssetBase(talk)));
@@ -251,6 +257,14 @@ export function privateRouter(port: number) {
           if (talkMatch[2] === 'events' && request.method === 'POST') {
             event(talk, await body(request));
             return response(presenterSession(privateState(talk), publicTalkAssetBase(talk)));
+          }
+          if (talkMatch[2] === 'pointer' && request.method === 'POST') {
+            const data = await body(request);
+            setPointer(talk, data.pointer ?? null);
+            return response({ ok: true });
+          }
+          if (talkMatch[2] === 'stream' && request.method === 'GET') {
+            return presenterStream(talk, request);
           }
           if (talkMatch[2] === 'share' && request.method === 'POST') {
             const data = await body(request);
@@ -284,7 +298,7 @@ export function privateRouter(port: number) {
 
 export function startHost(port = 0) {
   let router: ReturnType<typeof privateRouter>;
-  const server = Bun.serve({ hostname: '127.0.0.1', port, fetch(request: Request): Promise<Response> { return router(request); } });
+  const server = Bun.serve({ hostname: '127.0.0.1', port, idleTimeout: 30, fetch(request: Request): Promise<Response> { return router(request); } });
   if (!server.port) throw new Error('Owner listener has no port');
   router = privateRouter(server.port);
   return server;

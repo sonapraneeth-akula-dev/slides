@@ -10,15 +10,92 @@ import { LibraryError, openDeck } from './library';
 import { publicSnapshot } from './presentation-model';
 
 interface Mark { slideId: string; step: number; tool: 'pen' | 'highlight'; color: string; width: number; points: { x: number; y: number }[] }
+export interface SseClient {
+  send: (eventName: string, payload: unknown) => void;
+  close: () => void;
+}
 export interface Talk {
   id: string; localKey: string; assetToken: string; deckId: string; revision: string; deck: Deck; notes: Record<string, string[]>;
   assets: Map<string, { bytes: Uint8Array<ArrayBuffer>; mime: string }>;
   slideId: string; step: number; sequence: number; started: number;
-  marks: Mark[]; blackout: boolean; canvas: boolean;
-  share?: { server: ReturnType<typeof Bun.serve>; key: string; address: string; port: number; viewers: Map<string, Viewer> };
+  marks: Mark[]; blackout: boolean; canvas: boolean; laser: { x: number; y: number } | null;
+  localClients: Set<{ client: SseClient; assetBase: string }>;
+  presenterClients: Set<SseClient>;
+  share?: {
+    server: ReturnType<typeof Bun.serve>; key: string; address: string; port: number;
+    viewers: Map<string, Viewer>; clients: Set<SseClient>;
+  };
 }
-interface Viewer { name: string; ip: string; seen: number }
+interface Viewer { name: string; ip: string; seen: number; streams?: Set<string> }
 const talks = new Map<string, Talk>();
+
+function sseStreamResponse(request: Request, onStart: (client: SseClient) => void, onClose: () => void): Response {
+  const encoder = new TextEncoder();
+  let closed = false;
+  let heartbeat: ReturnType<typeof setInterval> | undefined;
+  let streamController: ReadableStreamDefaultController<Uint8Array> | undefined;
+  const cleanup = () => {
+    if (closed) return;
+    closed = true;
+    if (heartbeat) clearInterval(heartbeat);
+    onClose();
+    try { streamController?.close(); } catch { /* stream already closed */ }
+  };
+  const stream = new ReadableStream<Uint8Array>({
+    start(controller) {
+      streamController = controller;
+      const client: SseClient = {
+        send(eventName, payload) {
+          if (closed) return;
+          try {
+            controller.enqueue(encoder.encode(`event: ${eventName}\ndata: ${JSON.stringify(payload)}\n\n`));
+          } catch {
+            cleanup();
+          }
+        },
+        close: cleanup,
+      };
+      request.signal.addEventListener('abort', cleanup, { once: true });
+      heartbeat = setInterval(() => {
+        if (closed) return;
+        try { controller.enqueue(encoder.encode(': keepalive\n\n')); }
+        catch { cleanup(); }
+      }, 2_000);
+      onStart(client);
+    },
+    cancel() {
+      cleanup();
+    },
+  });
+  return new Response(stream, {
+    headers: {
+      'Content-Type': 'text/event-stream; charset=utf-8',
+      'Cache-Control': 'no-store',
+      'Connection': 'keep-alive',
+      'X-Content-Type-Options': 'nosniff',
+    },
+  });
+}
+
+function broadcastState(talk: Talk): void {
+  const state = publicState(talk);
+  for (const entry of talk.localClients) {
+    entry.client.send('state', publicSnapshot(state, entry.assetBase));
+  }
+  if (talk.share) {
+    const lanPayload = { ...publicSnapshot(state, `/assets/${talk.assetToken}`), viewers: publicViewers(talk) };
+    for (const client of talk.share.clients) client.send('state', lanPayload);
+  }
+}
+
+function broadcastViewers(talk: Talk): void {
+  const presenterList = talk.share ? activeViewers(talk.share.viewers) : [];
+  for (const client of talk.presenterClients) client.send('viewers', { viewers: presenterList });
+  if (talk.share) {
+    const audienceList = publicViewers(talk);
+    for (const client of talk.share.clients) client.send('viewers', { viewers: audienceList });
+  }
+}
 
 export async function createTalk(deckId: string, revision: string): Promise<Talk> {
   const source = await openDeck(deckId);
@@ -38,7 +115,8 @@ export async function createTalk(deckId: string, revision: string): Promise<Talk
   const talk: Talk = {
     id: randomUUID(), localKey: randomBytes(32).toString('base64url'), assetToken: randomBytes(24).toString('base64url'),
     deckId, revision, deck, assets, notes: Object.fromEntries(deck.slides.map(slide => [slide.id, slide.notes])),
-    slideId: first.id, step: 0, sequence: 0, started: Date.now(), marks: [], blackout: false, canvas: false
+    slideId: first.id, step: 0, sequence: 0, started: Date.now(), marks: [], blackout: false, canvas: false, laser: null,
+    localClients: new Set(), presenterClients: new Set(),
   };
   talks.set(talk.id, talk);
   return talk;
@@ -64,14 +142,17 @@ export function publicState(talk: Talk) {
   return {
     schemaVersion: 1, sessionId: talk.id, sequence: talk.sequence, slideId: talk.slideId, step: talk.step,
     stage: audienceProjection(talk.deck, talk.slideId, talk.step),
-    overlay: { marks: talk.marks.filter(mark => mark.slideId === talk.slideId && mark.step <= talk.step), blackout: talk.blackout, canvas: talk.canvas },
+    overlay: {
+      marks: talk.marks.filter(mark => mark.slideId === talk.slideId && mark.step <= talk.step),
+      blackout: talk.blackout, canvas: talk.canvas, laser: talk.laser,
+    },
     resources: [], mediaState: {}
   };
 }
 
-// Audience pages poll /state about once per second, so recent polls mean an open viewer.
+// Audience pages stream via SSE or poll /state; actively streaming tabs stay live until disconnect.
 export function activeViewers(viewers: Map<string, Viewer>, now = Date.now()): { name: string; ip: string }[] {
-  for (const [id, viewer] of viewers) if (now - viewer.seen > 5000) viewers.delete(id);
+  for (const [id, viewer] of viewers) if (!viewer.streams?.size && now - viewer.seen > 5000) viewers.delete(id);
   return [...viewers.values()].map(({ name, ip }) => ({ name, ip }))
     .sort((a, b) => a.name.localeCompare(b.name) || a.ip.localeCompare(b.ip));
 }
@@ -145,8 +226,55 @@ export function event(talk: Talk, data: Record<string, unknown>) {
   } else if (data.action === 'clear') {
     talk.marks = talk.marks.filter(mark => mark.slideId !== talk.slideId);
   } else throw new LibraryError(400, 'Unknown presentation action');
+  if (['next', 'previous', 'jump', 'parent', 'left', 'right', 'up', 'down', 'mode'].includes(String(data.action))) {
+    talk.laser = null;
+  }
   talk.sequence++;
+  broadcastState(talk);
   return privateState(talk);
+}
+
+export function setPointer(talk: Talk, raw: unknown): void {
+  if (raw === null) {
+    talk.laser = null;
+  } else if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
+    const candidate = raw as Record<string, unknown>;
+    if (typeof candidate.x !== 'number' || typeof candidate.y !== 'number' ||
+        !Number.isFinite(candidate.x) || !Number.isFinite(candidate.y) ||
+        candidate.x < 0 || candidate.x > 1 || candidate.y < 0 || candidate.y > 1) {
+      throw new LibraryError(400, 'Invalid pointer coordinates');
+    }
+    talk.laser = { x: candidate.x, y: candidate.y };
+  } else {
+    throw new LibraryError(400, 'Invalid pointer payload');
+  }
+  const payload = { pointer: talk.laser };
+  for (const entry of talk.localClients) entry.client.send('pointer', payload);
+  if (talk.share) {
+    for (const client of talk.share.clients) client.send('pointer', payload);
+  }
+}
+
+export function localAudienceStream(talk: Talk, assetBase: string, request: Request): Response {
+  let entry: { client: SseClient; assetBase: string } | undefined;
+  return sseStreamResponse(request, client => {
+    entry = { client, assetBase };
+    talk.localClients.add(entry);
+    client.send('state', publicSnapshot(publicState(talk), assetBase));
+  }, () => {
+    if (entry) talk.localClients.delete(entry);
+  });
+}
+
+export function presenterStream(talk: Talk, request: Request): Response {
+  let activeClient: SseClient | undefined;
+  return sseStreamResponse(request, client => {
+    activeClient = client;
+    talk.presenterClients.add(client);
+    client.send('viewers', { viewers: talk.share ? activeViewers(talk.share.viewers) : [] });
+  }, () => {
+    if (activeClient) talk.presenterClients.delete(activeClient);
+  });
 }
 
 function addresses() {
@@ -176,12 +304,13 @@ export function startShare(talk: Talk, address: string, start: number, end: numb
   allowedAssets();
   const key = randomBytes(32).toString('base64url');
   const viewers = new Map<string, Viewer>();
+  const clients = new Set<SseClient>();
   let server: ReturnType<typeof Bun.serve> | undefined;
   let lastError: unknown;
   for (let port = start; port <= end; port++) {
     try {
       server = Bun.serve({
-        hostname: address, port,
+        hostname: address, port, idleTimeout: 30,
         async fetch(request, listener) {
           const url = new URL(request.url);
           if (request.method !== 'GET' && request.method !== 'HEAD') return new Response('Method not allowed', { status: 405 });
@@ -191,10 +320,42 @@ export function startShare(talk: Talk, address: string, start: number, end: numb
             const tab = request.headers.get('X-Slides-Viewer');
             const id = tab && /^[a-f0-9]{32}$/.test(tab) ? tab : ip;
             activeViewers(viewers);
-            if (id && (viewers.has(id) || viewers.size < 200)) {
-              viewers.set(id, { name: viewerName(request.headers.get('X-Slides-Viewer-Name')), ip, seen: Date.now() });
+            const nextName = viewerName(request.headers.get('X-Slides-Viewer-Name'));
+            const prev = id ? viewers.get(id) : undefined;
+            if (id && (prev || viewers.size < 200)) {
+              viewers.set(id, { name: nextName, ip, seen: Date.now(), streams: prev?.streams });
+              if (!prev || prev.name !== nextName) broadcastViewers(talk);
             }
             return Response.json({ ...publicSnapshot(publicState(talk), `/assets/${talk.assetToken}`), viewers: publicViewers(talk) }, { headers: { 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' } });
+          }
+          if (url.pathname === '/stream' && request.method === 'GET') {
+            if (request.headers.get('X-Slides-Public') !== key) return new Response('Forbidden', { status: 403 });
+            const ip = (listener.requestIP(request)?.address ?? '').replace(/^::ffff:/, '');
+            const tab = request.headers.get('X-Slides-Viewer');
+            const id = tab && /^[a-f0-9]{32}$/.test(tab) ? tab : ip;
+            const streamId = randomUUID();
+            let activeClient: SseClient | undefined;
+            return sseStreamResponse(request, client => {
+              activeClient = client;
+              clients.add(client);
+              activeViewers(viewers);
+              const existing = id ? viewers.get(id) : undefined;
+              if (id && (existing || viewers.size < 200)) {
+                const streams = existing?.streams ?? new Set<string>();
+                streams.add(streamId);
+                viewers.set(id, { name: viewerName(request.headers.get('X-Slides-Viewer-Name')), ip, seen: Date.now(), streams });
+              }
+              client.send('state', { ...publicSnapshot(publicState(talk), `/assets/${talk.assetToken}`), viewers: publicViewers(talk) });
+              broadcastViewers(talk);
+            }, () => {
+              if (activeClient) clients.delete(activeClient);
+              if (id) {
+                const current = viewers.get(id);
+                current?.streams?.delete(streamId);
+                if (current && !current.streams?.size) viewers.delete(id);
+              }
+              if (talk.share) broadcastViewers(talk);
+            });
           }
           const talkAssetMatch = /^\/assets\/([A-Za-z0-9_-]+)\/(.+)$/.exec(url.pathname);
           if (talkAssetMatch) {
@@ -226,16 +387,33 @@ export function startShare(talk: Talk, address: string, start: number, end: numb
     } catch (error) { lastError = error; }
   }
   if (!server) throw new LibraryError(503, `Cannot bind LAN listener: ${String(lastError)}`);
-  talk.share = { server, key, address, port: server.port ?? start, viewers };
+  talk.share = { server, key, address, port: server.port ?? start, viewers, clients };
+  broadcastViewers(talk);
   return privateState(talk).share;
 }
 
 export function stopShare(talk: Talk) {
-  if (talk.share) { talk.share.server.stop(true); talk.share = undefined; }
+  if (talk.share) {
+    for (const client of [...talk.share.clients]) {
+      client.send('ended', { ended: true });
+      client.close();
+    }
+    talk.share.server.stop(true);
+    talk.share = undefined;
+    broadcastViewers(talk);
+  }
 }
 
 export function endTalk(talk: Talk, discardMarks: boolean) {
   if (talk.marks.length && !discardMarks) throw new LibraryError(409, 'Discard marks explicitly before ending');
+  for (const entry of [...talk.localClients]) {
+    entry.client.send('ended', { ended: true });
+    entry.client.close();
+  }
+  for (const client of [...talk.presenterClients]) {
+    client.send('ended', { ended: true });
+    client.close();
+  }
   stopShare(talk);
   talks.delete(talk.id);
 }

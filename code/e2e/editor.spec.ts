@@ -371,6 +371,13 @@ Audience sees this.
   await page.locator('#blackout').click();
   await expect(audience.locator('#audience-mode')).toHaveAttribute('data-mode', 'blackout');
   await page.locator('#blackout').click();
+  await page.locator('[data-tool="laser"]').click();
+  const stageBox = (await page.locator('#stage-frame').boundingBox())!;
+  await page.mouse.move(stageBox.x + stageBox.width * 0.5, stageBox.y + stageBox.height * 0.5);
+  await expect(page.locator('#laser')).toBeVisible();
+  await expect(audience.locator('#audience-laser')).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(audience.locator('#audience-laser')).toBeHidden();
   await page.locator('#end').click();
   await expect(page.locator('#end-dialog')).toBeVisible();
   await page.locator('#confirm-end').click();

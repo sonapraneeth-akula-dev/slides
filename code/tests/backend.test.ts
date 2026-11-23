@@ -751,4 +751,79 @@ describe('persistent library and presentation', () => {
       await rm(deckAssetsDir, { recursive: true, force: true });
     }
   });
+
+  test('pushes real-time state, pointer coordinates, and session closure over SSE', async () => {
+    const { privateRouter } = await import('../src/host');
+    const route = privateRouter(12350);
+    const headers = { host: '127.0.0.1:12350' };
+    const { token } = await (await route(new Request('http://127.0.0.1:12350/api/bootstrap', { headers }))).json() as { token: string };
+    const opened = await library.openDeck(library.deckId('study.md'));
+    const talk = await session.createTalk(opened.id, opened.revision);
+    let ended = false;
+    const abort = new AbortController();
+    try {
+      expect((await route(new Request(`http://127.0.0.1:12350/api/public/${talk.id}/stream`, { headers }))).status).toBe(403);
+      const streamRes = await route(new Request(`http://127.0.0.1:12350/api/public/${talk.id}/stream`, {
+        headers: { ...headers, 'X-Slides-Public': talk.localKey },
+        signal: abort.signal,
+      }));
+      expect(streamRes.status).toBe(200);
+      expect(streamRes.headers.get('content-type')).toContain('text/event-stream');
+      const reader = streamRes.body!.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+      const nextEvent = async (): Promise<{ event: string; data: Record<string, unknown> }> => {
+        while (true) {
+          const boundary = buffer.indexOf('\n\n');
+          if (boundary >= 0) {
+            const block = buffer.slice(0, boundary);
+            buffer = buffer.slice(boundary + 2);
+            let eventName = 'message';
+            let dataText = '';
+            for (const line of block.split('\n')) {
+              if (line.startsWith('event:')) eventName = line.slice(6).trim();
+              else if (line.startsWith('data:')) dataText += line.slice(5).trimStart();
+            }
+            if (dataText) return { event: eventName, data: JSON.parse(dataText) as Record<string, unknown> };
+          }
+          const { done, value } = await reader.read();
+          if (done) throw new Error('Unexpected stream EOF');
+          buffer += decoder.decode(value, { stream: true });
+        }
+      };
+
+      const initial = await nextEvent();
+      expect(initial.event).toBe('state');
+      expect(initial.data.slideId).toBe('root');
+      expect(initial.data.step).toBe(0);
+
+      const badPointer = await route(new Request(`http://127.0.0.1:12350/api/sessions/${talk.id}/pointer`, {
+        method: 'POST',
+        headers: { ...headers, 'X-Slides-Token': token, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pointer: { x: 1.5, y: 0.2 } }),
+      }));
+      expect(badPointer.status).toBe(400);
+
+      const okPointer = await route(new Request(`http://127.0.0.1:12350/api/sessions/${talk.id}/pointer`, {
+        method: 'POST',
+        headers: { ...headers, 'X-Slides-Token': token, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pointer: { x: 0.4, y: 0.6 } }),
+      }));
+      expect(okPointer.status).toBe(200);
+      expect(await nextEvent()).toEqual({ event: 'pointer', data: { pointer: { x: 0.4, y: 0.6 } } });
+
+      session.event(talk, { action: 'next', sequence: talk.sequence });
+      const advanced = await nextEvent();
+      expect(advanced.event).toBe('state');
+      expect(advanced.data.step).toBe(1);
+      expect((advanced.data.overlay as { laser: unknown }).laser).toBeNull();
+
+      session.endTalk(talk, true);
+      ended = true;
+      expect(await nextEvent()).toEqual({ event: 'ended', data: { ended: true } });
+    } finally {
+      abort.abort();
+      if (!ended) session.endTalk(talk, true);
+    }
+  });
 });
