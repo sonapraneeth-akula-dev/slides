@@ -170,7 +170,7 @@ export function viewerName(value: string | null): string {
 export function privateState(talk: Talk) {
   return {
     id: talk.id, localKey: talk.localKey, deckId: talk.deckId, revision: talk.revision, deck: talk.deck,
-    notes: talk.notes, started: talk.started, ...publicState(talk),
+    notes: talk.notes, started: talk.started, hasMarks: talk.marks.length > 0, ...publicState(talk),
     share: talk.share ? { address: talk.share.address, port: talk.share.port, url: `http://${talk.share.address}:${talk.share.port}/audience/#${talk.share.key}`, reachability: 'unverified', viewers: activeViewers(talk.share.viewers) } : null
   };
 }

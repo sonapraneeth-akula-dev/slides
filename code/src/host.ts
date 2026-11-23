@@ -4,6 +4,7 @@ import { publicAssetPath } from './asset-path';
 import { compileDeck } from './deck';
 import { createDeck, deleteDeck, duplicateDeck, featureTourDeckId, featureToursRoot, filenameTitle, grantDeck, LibraryError, libraryRoot, listDecks, openDeck, removeDeck, renameDeck, saveDeck } from './library';
 import { createTalk, endTalk, event, getTalk, localAudienceStream, presenterStream, privateState, publicState, publicViewers, setPointer, shareOptions, startShare, stopShare, talkAssetResponse, type Talk } from './session';
+import { exportDeckArtifact, exportTalkArtifact, type ExportFormat, type RevealExportMode } from './export';
 import { presenterSession, publicSnapshot, renderCompilation } from './presentation-model';
 import { assetResponse, ensureSampleImage, readDeckAsset, sampleImageResponse } from './sample-image';
 import { sampleImageUrl } from './sample-image-reference';
@@ -107,6 +108,29 @@ async function featureTour(): Promise<{ id: string }> {
 function requireString(data: Record<string, unknown>, key: string): string {
   if (typeof data[key] !== 'string') throw new LibraryError(400, `${key} must be text`);
   return data[key];
+}
+
+function parseExportRequest(data: Record<string, unknown>): { format: ExportFormat; revealMode: RevealExportMode; includeMarks: boolean } {
+  if (data.format !== 'html' && data.format !== 'pdf') throw new LibraryError(400, 'Export format must be html or pdf');
+  if (data.revealMode !== undefined && data.revealMode !== 'final' && data.revealMode !== 'steps') {
+    throw new LibraryError(400, 'Reveal mode must be final or steps');
+  }
+  return {
+    format: data.format,
+    revealMode: data.revealMode === 'steps' ? 'steps' : 'final',
+    includeMarks: data.includeMarks !== false,
+  };
+}
+
+function artifactDownloadResponse(artifact: { bytes: Uint8Array<ArrayBuffer>; mime: string; filename: string }): Response {
+  return new Response(artifact.bytes, {
+    headers: {
+      'Content-Type': artifact.mime,
+      'Content-Disposition': `attachment; filename="${artifact.filename}"`,
+      'Cache-Control': 'no-store',
+      'X-Content-Type-Options': 'nosniff',
+    },
+  });
 }
 
 function response(data: unknown, status = 200): Response {
@@ -222,6 +246,11 @@ export function privateRouter(port: number) {
           const data = await body(request);
           return response(await deleteDeck(libraryMatch[1], requireString(data, 'baseRevision'), data.confirm === true));
         }
+        const deckExportMatch = /^\/api\/decks\/([A-Za-z0-9_-]+)\/export$/.exec(path);
+        if (deckExportMatch && request.method === 'POST') {
+          const options = parseExportRequest(await body(request));
+          return artifactDownloadResponse(await exportDeckArtifact(deckExportMatch[1], options));
+        }
         const deckMatch = /^\/api\/decks\/([A-Za-z0-9_-]+)$/.exec(path);
         if (deckMatch && request.method === 'GET') {
           const opened = await openDeck(deckMatch[1]);
@@ -245,7 +274,7 @@ export function privateRouter(port: number) {
           const talk = await createTalk(requireString(data, 'deckId'), requireString(data, 'revision'));
           return response(presenterSession(privateState(talk), publicTalkAssetBase(talk)), 201);
         }
-        const talkMatch = /^\/api\/sessions\/([a-f0-9-]+)(?:\/(events|share|pointer|stream))?$/.exec(path);
+        const talkMatch = /^\/api\/sessions\/([a-f0-9-]+)(?:\/(events|share|pointer|stream|export))?$/.exec(path);
         if (talkMatch) {
           const talk = getTalk(talkMatch[1]);
           if (!talkMatch[2] && request.method === 'GET') return response(presenterSession(privateState(talk), publicTalkAssetBase(talk)));
@@ -257,6 +286,10 @@ export function privateRouter(port: number) {
           if (talkMatch[2] === 'events' && request.method === 'POST') {
             event(talk, await body(request));
             return response(presenterSession(privateState(talk), publicTalkAssetBase(talk)));
+          }
+          if (talkMatch[2] === 'export' && request.method === 'POST') {
+            const options = parseExportRequest(await body(request));
+            return artifactDownloadResponse(await exportTalkArtifact(talk, options));
           }
           if (talkMatch[2] === 'pointer' && request.method === 'POST') {
             const data = await body(request);

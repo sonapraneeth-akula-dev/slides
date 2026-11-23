@@ -75,6 +75,7 @@ export interface PrivateState extends PublicState {
   notes: Record<string, string[]>;
   localKey: string;
   started: number;
+  hasMarks?: boolean;
 }
 
 function overlay(state: PublicState): Snapshot['overlay'] {
@@ -108,7 +109,7 @@ export function publicSnapshot(state: PublicState, assetBase?: string): Snapshot
 export function presenterSession(state: PrivateState, assetBase?: string) {
   const deck = renderDeck(state.deck, assetBase);
   return {
-    sessionId: state.id, localKey: state.localKey, snapshot: {
+    sessionId: state.id, localKey: state.localKey, hasMarks: state.hasMarks === true, snapshot: {
       schemaVersion: state.schemaVersion, sessionId: state.id, sequence: state.sequence,
       slideId: state.slideId, step: state.step, stage: deck,
       overlay: overlay(state), ended: false,

@@ -28,6 +28,7 @@ export interface Stage {
   slides: Slide[];
   total?: number;
   assetBase?: string;
+  assetMap?: Record<string, string>;
 }
 
 export interface Deck extends Stage {
@@ -63,15 +64,23 @@ export interface Snapshot {
 
 const md = new MarkdownIt({ html: false, linkify: false, breaks: true });
 const safeAssetBase = /^\/(?:api\/(?:deck-assets|public)\/|assets\/)[A-Za-z0-9/_-]+$/;
+const safeDataImage = /^data:image\/(?:png|jpeg|webp|gif|svg\+xml);base64,[A-Za-z0-9+/=]+$/;
 md.renderer.rules.image = (tokens, index, _options, env) => {
   const token = tokens[index];
   const alt = token.content || 'Unlabelled image';
   const src = String(token.attrGet('src') ?? '');
+  const context = env as { assetBase?: string; assetMap?: Record<string, string> } | undefined;
   if (src === sampleImageReference) {
+    if (context?.assetMap?.[sampleImageReference]) {
+      return `<img class="slide-image" alt="${md.utils.escapeHtml(alt)}" data-asset-key="${sampleImageReference}">`;
+    }
     return `<img class="slide-image" src="${sampleImageUrl}" alt="${md.utils.escapeHtml(alt)}" loading="lazy">`;
   }
   const rel = parseAssetReference(src);
-  const assetBase = (env as { assetBase?: string } | undefined)?.assetBase;
+  if (rel && context?.assetMap?.[rel]) {
+    return `<img class="slide-image" alt="${md.utils.escapeHtml(alt)}" data-asset-key="${md.utils.escapeHtml(rel)}">`;
+  }
+  const assetBase = context?.assetBase;
   if (rel && assetBase && safeAssetBase.test(assetBase)) {
     const encoded = rel.split('/').map(encodeURIComponent).join('/');
     return `<img class="slide-image" src="${assetBase}/${encoded}" alt="${md.utils.escapeHtml(alt)}" data-asset-alt="${md.utils.escapeHtml(alt)}">`;
@@ -229,12 +238,20 @@ md.renderer.rules.math_block = (tokens, index) => {
   }
 };
 
-export function markdown(source: string, assetBase?: string): HTMLElement {
+export function markdown(source: string, assetBase?: string, assetMap?: Record<string, string>): HTMLElement {
   const element = document.createElement('div');
   element.className = 'slide-markdown';
-  element.innerHTML = DOMPurify.sanitize(md.render(source, { assetBase }), {
+  element.innerHTML = DOMPurify.sanitize(md.render(source, { assetBase, assetMap }), {
     FORBID_TAGS: ['iframe', 'object', 'form', 'script', 'style'],
   });
+  if (assetMap) {
+    for (const img of element.querySelectorAll<HTMLImageElement>('img.slide-image[data-asset-key]')) {
+      const key = img.getAttribute('data-asset-key') || '';
+      img.removeAttribute('data-asset-key');
+      const dataUrl = assetMap[key];
+      if (dataUrl && safeDataImage.test(dataUrl)) img.src = dataUrl;
+    }
+  }
   for (const img of element.querySelectorAll<HTMLImageElement>('img.slide-image[data-asset-alt]')) {
     const label = img.getAttribute('data-asset-alt') || 'Unlabelled image';
     img.removeAttribute('data-asset-alt');
@@ -400,19 +417,24 @@ async function renderFences(root: HTMLElement): Promise<void> {
         canvas.className = 'chart-visual';
         canvas.setAttribute('aria-hidden', 'true');
         fence.replaceChildren(canvas, accessibleData);
-        const [echarts, { BarChart, LineChart, PieChart, ScatterChart }, { GridComponent, LegendComponent, TooltipComponent }, { CanvasRenderer }] = await Promise.all([
+        const staticExport = document.documentElement.dataset.exportStatic === 'true';
+        const [echarts, { BarChart, LineChart, PieChart, ScatterChart }, { GridComponent, LegendComponent, TooltipComponent }, { CanvasRenderer, SVGRenderer }] = await Promise.all([
           import('echarts/core'),
           import('echarts/charts'),
           import('echarts/components'),
           import('echarts/renderers'),
         ]);
-        echarts.use([BarChart, LineChart, PieChart, ScatterChart, GridComponent, LegendComponent, TooltipComponent, CanvasRenderer]);
+        echarts.use([BarChart, LineChart, PieChart, ScatterChart, GridComponent, LegendComponent, TooltipComponent, CanvasRenderer, SVGRenderer]);
         if (!fence.isConnected) continue;
-        const instance = echarts.init(canvas, undefined, { renderer: 'canvas' });
+        const instance = echarts.init(
+          canvas,
+          undefined,
+          staticExport ? { renderer: 'svg', width: canvas.clientWidth || 960, height: canvas.clientHeight || 320 } : { renderer: 'canvas' },
+        );
         try {
           const round = chart.type === 'pie' || chart.type === 'donut';
           instance.setOption({
-            animation: !matchMedia('(prefers-reduced-motion: reduce)').matches,
+            animation: !staticExport && !matchMedia('(prefers-reduced-motion: reduce)').matches,
             tooltip: { trigger: round ? 'item' : 'axis', renderMode: 'richText' },
             legend: { top: 0 },
             grid: { left: '12%', right: '5%', bottom: '16%', top: '18%' },
@@ -497,14 +519,14 @@ export async function renderStage(host: HTMLElement, stage: Stage, slide: Slide 
     const content = document.createElement('div');
     content.className = 'slide-content';
     if (slide.layout === 'title-image-left' || slide.layout === 'title-image-right') {
-      const text = markdown(slide.body, stage.assetBase);
+      const text = markdown(slide.body, stage.assetBase, stage.assetMap);
       text.classList.add('slide-cover-text');
-      const image = markdown(slide.slots?.image || '', stage.assetBase);
+      const image = markdown(slide.slots?.image || '', stage.assetBase, stage.assetMap);
       image.classList.add('slide-cover-image');
       image.setAttribute('aria-label', 'Cover image');
       content.append(text, image);
     } else {
-      const body = markdown(slide.body, stage.assetBase);
+      const body = markdown(slide.body, stage.assetBase, stage.assetMap);
       if (slide.layout === 'image-full') body.classList.add('slide-full-image');
       content.append(body);
     }
@@ -514,7 +536,7 @@ export async function renderStage(host: HTMLElement, stage: Stage, slide: Slide 
       const columns = document.createElement('div');
       columns.className = 'slide-columns';
       for (const name of names) {
-        const column = markdown(slide.slots?.[name] || '', stage.assetBase);
+        const column = markdown(slide.slots?.[name] || '', stage.assetBase, stage.assetMap);
         column.classList.add('slide-column');
         column.setAttribute('aria-label', `${name} column`);
         columns.append(column);
@@ -523,7 +545,7 @@ export async function renderStage(host: HTMLElement, stage: Stage, slide: Slide 
     }
     for (const [index, reveal] of (slide.reveals || []).entries()) {
       if (index >= step) break;
-      const element = markdown(reveal, stage.assetBase);
+      const element = markdown(reveal, stage.assetBase, stage.assetMap);
       element.classList.add('slide-reveal');
       content.append(element);
     }

@@ -9,7 +9,7 @@
     "typecheck:ts": "bun check --no-script",
     "dev": "bun ./scripts/dev.ts",
     "check": "astro check",
-    "build": "astro build && bun ./scripts/audience-assets.ts && bun build ./src/host.ts --target=bun --outfile ./build/host.js",
+    "build": "astro build && bun ./scripts/audience-assets.ts && bun ./scripts/build-export.ts && bun build ./src/host.ts --target=bun --external playwright-core --outfile ./build/host.js",
     "start": "bun ./build/host.js",
     "test": "bun test ./tests",
     "test:e2e": "bun run build && playwright test"
@@ -22,6 +22,7 @@
     "katex": "^0.19.1",
     "markdown-it": "^15.0.3",
     "mermaid": "^12.3.0",
+    "playwright-core": "1.65.1",
     "yaml": "2.9.1"
   },
   "devDependencies": {

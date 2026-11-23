@@ -10,7 +10,7 @@ import { renderViewers, type Viewer } from './viewers';
 type LibraryEntry = { id: string; name: string; path: string; kind: 'tour' | 'presentation'; missing?: boolean };
 type Diagnostic = { severity: string; message: string; code?: string; sourceSpan?: { start?: number; end?: number }; slideId?: string };
 type DeckResponse = { text: string; revision: string; deck: Deck | null; diagnostics: Diagnostic[] };
-type SessionResponse = { sessionId: string; localKey: string; snapshot: Snapshot; notes: Record<string, string> };
+type SessionResponse = { sessionId: string; localKey: string; hasMarks?: boolean; snapshot: Snapshot; notes: Record<string, string> };
 type BootstrapResponse = { token: string; library: LibraryEntry[]; devMode: boolean; interfaces: string[] };
 type Page = 'library' | 'editor' | 'presentation';
 type View = 'source' | 'split' | 'preview';
@@ -547,7 +547,10 @@ function updateEditor(): void {
   void updatePreview();
   const theme = $<HTMLSelectElement>('theme');
   theme.value = compiled?.theme || 'signal';
-  $('present').toggleAttribute('disabled', !compiled || !compiled.slides.length || !canEditPreview());
+  const invalid = !compiled || !compiled.slides.length || !canEditPreview();
+  $('present').toggleAttribute('disabled', invalid);
+  $('export-pdf').toggleAttribute('disabled', invalid);
+  $('export-html').toggleAttribute('disabled', invalid);
   $('preview-label').textContent = canEditPreview()
     ? 'Plain-text paragraphs can be edited here'
     : 'Preview edits paused until source is valid and current';
@@ -570,6 +573,8 @@ function scheduleCompile(): void {
   $('preview-label').textContent = 'Preview edits paused until source is valid and current';
   status('Compiling draft…', true);
   $('present').setAttribute('disabled', '');
+  $('export-pdf').setAttribute('disabled', '');
+  $('export-html').setAttribute('disabled', '');
   clearTimeout(compileTimer);
   compileTimer = setTimeout(async () => {
     const draft = sourceInput.value;
@@ -892,6 +897,7 @@ function drawPresenter(): void {
   $('blackout').setAttribute('aria-pressed', String(overlayMode(snapshot.overlay?.mode) === 'blackout'));
   $('undo').toggleAttribute('disabled', !snapshot.overlay?.strokes?.length);
   $('clear').toggleAttribute('disabled', !snapshot.overlay?.strokes?.length);
+  $('save-annotations').toggleAttribute('disabled', !session.hasMarks && !snapshot.overlay?.strokes?.length);
   text('share-info', sharing
     ? `Audience URL: ${shareUrl} — network reachability unverified. Share only with trusted viewers.`
     : 'Local only. Sharing is off.');
@@ -917,21 +923,80 @@ async function sendEvent(action: string, extra: Record<string, unknown> = {}): P
   if (!session || eventPending) return;
   eventPending = true;
   try {
-    const result = await request<{ snapshot: Snapshot; notes: Record<string, string> }>(
+    const result = await request<{ snapshot: Snapshot; notes: Record<string, string>; hasMarks?: boolean }>(
       `/api/sessions/${encodeURIComponent(session.sessionId)}/events`, 'POST',
       { sequence: session.snapshot.sequence, action, ...extra });
     session.snapshot = result.snapshot;
     session.notes = result.notes;
+    session.hasMarks = result.hasMarks === true;
     drawPresenter();
   } catch (error) {
     errorNotice(error);
     try {
-      const current = await request<{ snapshot: Snapshot; notes: Record<string, string> }>(`/api/sessions/${encodeURIComponent(session.sessionId)}`);
+      const current = await request<{ snapshot: Snapshot; notes: Record<string, string>; hasMarks?: boolean }>(`/api/sessions/${encodeURIComponent(session.sessionId)}`);
       session.snapshot = current.snapshot;
       session.notes = current.notes;
+      session.hasMarks = current.hasMarks === true;
       drawPresenter();
     } catch (refreshError) { status(`Presentation disconnected: ${message(refreshError)}`, true); }
   } finally { eventPending = false; }
+}
+
+let exporting = false;
+async function downloadArtifact(path: string, format: 'html' | 'pdf', includeMarks = true): Promise<void> {
+  if (exporting) return;
+  exporting = true;
+  document.querySelectorAll<HTMLDetailsElement>('details.export-menu[open]').forEach(menu => { menu.open = false; });
+  notify(`Exporting ${format.toUpperCase()}…`);
+  try {
+    const send = () => fetch(path, {
+      method: 'POST',
+      headers: { 'X-Slides-Token': token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ format, includeMarks }),
+    });
+    let response = await send();
+    if (response.status === 403 && response.headers.get('content-type')?.includes('application/json')) {
+      const data = await response.clone().json().catch(() => null) as { error?: string } | null;
+      if (data?.error === 'Owner token required') {
+        token = (await loadBootstrap()).token;
+        response = await send();
+      }
+    }
+    if (!response.ok) {
+      const data = await response.json().catch(() => null) as { error?: string } | null;
+      throw new Error(data?.error || `Export failed (${response.status}).`);
+    }
+    const disposition = response.headers.get('content-disposition') || '';
+    const filename = /filename="([^"]+)"/.exec(disposition)?.[1] || `presentation.${format}`;
+    const blob = await response.blob();
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    document.body.append(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    notify(`Exported ${filename}.`);
+  } catch (error) {
+    errorNotice(error);
+  } finally {
+    exporting = false;
+  }
+}
+
+async function exportFromEditor(format: 'html' | 'pdf'): Promise<void> {
+  clearTimeout(saveTimer);
+  clearTimeout(compileTimer);
+  if (!canEditPreview()) { notify('Wait for a valid, current preview before exporting.'); return; }
+  if (isDirty() && !(await save())) return;
+  if (!canEditPreview() || !deckId) { notify('Fix diagnostics before exporting.'); return; }
+  await downloadArtifact(`/api/decks/${encodeURIComponent(deckId)}/export`, format, false);
+}
+
+async function exportFromPresenter(format: 'html' | 'pdf', includeMarks = true): Promise<void> {
+  if (!session) return;
+  await downloadArtifact(`/api/sessions/${encodeURIComponent(session.sessionId)}/export`, format, includeMarks);
 }
 async function startPresentation(): Promise<void> {
   clearTimeout(saveTimer);
@@ -1121,6 +1186,13 @@ function wire(): void {
   });
   $('save').addEventListener('click', () => { clearTimeout(saveTimer); void save(); });
   $('present').addEventListener('click', () => { void startPresentation(); });
+  $('export-pdf').addEventListener('click', () => { void exportFromEditor('pdf'); });
+  $('export-html').addEventListener('click', () => { void exportFromEditor('html'); });
+  $('presenter-export-pdf').addEventListener('click', () => { void exportFromPresenter('pdf', true); });
+  $('presenter-export-html').addEventListener('click', () => { void exportFromPresenter('html', true); });
+  $('save-annotations').addEventListener('click', () => { void exportFromPresenter('pdf', true); });
+  $('end-export-pdf').addEventListener('click', () => { void exportFromPresenter('pdf', true); });
+  $('end-export-html').addEventListener('click', () => { void exportFromPresenter('html', true); });
   $('use-disk').addEventListener('click', () => {
     if (!diskConflict) return;
     revision = diskConflict.diskRevision;
@@ -1260,7 +1332,12 @@ function wire(): void {
   });
   $('end').addEventListener('click', () => {
     if (!session) return;
-    text('end-warning', 'Audience windows will stop receiving updates. Any ink will be discarded; saving annotations is not available yet.');
+    const marked = Boolean(session.hasMarks || session.snapshot.overlay?.strokes?.length);
+    $('end-export-pdf').hidden = !marked;
+    $('end-export-html').hidden = !marked;
+    text('end-warning', marked
+      ? 'Audience windows will stop receiving updates. Export annotated slides now or end to discard live ink.'
+      : 'Audience windows will stop receiving updates.');
     dialog('end-dialog').showModal();
   });
   $('confirm-end').addEventListener('click', async () => {

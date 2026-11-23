@@ -826,4 +826,45 @@ describe('persistent library and presentation', () => {
       if (!ended) session.endTalk(talk, true);
     }
   });
+
+  test('exports standalone HTML and PDF without notes leakage and reports missing browser for PDF', async () => {
+    const { privateRouter } = await import('../src/host');
+    const route = privateRouter(12351);
+    const headers = { host: '127.0.0.1:12351' };
+    const { token } = await (await route(new Request('http://127.0.0.1:12351/api/bootstrap', { headers }))).json() as { token: string };
+    const studyId = library.deckId('study.md');
+
+    const htmlRes = await route(new Request(`http://127.0.0.1:12351/api/decks/${studyId}/export`, {
+      method: 'POST',
+      headers: { ...headers, 'X-Slides-Token': token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ format: 'html', revealMode: 'steps' }),
+    }));
+    expect(htmlRes.status).toBe(200);
+    expect(htmlRes.headers.get('content-disposition')).toContain('Journey.html');
+    const html = await htmlRes.text();
+    expect(html).toContain('class="export-slide"');
+    expect((html.match(/class="export-slide"/g) ?? []).length).toBe(4);
+    expect(html).not.toContain('PRIVATE SECRET');
+
+    const prevChromium = process.env.SLIDES_CHROMIUM_PATH;
+    process.env.SLIDES_CHROMIUM_PATH = 'none';
+    try {
+      const noBrowserPdf = await route(new Request(`http://127.0.0.1:12351/api/decks/${studyId}/export`, {
+        method: 'POST',
+        headers: { ...headers, 'X-Slides-Token': token, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ format: 'pdf' }),
+      }));
+      expect(noBrowserPdf.status).toBe(503);
+      const fallbackHtml = await route(new Request(`http://127.0.0.1:12351/api/decks/${studyId}/export`, {
+        method: 'POST',
+        headers: { ...headers, 'X-Slides-Token': token, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ format: 'html' }),
+      }));
+      expect(fallbackHtml.status).toBe(200);
+      expect(await fallbackHtml.text()).not.toContain('PRIVATE SECRET');
+    } finally {
+      if (prevChromium === undefined) delete process.env.SLIDES_CHROMIUM_PATH;
+      else process.env.SLIDES_CHROMIUM_PATH = prevChromium;
+    }
+  });
 });

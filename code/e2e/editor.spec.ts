@@ -86,9 +86,9 @@ test('author, persist, present and share only read-only public state', async ({ 
   await page.locator('#editor-actions .export-menu summary').click();
   await expect(page.locator('#editor-actions .export-options')).toBeVisible();
   await expect(page.locator('#editor-actions .export-options button')).toHaveText([
-    'Export To PDF (Coming Later)', 'Export To HTML (Coming Later)'
+    'Export to PDF', 'Export to HTML'
   ]);
-  await expect(page.locator('#editor-actions .export-options button:enabled')).toHaveCount(0);
+  await expect(page.locator('#editor-actions .export-options button:enabled')).toHaveCount(2);
   await page.locator('#editor-actions .export-menu summary').click();
   await expect(page.locator('#save')).toHaveCSS('border-radius', '0px');
   await expect(page.locator('#editor-actions .editor-buttons')).toHaveCSS('border-radius', '8px');
@@ -328,9 +328,9 @@ Audience sees this.
   await expect(page.locator('#jump option')).toHaveText(['1. Browser Acceptance', '2. Second Slide']);
   await page.locator('.presenter-export summary').click();
   await expect(page.locator('.presenter-export .export-options button')).toHaveCount(2);
-  await expect(page.locator('.presenter-export .export-options button:enabled')).toHaveCount(0);
+  await expect(page.locator('.presenter-export .export-options button:enabled')).toHaveCount(2);
   await page.locator('.presenter-export summary').click();
-  await expect(page.getByRole('button', { name: 'Save annotations (coming later)' })).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Save annotations' })).toBeDisabled();
   const popupPromise = context.waitForEvent('page');
   await page.locator('#local-audience').click();
   const audience = await popupPromise;
@@ -1173,6 +1173,108 @@ test('authorized local deck assets render in editor, presenter and audience whil
   await expect.poll(() => audience.locator('#audience-stage img.slide-image').evaluate(image => (image as HTMLImageElement).naturalWidth)).toBe(160);
   await expect(audience.locator('#audience-stage .asset-fallback')).toHaveCount(3);
   await audience.close();
+});
+
+test('exports self-contained offline HTML and PDF with charts, Mermaid, images, and live annotations without leaking notes', async ({ page, context }) => {
+  await page.goto(origin);
+  await page.locator('#deck-name').fill('Export Verification');
+  await page.locator('#create').click();
+  await expect(page.locator('#editor-page')).toBeVisible();
+  await page.locator('#source').fill(`---
+slides:
+  formatVersion: 1
+  title: Export Verification
+  master:
+    theme: paper
+---
+::slide{id="first"}
+# Exported Slide One
+
+![Landscape](assets/sample-landscape.svg)
+
+\`\`\`chart
+{"type":"bar","labels":["Before","After"],"series":[{"name":"Score","data":[3,8]}]}
+\`\`\`
+
+:::notes
+TOP SECRET SPEAKER NOTE
+:::
+
+:::reveal{step="1"}
+Final reveal visible in export
+:::
+
+::slide{id="second"}
+# Exported Slide Two
+
+\`\`\`mermaid
+flowchart LR
+  Author --> Export
+\`\`\`
+`);
+  await page.locator('#save').click();
+  await expect(page.locator('#save')).toBeDisabled();
+
+  await page.locator('#editor-actions .export-menu summary').click();
+  const htmlDownloadPromise = page.waitForEvent('download');
+  await page.locator('#export-html').click();
+  const htmlDownload = await htmlDownloadPromise;
+  expect(htmlDownload.suggestedFilename()).toBe('Export-Verification.html');
+  const htmlContent = await readFile((await htmlDownload.path())!, 'utf8');
+  expect(htmlContent).toContain('Exported Slide One');
+  expect(htmlContent).toContain('Final reveal visible in export');
+  expect(htmlContent).not.toContain('TOP SECRET SPEAKER NOTE');
+  expect(htmlContent).toContain('data:image/svg+xml;base64,');
+
+  const offlineContext = await context.browser()!.newContext();
+  try {
+    const offlinePage = await offlineContext.newPage();
+    const externalRequests: string[] = [];
+    await offlinePage.route('**/*', route => {
+      externalRequests.push(route.request().url());
+      return route.abort();
+    });
+    await offlinePage.setContent(htmlContent);
+    await expect(offlinePage.locator('.export-slide').first()).toBeVisible();
+    await expect(offlinePage.locator('#export-counter')).toHaveText('1 / 2');
+    await expect(offlinePage.locator('.export-slide').first().locator('.chart-visual svg')).toBeVisible();
+    await offlinePage.locator('#export-next').click();
+    await expect(offlinePage.locator('#export-counter')).toHaveText('2 / 2');
+    await expect(offlinePage.locator('.export-slide').nth(1).locator('.special-fence[data-kind="mermaid"] svg')).toBeVisible();
+    expect(externalRequests).toEqual([]);
+  } finally {
+    await offlineContext.close();
+  }
+
+  await page.locator('#present').click();
+  await expect(page.locator('#save-annotations')).toBeDisabled();
+  await page.locator('[data-tool="pen"]').click();
+  const box = (await page.locator('#stage-frame').boundingBox())!;
+  await page.mouse.move(box.x + 120, box.y + 120);
+  await page.mouse.down();
+  await page.mouse.move(box.x + 260, box.y + 200, { steps: 4 });
+  await page.mouse.up();
+  await expect(page.locator('#save-annotations')).toBeEnabled();
+
+  const pdfDownloadPromise = page.waitForEvent('download');
+  await page.locator('#save-annotations').click();
+  const pdfDownload = await pdfDownloadPromise;
+  expect(pdfDownload.suggestedFilename()).toBe('Export-Verification-annotated.pdf');
+  const pdfBytes = await readFile((await pdfDownload.path())!);
+  expect(pdfBytes.subarray(0, 5).toString()).toBe('%PDF-');
+  expect(pdfBytes.length).toBeGreaterThan(5000);
+
+  await page.locator('#end').click();
+  await expect(page.locator('#end-export-html')).toBeVisible();
+  const annotatedHtmlPromise = page.waitForEvent('download');
+  await page.locator('#end-export-html').click();
+  const annotatedHtmlDownload = await annotatedHtmlPromise;
+  expect(annotatedHtmlDownload.suggestedFilename()).toBe('Export-Verification-annotated.html');
+  const annotatedHtml = await readFile((await annotatedHtmlDownload.path())!, 'utf8');
+  expect(annotatedHtml).toContain('<svg class="ink"');
+  expect(annotatedHtml).toContain('<path d="M ');
+  expect(annotatedHtml).not.toContain('TOP SECRET SPEAKER NOTE');
+  await page.locator('#confirm-end').click();
 });
 
 test('external edit opens conflict dialog without overwriting either version', async ({ page }) => {
