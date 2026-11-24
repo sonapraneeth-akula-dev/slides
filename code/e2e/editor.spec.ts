@@ -1578,3 +1578,37 @@ test('slide outline sidebar can be hidden and reopened via header button, topbar
   await page.keyboard.press('Control+b');
   await expect(page.locator('#outline')).toBeVisible();
 });
+
+test('draggable splitter bar resizes source and slide preview panes and resets on double-click', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto(origin);
+  await page.locator('#open-demo').click();
+  const splitter = page.locator('#pane-splitter');
+  await expect(splitter).toBeVisible();
+  await expect(splitter).toHaveAttribute('aria-valuenow', '50');
+
+  const initialSource = (await page.locator('.source-pane').boundingBox())!;
+  const initialPreview = (await page.locator('.preview-pane').boundingBox())!;
+  expect(Math.abs(initialSource.width - initialPreview.width)).toBeLessThan(8);
+
+  const splitterBox = (await splitter.boundingBox())!;
+  await page.mouse.move(splitterBox.x + splitterBox.width / 2, splitterBox.y + splitterBox.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(splitterBox.x - 180, splitterBox.y + splitterBox.height / 2, { steps: 5 });
+  await page.mouse.up();
+
+  const narrowerSource = (await page.locator('.source-pane').boundingBox())!;
+  const widerPreview = (await page.locator('.preview-pane').boundingBox())!;
+  expect(narrowerSource.width).toBeLessThan(initialSource.width - 120);
+  expect(widerPreview.width).toBeGreaterThan(initialPreview.width + 120);
+
+  await splitter.focus();
+  await page.keyboard.press('ArrowRight');
+  const nudgedSource = (await page.locator('.source-pane').boundingBox())!;
+  expect(nudgedSource.width).toBeGreaterThan(narrowerSource.width + 20);
+
+  await splitter.dblclick();
+  await expect(splitter).toHaveAttribute('aria-valuenow', '50');
+  const resetSource = (await page.locator('.source-pane').boundingBox())!;
+  expect(Math.abs(resetSource.width - initialSource.width)).toBeLessThan(4);
+});

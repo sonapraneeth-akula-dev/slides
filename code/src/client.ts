@@ -35,6 +35,7 @@ let compiled: Deck | null = null;
 let selected = '';
 let view: View = 'split';
 let outlineHidden = false;
+let splitPercent = 50;
 let compileGeneration = 0;
 let compileTimer: ReturnType<typeof setTimeout> | undefined;
 let saveTimer: ReturnType<typeof setTimeout> | undefined;
@@ -358,6 +359,15 @@ function setOutlineHidden(hidden: boolean): void {
   const label = hidden ? 'Show slide outline' : 'Hide slide outline';
   toggle.setAttribute('aria-label', label);
   toggle.title = `${label} (Ctrl+B)`;
+}
+
+function applySplitPercent(next: number, persist = true): void {
+  splitPercent = Math.round(Math.min(80, Math.max(20, next)) * 10) / 10;
+  $('editor-panes').style.setProperty('--split-ratio', `${splitPercent}%`);
+  $('pane-splitter').setAttribute('aria-valuenow', String(Math.round(splitPercent)));
+  if (persist) {
+    try { localStorage.setItem('slides-split-percent', String(splitPercent)); } catch { /* ignore */ }
+  }
 }
 
 function updateOutline(): void {
@@ -1208,6 +1218,42 @@ function wire(): void {
     button.addEventListener('click', () => setView(button.dataset.view as View));
   }
   $('toggle-outline').addEventListener('click', () => setOutlineHidden(!outlineHidden));
+  const splitter = $('pane-splitter');
+  try {
+    const savedSplit = Number(localStorage.getItem('slides-split-percent'));
+    if (Number.isFinite(savedSplit) && savedSplit >= 20 && savedSplit <= 80) applySplitPercent(savedSplit, false);
+  } catch { /* ignore */ }
+  let draggingSplit: number | null = null;
+  splitter.addEventListener('pointerdown', event => {
+    if (event.button !== 0 || view !== 'split') return;
+    event.preventDefault();
+    draggingSplit = event.pointerId;
+    splitter.dataset.dragging = 'true';
+    splitter.setPointerCapture(event.pointerId);
+  });
+  splitter.addEventListener('pointermove', event => {
+    if (draggingSplit !== event.pointerId) return;
+    const rect = $('editor-panes').getBoundingClientRect();
+    const stacked = window.innerWidth <= 960;
+    const ratio = stacked
+      ? ((event.clientY - rect.top) / Math.max(1, rect.height)) * 100
+      : ((event.clientX - rect.left) / Math.max(1, rect.width)) * 100;
+    applySplitPercent(ratio);
+  });
+  const endSplitDrag = (event: PointerEvent) => {
+    if (draggingSplit !== event.pointerId) return;
+    draggingSplit = null;
+    delete splitter.dataset.dragging;
+  };
+  splitter.addEventListener('pointerup', endSplitDrag);
+  splitter.addEventListener('pointercancel', endSplitDrag);
+  splitter.addEventListener('dblclick', () => applySplitPercent(50));
+  splitter.addEventListener('keydown', event => {
+    if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') { event.preventDefault(); applySplitPercent(splitPercent - 5); }
+    else if (event.key === 'ArrowRight' || event.key === 'ArrowDown') { event.preventDefault(); applySplitPercent(splitPercent + 5); }
+    else if (event.key === 'Home') { event.preventDefault(); applySplitPercent(25); }
+    else if (event.key === 'End') { event.preventDefault(); applySplitPercent(75); }
+  });
   $<HTMLSelectElement>('theme').addEventListener('change', event => {
     try { editSource(setTheme(sourceInput.value, (event.target as HTMLSelectElement).value)); }
     catch (error) { errorNotice(error); }
