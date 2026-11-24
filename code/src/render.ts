@@ -384,14 +384,15 @@ async function renderFences(root: HTMLElement): Promise<void> {
             animation: !staticExport && !matchMedia('(prefers-reduced-motion: reduce)').matches,
             tooltip: { trigger: round ? 'item' : 'axis', renderMode: 'richText' },
             legend: { top: 0 },
-            grid: { left: '12%', right: '5%', bottom: '16%', top: '18%' },
+            grid: { left: '6%', right: '5%', bottom: '8%', top: '20%', containLabel: true },
             xAxis: round ? undefined : { type: chart.type === 'scatter' ? 'value' : 'category', data: chart.type === 'scatter' ? undefined : chart.labels, name: chart.x },
             yAxis: round ? undefined : { type: 'value', name: chart.y },
             series: chart.series.map(item => ({
               name: item.name,
               type: round ? 'pie' : chart.type === 'bar' ? 'bar' : chart.type === 'scatter' ? 'scatter' : 'line',
               areaStyle: chart.type === 'area' ? {} : undefined,
-              radius: chart.type === 'donut' ? ['42%', '68%'] : chart.type === 'pie' ? '68%' : undefined,
+              center: round ? ['50%', '55%'] : undefined,
+              radius: chart.type === 'donut' ? ['36%', '60%'] : chart.type === 'pie' ? '60%' : undefined,
               data: round ? item.data.map((value, index) => ({ value, name: chart.labels[index] })) : item.data,
             })),
           });

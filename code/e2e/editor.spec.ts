@@ -1646,3 +1646,39 @@ test('slide preview can be hidden to keep only code content and reopened from so
   await page.keyboard.press('Control+\\');
   await expect(page.locator('.preview-pane')).toBeVisible();
 });
+
+test('chart slides fit without scrollbars and keep footers anchored at the bottom in split preview and presenter', async ({ page }) => {
+  await page.goto(origin);
+  await page.locator('#open-demo').click();
+
+  for (const [width, height] of [[1920, 1080], [1366, 768], [1280, 720]] as const) {
+    await page.setViewportSize({ width, height });
+    for (const slideId of ['bar-chart', 'donut-chart']) {
+      const stage = page.locator(`.preview-card[data-slide-id="${slideId}"] .preview-stage`);
+      await stage.scrollIntoViewIfNeeded();
+      await expect(stage.locator('.chart-visual canvas')).toBeVisible();
+      const metrics = await stage.evaluate(el => {
+        const stageRect = el.getBoundingClientRect();
+        const chartRect = el.querySelector('.chart-visual')!.getBoundingClientRect();
+        const paragraphs = [...el.querySelectorAll('.slide-markdown > p')].map(p => p.getBoundingClientRect());
+        const contentBottom = Math.max(chartRect.bottom, ...paragraphs.map(p => p.bottom));
+        const bottomLeft = el.querySelector('.slide-meta[data-position="BottomLeft"]')!.getBoundingClientRect();
+        const bottomRight = el.querySelector('.slide-meta[data-position="BottomRight"]')!.getBoundingClientRect();
+        return {
+          overflow: el.scrollHeight > el.clientHeight + 1,
+          chartHeight: chartRect.height,
+          contentBottom,
+          footerTop: Math.min(bottomLeft.top, bottomRight.top),
+          leftBottomGap: stageRect.bottom - bottomLeft.bottom,
+          rightBottomGap: stageRect.bottom - bottomRight.bottom,
+          stageHeight: stageRect.height,
+        };
+      });
+      expect(metrics.overflow).toBe(false);
+      expect(metrics.chartHeight).toBeGreaterThanOrEqual(80);
+      expect(metrics.footerTop).toBeGreaterThanOrEqual(metrics.contentBottom - 2);
+      expect(metrics.leftBottomGap).toBeLessThan(metrics.stageHeight * 0.08);
+      expect(metrics.rightBottomGap).toBeLessThan(metrics.stageHeight * 0.08);
+    }
+  }
+});

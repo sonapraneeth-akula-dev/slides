@@ -188,7 +188,7 @@ a { color: #1752ad; }
 .preview-heading strong { overflow-wrap: anywhere; }
 .preview-heading select { margin-left: auto; max-width: 55%; }
 .layout-type { display: inline-block; padding: 3px 7px; border: 1px solid #cbd5e4; border-radius: 0; color: #3f5371; background: #eaf0f9; font-size: 12px; white-space: nowrap; }
-.preview-stage { aspect-ratio: 16 / 9; min-height: 0; border: 1px solid #cbd5e4; font-size: clamp(10px, 1.4vw, 18px); }
+.preview-stage { aspect-ratio: 16 / 9; min-height: 0; container-type: inline-size; border: 1px solid #cbd5e4; font-size: clamp(10px, 1.4vw, 18px); }
 .preview-stage [contenteditable="plaintext-only"] { cursor: text; border-radius: 0; }
 .preview-stage [contenteditable="plaintext-only"]:hover { outline: 1px dashed var(--slide-accent); outline-offset: 2px; }
 .diagnostics { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; min-height: 40px; padding: 5px 16px; background: #fff; border-top: 1px solid #dbe1e9; font-size: 13px; }
@@ -315,7 +315,7 @@ a { color: #1752ad; }
 .stage[data-layout^="title-image-"] .slide-image, .stage[data-layout="image-full"] .slide-image { width: 100%; height: 100%; max-width: none; max-height: none; border-radius: 0; object-fit: cover; }
 .stage[data-layout^="title-image-"] .slide-meta, .stage[data-layout="image-full"] .slide-meta { padding: .2em .5em; border-radius: 0; background: var(--slide-surface); }
 .special-fence svg { max-width: 100%; height: auto; }
-.chart-visual { height: clamp(160px, 28vw, 380px); }
+.chart-visual { width: 100%; height: clamp(110px, 30cqw, 300px); }
 .stage .chart-data {
   position: absolute;
   width: 1px;
@@ -333,13 +333,35 @@ a { color: #1752ad; }
 .stage-frame[data-tool="pen"], .stage-frame[data-tool="highlighter"] { touch-action: none; cursor: crosshair; }
 .stage-frame > .stage { font-size: clamp(12px, 2vw, 32px); }
 .stage .slide-content:has(> .slide-markdown > .special-fence[data-kind="mermaid"]),
-.stage .slide-content > .slide-markdown:has(> .special-fence[data-kind="mermaid"]) { height: 100%; }
+.stage .slide-content > .slide-markdown:has(> .special-fence[data-kind="mermaid"]),
+.stage .slide-content:has(> .slide-markdown > .special-fence[data-kind="chart"]),
+.stage .slide-content > .slide-markdown:has(> .special-fence[data-kind="chart"]) { height: 100%; }
 .stage:has(> .slide-meta[data-position^="Bottom"]) .slide-content:has(> .slide-markdown > :is(h1, h2, h3):first-child + .special-fence[data-kind="mermaid"]:last-child) {
   height: calc(100% - 2.5em);
 }
-.stage .slide-content > .slide-markdown:has(> .special-fence[data-kind="mermaid"]) {
+.stage:has(> .slide-meta[data-position^="Bottom"]) .slide-content:has(> .slide-markdown > .special-fence[data-kind="chart"]) {
+  height: calc(100% - 1.8em);
+}
+.stage .slide-content > .slide-markdown:has(> .special-fence[data-kind="mermaid"]),
+.stage .slide-content > .slide-markdown:has(> .special-fence[data-kind="chart"]) {
   display: flex;
   flex-direction: column;
+}
+.stage .slide-content > .slide-markdown > .special-fence[data-kind="chart"] {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 80px;
+  min-width: 0;
+}
+.stage .slide-content > .slide-markdown > .special-fence[data-kind="chart"] > .chart-visual {
+  flex: 1;
+  height: 100%;
+  max-height: none;
+  min-height: 80px;
+}
+.stage .slide-content > .slide-markdown:has(> .special-fence[data-kind="chart"]) > p {
+  margin-block: .25em 0;
 }
 .stage .slide-content > .slide-markdown > .special-fence[data-kind="mermaid"] {
   display: grid;

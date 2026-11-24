@@ -39,7 +39,6 @@ body.export-body[data-mode="single"] .export-slide:not([data-active="true"]) { d
 .export-slide { width: min(100%, 1280px); margin: 0 auto; }
 .export-frame { position: relative; width: 100%; aspect-ratio: 16 / 9; container-type: inline-size; overflow: hidden; box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35); }
 .export-frame .stage { width: 100%; height: 100%; font-size: clamp(12px, 1.8cqw, 24px); overflow: hidden; }
-.export-frame .chart-visual { height: min(34cqw, 340px); width: 100%; }
 .export-frame .special-fence[data-kind="mermaid"] { display: grid; place-items: center; min-height: min(32cqw, 300px); }
 .export-frame .special-fence[data-kind="mermaid"] svg { max-width: 100%; max-height: min(38cqw, 340px); height: auto; }
 @media print {
