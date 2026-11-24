@@ -843,6 +843,11 @@ test('presenter fits charts and Mermaid, shows private notes, and groups legible
   expect(audienceIconBox.width).toBeGreaterThanOrEqual(16);
   expect(audienceIconBox.height).toBeGreaterThanOrEqual(16);
   await expect(page.locator('#local-audience > svg rect')).toHaveCount(0);
+  await expect(page.locator('#end')).toHaveCSS('background-color', 'rgb(196, 37, 54)');
+  await expect(page.locator('#end')).toHaveCSS('color', 'rgb(255, 255, 255)');
+  await page.locator('#end').hover();
+  await expect(page.locator('#end')).toHaveCSS('background-color', 'rgb(158, 28, 43)');
+  await expect(page.locator('#end')).toHaveCSS('color', 'rgb(255, 255, 255)');
   for (let index = 1; index < headerButtons.length; index++) {
     expect(Math.abs(headerButtons[index].left - headerButtons[index - 1].right)).toBeLessThan(1);
   }
