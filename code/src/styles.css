@@ -165,9 +165,10 @@ a { color: #1752ad; }
 .pane-splitter::after { content: ''; position: absolute; inset: 50% auto auto 50%; width: 2px; height: 28px; translate: -50% -50%; background: #8da0ba; }
 .pane-splitter:hover, .pane-splitter[data-dragging="true"], .pane-splitter:focus-visible { background: #dbe8fe; border-color: #466ec1; }
 .pane-splitter:hover::after, .pane-splitter[data-dragging="true"]::after { background: #2354ad; }
-.pane-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 12px; background: #fff; border-bottom: 1px solid #dbe1e9; color: #4a5a70; font-size: 12px; }
+.pane-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 5px 12px; background: #fff; border-bottom: 1px solid #dbe1e9; color: #4a5a70; font-size: 12px; }
 .pane-heading strong { flex: none; font-size: 13px; color: #1b2534; }
-.pane-heading span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pane-heading span { flex: 1; min-width: 0; text-align: right; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pane-heading .pane-icon-button { flex: none; }
 #source { flex: 1; width: 100%; min-height: 220px; padding: 10px 14px; resize: none; border: none; border-radius: 0; background: #fafbfc; font: 13px/1.55 ui-monospace, monospace; tab-size: 2; overflow-wrap: anywhere; }
 .preview-list { overflow: auto; flex: 1; padding: 10px 12px; }
 .preview-list > .slide-group { max-width: 900px; margin: 0 auto 14px; padding: 0 10px; }

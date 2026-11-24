@@ -275,6 +275,7 @@ function syncEditorNavigation(): void {
   for (const button of document.querySelectorAll<HTMLButtonElement>('.outline-item')) {
     button.setAttribute('aria-current', String(!settingsActive && button.dataset.slideId === selected));
   }
+  $('show-preview').hidden = settingsActive || view !== 'source';
 }
 function updateDiagnostics(diagnostics: Diagnostic[] = []): void {
   const area = $('diagnostics');
@@ -1217,6 +1218,8 @@ function wire(): void {
   for (const button of document.querySelectorAll<HTMLButtonElement>('button[data-view]')) {
     button.addEventListener('click', () => setView(button.dataset.view as View));
   }
+  $('hide-preview').addEventListener('click', () => setView('source'));
+  $('show-preview').addEventListener('click', () => setView('split'));
   $('toggle-outline').addEventListener('click', () => setOutlineHidden(!outlineHidden));
   const splitter = $('pane-splitter');
   try {
@@ -1472,10 +1475,17 @@ function wire(): void {
     if (alreadyStopped) notify('Presentation is no longer active. Returned to the editor.');
   });
   document.addEventListener('keydown', event => {
-    if (page === 'editor' && (event.ctrlKey || event.metaKey) && !event.altKey && !event.shiftKey && event.key.toLowerCase() === 'b') {
-      event.preventDefault();
-      setOutlineHidden(!outlineHidden);
-      return;
+    if (page === 'editor' && (event.ctrlKey || event.metaKey) && !event.altKey && !event.shiftKey) {
+      if (event.key.toLowerCase() === 'b') {
+        event.preventDefault();
+        setOutlineHidden(!outlineHidden);
+        return;
+      }
+      if (event.key === '\\') {
+        event.preventDefault();
+        setView(view === 'source' ? 'split' : 'source');
+        return;
+      }
     }
     presenterKeys(event);
   });

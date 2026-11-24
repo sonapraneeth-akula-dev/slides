@@ -87,13 +87,21 @@ import '../styles.css';
         <section id="editor-workspace" class="editor-workspace" aria-label="Deck editor">
           <div class="editor-panes" id="editor-panes" data-view="split">
             <section class="source-pane" aria-label="Markdown source">
-              <div class="pane-heading"><strong>Source</strong><span id="source-file"></span></div>
+              <div class="pane-heading">
+                <strong>Source</strong>
+                <span id="source-file"></span>
+                <button type="button" id="show-preview" class="pane-icon-button" aria-label="Show slide preview" title="Show slide preview beside source (Ctrl+\)" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16"/><path d="M15 4v16m-3-6-3-2 3-2"/></svg>Show preview</button>
+              </div>
               <label class="sr-only" for="source">Deck Markdown source</label>
               <textarea id="source" spellcheck="false" autocomplete="off" autocapitalize="off"></textarea>
             </section>
             <div id="pane-splitter" class="pane-splitter" role="separator" aria-orientation="vertical" aria-label="Resize source and slide preview" aria-valuemin="20" aria-valuemax="80" aria-valuenow="50" tabindex="0" title="Drag to resize · Double-click to reset"></div>
             <section class="preview-pane" aria-label="Slide preview">
-              <div class="pane-heading"><strong>Preview</strong><span id="preview-label">Plain text can be edited here</span></div>
+              <div class="pane-heading">
+                <strong>Preview</strong>
+                <span id="preview-label">Plain text can be edited here</span>
+                <button type="button" id="hide-preview" class="pane-icon-button" aria-label="Hide slide preview" title="Hide slide preview and keep code only (Ctrl+\)"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16"/><path d="M15 4v16m-6-6 3-2-3-2"/></svg>Hide preview</button>
+              </div>
               <div id="preview" class="preview-list"></div>
             </section>
           </div>

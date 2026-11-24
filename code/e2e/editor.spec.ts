@@ -1612,3 +1612,32 @@ test('draggable splitter bar resizes source and slide preview panes and resets o
   const resetSource = (await page.locator('.source-pane').boundingBox())!;
   expect(Math.abs(resetSource.width - initialSource.width)).toBeLessThan(4);
 });
+
+test('slide preview can be hidden to keep only code content and reopened from source header or shortcut', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await page.goto(origin);
+  await page.locator('#open-demo').click();
+  await expect(page.locator('.preview-pane')).toBeVisible();
+  await expect(page.locator('#show-preview')).toBeHidden();
+
+  await page.locator('#hide-preview').click();
+  await expect(page.locator('.preview-pane')).toBeHidden();
+  await expect(page.locator('#pane-splitter')).toBeHidden();
+  await expect(page.locator('#show-preview')).toBeVisible();
+  await expect(page.locator('button[data-view="source"]')).toHaveAttribute('aria-pressed', 'true');
+
+  await page.locator('#hide-outline').click();
+  const fullCodeBox = (await page.locator('.source-pane').boundingBox())!;
+  expect(fullCodeBox.x).toBe(0);
+  expect(fullCodeBox.width).toBe(1280);
+
+  await page.locator('#show-preview').click();
+  await expect(page.locator('.preview-pane')).toBeVisible();
+  await expect(page.locator('#show-preview')).toBeHidden();
+  await expect(page.locator('button[data-view="split"]')).toHaveAttribute('aria-pressed', 'true');
+
+  await page.keyboard.press('Control+\\');
+  await expect(page.locator('.preview-pane')).toBeHidden();
+  await page.keyboard.press('Control+\\');
+  await expect(page.locator('.preview-pane')).toBeVisible();
+});
