@@ -91,7 +91,7 @@ test('author, persist, present and share only read-only public state', async ({ 
   await expect(page.locator('#editor-actions .export-options button:enabled')).toHaveCount(2);
   await page.locator('#editor-actions .export-menu summary').click();
   await expect(page.locator('#save')).toHaveCSS('border-radius', '0px');
-  await expect(page.locator('#editor-actions .editor-buttons')).toHaveCSS('border-radius', '8px');
+  await expect(page.locator('#editor-actions .editor-buttons')).toHaveCSS('border-radius', '0px');
   await expect(page.locator('#page-title')).toHaveText('browser-acceptance');
   await expect(page.locator('.outline-actions')).toBeVisible();
   const outline = await page.locator('#outline').boundingBox();
@@ -307,7 +307,7 @@ Audience sees this.
   await expect(page.locator('#editor-panes')).toHaveAttribute('data-view', 'source');
   await page.locator('#save').click();
   await expect(page.locator('#save-status')).toHaveText('Saved');
-  await expect(page.locator('#save-status')).toHaveCSS('border-radius', '8px');
+  await expect(page.locator('#save-status')).toHaveCSS('border-radius', '0px');
   await expect(page.locator('#save')).toBeDisabled();
   await expect.poll(async () => readFile(join(directory, 'presentations', name), 'utf8')).toContain('Updated audience paragraph');
   expect(await readFile(join(directory, 'presentations', name), 'utf8')).toContain('theme: "forest"');
@@ -818,7 +818,7 @@ test('presenter fits charts and Mermaid, shows private notes, and groups legible
       expect(groupBox).not.toBeNull();
       expect(groupBox!.x).toBeGreaterThanOrEqual(0);
       expect(groupBox!.x + groupBox!.width).toBeLessThanOrEqual(width);
-      await expect(row).toHaveCSS('border-radius', '8px');
+      await expect(row).toHaveCSS('border-radius', '0px');
       const buttons = await row.locator('button').evaluateAll(elements => elements.map(element => {
         const rect = element.getBoundingClientRect();
         return { left: rect.left, right: rect.right, top: rect.top, scrollWidth: element.scrollWidth, width: element.clientWidth };
@@ -835,7 +835,7 @@ test('presenter fits charts and Mermaid, shows private notes, and groups legible
   await expect(page.locator('#presenter-side')).not.toContainText(/[←→↑↓]/);
   await page.setViewportSize({ width: 1600, height: 1000 });
   const actions = page.locator('#presenter-actions .editor-buttons');
-  await expect(actions).toHaveCSS('border-radius', '8px');
+  await expect(actions).toHaveCSS('border-radius', '0px');
   const headerButtons = await actions.locator('button').evaluateAll(elements => elements.map(element => element.getBoundingClientRect()));
   expect(headerButtons).toHaveLength(3);
   await expect(actions.locator('button > svg')).toHaveCount(3);
@@ -942,7 +942,7 @@ test('editor actions form one contiguous toolbar on desktop and narrow screens',
   const toolbar = page.getByRole('toolbar', { name: 'Editor actions' });
   await expect(toolbar.locator(':scope > *')).toHaveCount(5);
   await expect(toolbar.locator(':scope > label #theme')).toBeVisible();
-  await expect(toolbar).toHaveCSS('border-radius', '8px');
+  await expect(toolbar).toHaveCSS('border-radius', '0px');
   const positions = await toolbar.locator(':scope > *').evaluateAll(elements => elements.map(element => {
     const rect = element.getBoundingClientRect();
     return { left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom };

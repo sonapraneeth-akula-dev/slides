@@ -30,7 +30,7 @@ body.export-body { margin: 0; background: #0b111c; color: #e2e8f0; font-family: 
 .export-toolbar { position: sticky; top: 0; z-index: 10; display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 8px 16px; background: #0f172a; border-bottom: 1px solid #1e293b; }
 .export-toolbar strong { margin-right: auto; font-size: 14px; color: #f8fafc; }
 .export-toolbar span { font-size: 13px; color: #cbd5e1; font-variant-numeric: tabular-nums; }
-.export-toolbar button { padding: 5px 10px; border: 1px solid #334155; border-radius: 6px; background: #1e293b; color: #f8fafc; cursor: pointer; font: inherit; font-size: 13px; }
+.export-toolbar button { padding: 5px 10px; border: 1px solid #334155; border-radius: 0; background: #1e293b; color: #f8fafc; cursor: pointer; font: inherit; font-size: 13px; }
 .export-toolbar button:hover:not(:disabled) { background: #334155; }
 .export-toolbar button:disabled { opacity: 0.45; cursor: default; }
 .export-deck { display: grid; gap: 24px; padding: 24px; max-width: 1328px; margin: 0 auto; }
