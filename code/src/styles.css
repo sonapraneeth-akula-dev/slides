@@ -140,7 +140,7 @@ a { color: #1752ad; }
 .outline-slides .slide-group > .outline-item { margin: 1px 0; }
 .outline-actions { flex: none; border-top: 1px solid #dbe1e9; padding-top: 8px; }
 .outline-item, .add-slide, #settings-button { display: block; width: 100%; margin: 3px 0; text-align: left; overflow-wrap: anywhere; border-color: transparent; background: transparent; }
-.outline-actions .add-slide { display: flex; align-items: center; gap: 8px; padding: 5px 8px; border-color: #b7c9ed; background: #fff; color: #2354ad; font-weight: 600; }
+.outline-actions .add-slide { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 5px 8px; text-align: center; border-color: #b7c9ed; background: #fff; color: #2354ad; font-weight: 600; }
 .outline-actions .add-slide:hover { background: #e9f0fe; }
 .add-slide-icon { display: inline-flex; align-items: center; justify-content: center; flex: none; width: 18px; height: 18px; border-radius: 50%; background: #2354ad; color: #fff; }
 .add-slide-icon svg { display: block; width: 13px; height: 13px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; }

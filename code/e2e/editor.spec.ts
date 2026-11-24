@@ -97,6 +97,17 @@ test('author, persist, present and share only read-only public state', async ({ 
   const outline = await page.locator('#outline').boundingBox();
   const actions = await page.locator('.outline-actions').boundingBox();
   expect(outline && actions && actions.y + actions.height).toBeGreaterThanOrEqual((outline?.y ?? 0) + (outline?.height ?? 0) - 20);
+  const addButtonCenters = await page.locator('.outline-actions .add-slide').evaluateAll(buttons => buttons.map(button => {
+    const btnRect = button.getBoundingClientRect();
+    const range = document.createRange();
+    range.selectNodeContents(button);
+    const contentRect = range.getBoundingClientRect();
+    return { btnCenter: (btnRect.left + btnRect.right) / 2, contentCenter: (contentRect.left + contentRect.right) / 2 };
+  }));
+  expect(addButtonCenters).toHaveLength(2);
+  for (const item of addButtonCenters) {
+    expect(Math.abs(item.btnCenter - item.contentCenter)).toBeLessThanOrEqual(2);
+  }
   await page.locator('#edit-title').click();
   await page.locator('#title-input').fill('Browser acceptance');
   await page.locator('#title-input').press('Enter');
