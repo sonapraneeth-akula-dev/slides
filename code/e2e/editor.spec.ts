@@ -839,6 +839,10 @@ test('presenter fits charts and Mermaid, shows private notes, and groups legible
   const headerButtons = await actions.locator('button').evaluateAll(elements => elements.map(element => element.getBoundingClientRect()));
   expect(headerButtons).toHaveLength(3);
   await expect(actions.locator('button > svg')).toHaveCount(3);
+  const audienceIconBox = (await page.locator('#local-audience > svg').boundingBox())!;
+  expect(audienceIconBox.width).toBeGreaterThanOrEqual(16);
+  expect(audienceIconBox.height).toBeGreaterThanOrEqual(16);
+  await expect(page.locator('#local-audience > svg rect')).toHaveCount(0);
   for (let index = 1; index < headerButtons.length; index++) {
     expect(Math.abs(headerButtons[index].left - headerButtons[index - 1].right)).toBeLessThan(1);
   }
