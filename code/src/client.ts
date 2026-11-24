@@ -34,6 +34,7 @@ let validText = '';
 let compiled: Deck | null = null;
 let selected = '';
 let view: View = 'split';
+let outlineHidden = false;
 let compileGeneration = 0;
 let compileTimer: ReturnType<typeof setTimeout> | undefined;
 let saveTimer: ReturnType<typeof setTimeout> | undefined;
@@ -130,6 +131,7 @@ function show(next: Page): void {
   }
   $('editor-actions').hidden = next !== 'editor';
   $('presenter-actions').hidden = next !== 'presentation';
+  $('toggle-outline').hidden = next !== 'editor';
   $('edit-title').hidden = next !== 'editor';
   $('title-input').hidden = true;
   $('page-title').hidden = next === 'library';
@@ -346,12 +348,35 @@ function sectionGroup(name: string, count: number, key: string, collapsed: Set<s
   return group;
 }
 
+function setOutlineHidden(hidden: boolean): void {
+  outlineHidden = hidden;
+  $('editor-page').dataset.outline = hidden ? 'collapsed' : 'open';
+  $('outline').hidden = hidden;
+  const toggle = $<HTMLButtonElement>('toggle-outline');
+  toggle.setAttribute('aria-pressed', String(!hidden));
+  toggle.setAttribute('aria-expanded', String(!hidden));
+  const label = hidden ? 'Show slide outline' : 'Hide slide outline';
+  toggle.setAttribute('aria-label', label);
+  toggle.title = `${label} (Ctrl+B)`;
+}
+
 function updateOutline(): void {
   const outline = $('outline');
   outline.replaceChildren();
+  const header = document.createElement('div');
+  header.className = 'outline-header';
   const heading = document.createElement('h2');
   heading.textContent = 'Slide outline';
-  outline.append(heading);
+  const hideBtn = document.createElement('button');
+  hideBtn.type = 'button';
+  hideBtn.id = 'hide-outline';
+  hideBtn.className = 'pane-icon-button';
+  hideBtn.setAttribute('aria-label', 'Hide slide outline');
+  hideBtn.title = 'Hide slide outline (Ctrl+B)';
+  hideBtn.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16"/><path d="M9 4v16m6-10-3 2 3 2"/></svg>';
+  hideBtn.addEventListener('click', () => setOutlineHidden(true));
+  header.append(heading, hideBtn);
+  outline.append(header);
   const settings = document.createElement('button');
   settings.type = 'button';
   settings.id = 'settings-button';
@@ -1182,6 +1207,7 @@ function wire(): void {
   for (const button of document.querySelectorAll<HTMLButtonElement>('button[data-view]')) {
     button.addEventListener('click', () => setView(button.dataset.view as View));
   }
+  $('toggle-outline').addEventListener('click', () => setOutlineHidden(!outlineHidden));
   $<HTMLSelectElement>('theme').addEventListener('change', event => {
     try { editSource(setTheme(sourceInput.value, (event.target as HTMLSelectElement).value)); }
     catch (error) { errorNotice(error); }
@@ -1399,7 +1425,14 @@ function wire(): void {
     updateEditor();
     if (alreadyStopped) notify('Presentation is no longer active. Returned to the editor.');
   });
-  document.addEventListener('keydown', presenterKeys);
+  document.addEventListener('keydown', event => {
+    if (page === 'editor' && (event.ctrlKey || event.metaKey) && !event.altKey && !event.shiftKey && event.key.toLowerCase() === 'b') {
+      event.preventDefault();
+      setOutlineHidden(!outlineHidden);
+      return;
+    }
+    presenterKeys(event);
+  });
   window.addEventListener('beforeunload', event => {
     if (isDirty() || session) { event.preventDefault(); event.returnValue = ''; }
   });

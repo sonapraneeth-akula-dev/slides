@@ -1554,3 +1554,27 @@ test('responsive layout adapts cleanly across laptop, tablet, and phone screens 
   await page.locator('#end').click();
   await page.locator('#confirm-end').click();
 });
+
+test('slide outline sidebar can be hidden and reopened via header button, topbar toggle, and shortcut', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await page.goto(origin);
+  await page.locator('#open-demo').click();
+  await expect(page.locator('#outline')).toBeVisible();
+  await expect(page.locator('#toggle-outline')).toHaveAttribute('aria-expanded', 'true');
+
+  await page.locator('#hide-outline').click();
+  await expect(page.locator('#outline')).toBeHidden();
+  await expect(page.locator('#toggle-outline')).toHaveAttribute('aria-expanded', 'false');
+  const fullWorkspace = (await page.locator('#editor-workspace').boundingBox())!;
+  expect(fullWorkspace.x).toBe(0);
+  expect(fullWorkspace.width).toBe(1280);
+
+  await page.locator('#toggle-outline').click();
+  await expect(page.locator('#outline')).toBeVisible();
+  await expect(page.locator('#toggle-outline')).toHaveAttribute('aria-expanded', 'true');
+
+  await page.keyboard.press('Control+b');
+  await expect(page.locator('#outline')).toBeHidden();
+  await page.keyboard.press('Control+b');
+  await expect(page.locator('#outline')).toBeVisible();
+});
