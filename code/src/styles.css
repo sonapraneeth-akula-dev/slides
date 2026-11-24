@@ -95,9 +95,12 @@ a { color: #1752ad; }
 .export-menu summary::after { content: ''; width: 7px; height: 7px; margin: -4px 2px 0 4px; border-right: 2px solid currentColor; border-bottom: 2px solid currentColor; transform: rotate(45deg); }
 .export-menu summary:hover { border-color: #466ec1; }
 .export-menu summary:focus-visible { outline: 3px solid #3468d2; outline-offset: 2px; }
-.export-options { position: absolute; z-index: 10; top: calc(100% + 4px); right: 0; min-width: 240px; padding: 6px; border: 1px solid #bbc7d6; border-radius: 8px; background: #fff; box-shadow: 0 6px 20px #1b2c4425; }
-.export-options button { display: block; width: 100%; text-align: left; border: 0; }
-.presenter-export { display: inline-block; margin-top: 8px; }
+.export-options { position: absolute; z-index: 10; top: calc(100% + 6px); right: 0; display: grid; gap: 6px; min-width: 220px; padding: 8px; border: 1px solid #bbc7d6; border-radius: 8px; background: #fff; box-shadow: 0 6px 20px #1b2c4425; }
+.export-options > button { display: block; width: 100%; text-align: left; border: 1px solid #dbe2ec; border-radius: 6px; background: #fff; }
+.export-options > button:hover:not(:disabled), .editor-buttons .export-options > button:hover:not(:disabled) { border-color: #82a9fc; background: #f0f5ff; }
+.presenter-export-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 12px; grid-column: 1 / -1; }
+.presenter-export { display: inline-block; margin-top: 0; }
+.presenter-export .export-options { left: 0; right: auto; }
 .eyebrow { color: #416ab8; letter-spacing: .15em; font-size: 12px; font-weight: 700; }
 .library-page { max-width: 1488px; margin: 0 auto; padding: clamp(24px, 3vw, 48px) 24px 64px; }
 .library-hero { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: clamp(24px, 4vw, 72px); align-items: start; }

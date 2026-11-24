@@ -848,6 +848,14 @@ test('presenter fits charts and Mermaid, shows private notes, and groups legible
   await page.locator('#end').hover();
   await expect(page.locator('#end')).toHaveCSS('background-color', 'rgb(158, 28, 43)');
   await expect(page.locator('#end')).toHaveCSS('color', 'rgb(255, 255, 255)');
+  const exportBtnBox = (await page.locator('.presenter-export summary').boundingBox())!;
+  const saveNotesBtnBox = (await page.locator('#save-annotations').boundingBox())!;
+  expect(saveNotesBtnBox.x - (exportBtnBox.x + exportBtnBox.width)).toBeGreaterThanOrEqual(8);
+  await page.locator('.presenter-export summary').click();
+  const [pdfOptBox, htmlOptBox] = await page.locator('.presenter-export .export-options > button')
+    .evaluateAll(buttons => buttons.map(btn => btn.getBoundingClientRect()));
+  expect(htmlOptBox.top - pdfOptBox.bottom).toBeGreaterThanOrEqual(5);
+  await page.locator('.presenter-export summary').click();
   for (let index = 1; index < headerButtons.length; index++) {
     expect(Math.abs(headerButtons[index].left - headerButtons[index - 1].right)).toBeLessThan(1);
   }
