@@ -57,6 +57,7 @@ a { color: #1752ad; }
   background: #fff;
   border-bottom: 1px solid #dbe1e9;
 }
+#app:has(> #editor-page:not([hidden]), > #presentation-page:not([hidden])) .topbar { padding-inline: 14px; }
 .topbar button, .topbar input, .topbar select, .topbar .export-menu summary,
 .outline button, .settings > button, .preview-heading select { font-size: 13px; }
 .brand { font-size: 22px; font-weight: 800; text-decoration: none; color: #152c54; }
@@ -154,25 +155,25 @@ a { color: #1752ad; }
 .editor-panes[data-view="preview"] .source-pane { display: none; }
 .source-pane, .preview-pane { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
 .source-pane { border-right: 1px solid #dbe1e9; }
-.pane-heading { display: flex; justify-content: space-between; gap: 12px; padding: 12px 18px; background: #fff; color: #4a5a70; font-size: 13px; }
-.pane-heading span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-#source { flex: 1; width: 100%; min-height: 260px; resize: none; border: none; border-radius: 0; background: #fafbfc; font: 14px/1.65 ui-monospace, monospace; tab-size: 2; }
-.preview-list { overflow: auto; flex: 1; padding: 12px; }
+.pane-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 12px; background: #fff; border-bottom: 1px solid #dbe1e9; color: #4a5a70; font-size: 12px; }
+.pane-heading strong { flex: none; font-size: 13px; color: #1b2534; }
+.pane-heading span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#source { flex: 1; width: 100%; min-height: 220px; padding: 10px 14px; resize: none; border: none; border-radius: 0; background: #fafbfc; font: 13px/1.55 ui-monospace, monospace; tab-size: 2; overflow-wrap: anywhere; }
+.preview-list { overflow: auto; flex: 1; padding: 10px 12px; }
 .preview-list > .slide-group { max-width: 900px; margin: 0 auto 14px; padding: 0 10px; }
 .preview-list > .slide-group > summary { margin: 0 -10px 12px; }
 .preview-card { max-width: 880px; margin: 0 auto 18px; }
 .slide-options { max-width: 880px; margin: 0 auto 10px; border: 1px solid #dbe1e9; border-radius: 0; background: #f9fbfe; }
-.slide-options > summary { cursor: pointer; padding: 6px 10px; font-size: 13px; }
+.slide-options > summary { cursor: pointer; padding: 5px 10px; font-size: 13px; }
 .slide-options > summary:focus-visible { outline: 3px solid #3468d2; }
 .slide-options-fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(155px, 1fr)); gap: 8px; padding: 10px; }
 .slide-options-fields label { display: grid; gap: 4px; font-size: 13px; }
 .slide-options-fields label:first-child { grid-column: 1 / -1; }
 .slide-options-fields input, .slide-options-fields select { min-width: 0; width: 100%; font-size: 13px; }
 .preview-card.selected .preview-stage { outline: 2px solid #3468d2; outline-offset: 2px; }
-.preview-heading { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }
+.preview-heading { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 6px; }
 .preview-heading strong { overflow-wrap: anywhere; }
-.preview-heading select { margin-left: auto; }
-.preview-heading select { max-width: 50%; }
+.preview-heading select { margin-left: auto; max-width: 55%; }
 .layout-type { display: inline-block; padding: 3px 7px; border: 1px solid #cbd5e4; border-radius: 0; color: #3f5371; background: #eaf0f9; font-size: 12px; white-space: nowrap; }
 .preview-stage { aspect-ratio: 16 / 9; min-height: 0; border: 1px solid #cbd5e4; font-size: clamp(10px, 1.4vw, 18px); }
 .preview-stage [contenteditable="plaintext-only"] { cursor: text; border-radius: 0; }
@@ -398,20 +399,34 @@ dialog input, dialog select { display: block; width: 100%; margin-top: 5px; }
 .conflict-columns { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
 .conflict-columns textarea { display: block; width: 100%; height: 240px; margin-top: 6px; resize: vertical; font-family: ui-monospace, monospace; }
 .dialog-actions { justify-content: flex-end; flex-wrap: wrap; margin-top: 20px; }
+@media (max-width: 1200px) {
+  .editor-page { grid-template-columns: 200px minmax(0, 1fr); }
+  .presentation-page { grid-template-columns: minmax(0, 1fr) 280px; }
+  .presenter-side { padding: 14px; }
+  #theme { min-width: 112px; }
+  .editor-buttons button, .editor-buttons .export-menu summary { padding-inline: 8px; }
+  .master-preview-body { grid-template-columns: 1fr; }
+  .sample-list { max-height: 180px; }
+}
 @media (max-width: 960px) {
-  .library-hero { grid-template-columns: 1fr; gap: 24px; }
+  .library-hero { grid-template-columns: 1fr; gap: 20px; }
   .library-intro h1 { max-width: none; }
   .library-demo { max-width: none; }
   .editor-page { grid-template-columns: 170px minmax(0, 1fr); }
+  .editor-panes[data-view="split"] { grid-template-columns: 1fr; grid-template-rows: minmax(200px, 44%) minmax(0, 1fr); }
+  .editor-panes[data-view="split"] .source-pane { border-right: 0; border-bottom: 1px solid #dbe1e9; }
+  .master-pane { grid-template-columns: 1fr; }
+  .settings { border-right: 0; border-bottom: 1px solid #dbe1e9; padding: 4px 0 12px; }
   .presentation-page { grid-template-columns: 1fr; }
-  .presenter-side { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 20px; }
-  .presenter-side h2 { margin: 8px 0; }
-  .master-preview-body { grid-template-columns: 1fr; }
+  .presenter-side { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 16px; }
+  .presenter-side h2 { margin: 6px 0; }
+  .tool-divider { display: none; }
 }
 @media (max-width: 780px) {
-  #editor-actions, .editor-buttons { width: 100%; }
+  .topbar { gap: 8px; }
+  #editor-actions, #presenter-actions, .editor-buttons { width: 100%; }
   .editor-buttons { flex-wrap: wrap; }
-  .editor-buttons > label { flex: 1 1 100%; border-right: 0; border-bottom: 1px solid #bbc7d6; }
+  .editor-buttons > label { flex: 1 1 100%; border-right: 0; border-bottom: 1px solid #bbc7d6; padding-block: 2px; }
   .editor-buttons #theme { flex: 1; }
   .editor-buttons .view-buttons { flex: 1 1 100%; border-bottom: 1px solid #bbc7d6; }
   .editor-buttons .view-buttons button { flex: 1; }
@@ -419,16 +434,26 @@ dialog input, dialog select { display: block; width: 100%; margin-top: 5px; }
   .editor-buttons .export-menu summary { justify-content: center; }
 }
 @media (max-width: 680px) {
+  .topbar { padding: 8px 16px; }
+  #app:has(> #editor-page:not([hidden]), > #presentation-page:not([hidden])) .topbar { padding-inline: 12px; }
+  .library-page { padding: 20px 16px 48px; }
   .library-start .actions { flex-wrap: wrap; }
   .library-start .actions input, .library-start .actions button { width: 100%; }
   .section-heading { flex-wrap: wrap; gap: 4px 12px; }
-  .editor-page { display: flex; flex-direction: column; height: auto; }
-  .outline { max-height: 180px; border-right: 0; border-bottom: 1px solid #dbe1e9; }
+  .editor-page { display: flex; flex-direction: column; height: auto; min-height: calc(100dvh - 54px); }
+  .outline { max-height: 195px; padding: 8px 10px; border-right: 0; border-bottom: 1px solid #dbe1e9; }
+  .outline h2 { margin: 2px 4px 6px; font-size: 13px; }
+  .outline-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; padding-top: 6px; }
+  .outline-actions .add-slide { margin: 0; justify-content: center; }
   .editor-workspace { min-height: 65dvh; }
-  .editor-panes[data-view="split"] { grid-template-columns: 1fr; }
-  .editor-panes[data-view="split"] .preview-pane { min-height: 50dvh; }
-  .source-pane { min-height: 45dvh; }
-  .presenter-side { display: block; }
+  .editor-panes[data-view="split"] { display: flex; flex-direction: column; height: auto; }
+  .editor-panes[data-view="split"] .source-pane { min-height: 36dvh; }
+  .editor-panes[data-view="split"] .preview-pane { min-height: 48dvh; }
+  .preview-list { padding: 8px; }
+  .preview-heading select { max-width: 100%; }
+  .settings input[type="text"], .settings-section select { max-width: min(180px, 55%); }
+  .presenter-side { display: block; padding: 12px; }
+  dialog { width: calc(100vw - 20px); padding: 16px; }
   .conflict-columns { grid-template-columns: 1fr; }
   .stage-frame > .stage { font-size: clamp(10px, 2vw, 18px); }
 }

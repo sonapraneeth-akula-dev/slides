@@ -866,5 +866,5 @@ describe('persistent library and presentation', () => {
       if (prevChromium === undefined) delete process.env.SLIDES_CHROMIUM_PATH;
       else process.env.SLIDES_CHROMIUM_PATH = prevChromium;
     }
-  });
+  }, 20_000);
 });

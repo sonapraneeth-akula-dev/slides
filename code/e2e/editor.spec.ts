@@ -1484,3 +1484,62 @@ test('add slide actions align source with the highlighted hierarchy, including d
   await expect.poll(async () => readFile(join(directory, 'presentations', name), 'utf8')).toBe(updated);
   await expect(page.locator('#save')).toBeDisabled();
 });
+
+test('responsive layout adapts cleanly across laptop, tablet, and phone screens without overflow', async ({ page }) => {
+  await page.goto(origin);
+  await page.locator('#open-demo').click();
+  await expect(page.locator('#editor-page')).toBeVisible();
+
+  await page.setViewportSize({ width: 1280, height: 720 });
+  const laptopLayout = await page.evaluate(() => {
+    const source = document.querySelector('.source-pane')!.getBoundingClientRect();
+    const preview = document.querySelector('.preview-pane')!.getBoundingClientRect();
+    return {
+      scrollWidth: document.documentElement.scrollWidth,
+      sourceRight: source.right,
+      previewLeft: preview.left,
+    };
+  });
+  expect(laptopLayout.scrollWidth).toBeLessThanOrEqual(1280);
+  expect(laptopLayout.previewLeft).toBeGreaterThanOrEqual(laptopLayout.sourceRight - 1);
+
+  for (const width of [900, 390]) {
+    await page.setViewportSize({ width, height: 844 });
+    const compactEditor = await page.evaluate(() => {
+      const source = document.querySelector('.source-pane')!.getBoundingClientRect();
+      const preview = document.querySelector('.preview-pane')!.getBoundingClientRect();
+      const addButtons = [...document.querySelectorAll('.outline-actions .add-slide')].map(el => el.getBoundingClientRect());
+      return {
+        scrollWidth: document.documentElement.scrollWidth,
+        sourceBottom: source.bottom,
+        previewTop: preview.top,
+        addButtons,
+      };
+    });
+    expect(compactEditor.scrollWidth).toBeLessThanOrEqual(width);
+    expect(compactEditor.previewTop).toBeGreaterThanOrEqual(compactEditor.sourceBottom - 1);
+    if (width === 390) {
+      expect(Math.abs(compactEditor.addButtons[0].top - compactEditor.addButtons[1].top)).toBeLessThan(2);
+    }
+  }
+
+  await page.locator('#present').click();
+  await expect(page.locator('#presentation-page')).toBeVisible();
+  for (const width of [1100, 768, 390]) {
+    await page.setViewportSize({ width, height: 844 });
+    const presenterBounds = await page.evaluate(() => {
+      const actions = document.querySelector('#presenter-actions')!.getBoundingClientRect();
+      const endBtn = document.querySelector('#end')!.getBoundingClientRect();
+      return {
+        scrollWidth: document.documentElement.scrollWidth,
+        actionsRight: actions.right,
+        endRight: endBtn.right,
+      };
+    });
+    expect(presenterBounds.scrollWidth).toBeLessThanOrEqual(width);
+    expect(presenterBounds.actionsRight).toBeLessThanOrEqual(width + 1);
+    expect(presenterBounds.endRight).toBeLessThanOrEqual(width + 1);
+  }
+  await page.locator('#end').click();
+  await page.locator('#confirm-end').click();
+});
