@@ -16,6 +16,9 @@ test('all dropdowns inset the arrow and keep native controls in forced colors', 
   await expect(dropdowns).toHaveCount(4);
   for (const dropdown of await dropdowns.all()) {
     await dropdown.hover();
+    const box = (await dropdown.boundingBox())!;
+    expect(box.height).toBeLessThanOrEqual(34);
+    expect(box.height).toBeGreaterThanOrEqual(28);
     const style = await dropdown.evaluate(element => {
       const computed = getComputedStyle(element);
       return {
