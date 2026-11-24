@@ -1047,8 +1047,13 @@ test('master settings announces the active view and matches editor control typog
     '#settings-button', '.outline-item', '.outline-actions .add-slide',
     '#settings-fields label', '#settings-fields input', '#reset-master'
   ]) await expect(page.locator(selector).first()).toHaveCSS('font-size', '13px');
+  await expect(page.locator('body')).toHaveCSS('font-family', /Segoe UI Variable Display.*SF Pro Display.*Ubuntu.*system-ui/);
+  await expect(page.locator('#master-preview .stage h1').first()).toHaveCSS('font-family', /Segoe UI Variable Display.*SF Pro Display.*Ubuntu.*system-ui/);
+  await page.locator('#master-preview .sample-list button').nth(13).click();
+  await expect(page.locator('#master-preview pre code')).toHaveCSS('font-family', /Cascadia Code PL.*SF Mono.*Ubuntu Mono.*monospace/);
 
   await page.locator('.outline-item').first().click();
+  await expect(page.locator('#source')).toHaveCSS('font-family', /Cascadia Code PL.*SF Mono.*Ubuntu Mono.*monospace/);
   await expect(page.locator('#master-pane')).toBeHidden();
   await expect(page.locator('button[data-view="split"]')).toHaveAttribute('aria-pressed', 'true');
   await expect(page.locator('#settings-button')).toHaveAttribute('aria-current', 'false');

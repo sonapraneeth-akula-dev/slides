@@ -26,7 +26,7 @@ export interface ExportOptions {
 
 const exportLayoutCss = `
 @page { size: 1280px 720px; margin: 0; }
-body.export-body { margin: 0; background: #0b111c; color: #e2e8f0; font-family: system-ui, -apple-system, sans-serif; }
+body.export-body { margin: 0; background: #0b111c; color: #e2e8f0; font-family: var(--font-sans, system-ui, -apple-system, sans-serif); }
 .export-toolbar { position: sticky; top: 0; z-index: 10; display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 8px 16px; background: #0f172a; border-bottom: 1px solid #1e293b; }
 .export-toolbar strong { margin-right: auto; font-size: 14px; color: #f8fafc; }
 .export-toolbar span { font-size: 13px; color: #cbd5e1; font-variant-numeric: tabular-nums; }

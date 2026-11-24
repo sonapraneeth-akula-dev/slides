@@ -7,7 +7,7 @@ import 'highlight.js/styles/github.css';
 import { parseAssetReference, sampleImageReference, sampleImageUrl } from './sample-image-reference';
 import { parseChart, safeMermaid, type ChartData } from './fence-validation';
 import { metadataPositions } from './slide-options';
-import { validFontFamily } from './font-family';
+import { defaultMonoFontStack, defaultSansFontStack, validFontFamily } from './font-family';
 
 export { parseChart, safeMermaid, type ChartData };
 
@@ -430,9 +430,12 @@ function setAppearance(host: HTMLElement, stage: Stage): void {
   }
   for (const key of ['headingFont', 'bodyFont', 'codeFont'] as const) {
     const value = stage.master?.[key];
+    const fallback = key === 'codeFont' ? defaultMonoFontStack : defaultSansFontStack;
     host.style.setProperty(`--${key}`, validFontFamily(value)
-      ? ['system-ui', 'ui-monospace'].includes(value) ? value : JSON.stringify(value)
-      : key === 'codeFont' ? 'ui-monospace' : 'system-ui');
+      ? value === 'system-ui' ? defaultSansFontStack
+        : value === 'ui-monospace' ? defaultMonoFontStack
+        : `${JSON.stringify(value)}, ${fallback}`
+      : fallback);
   }
   const size = (key: string, baseline: number): number => {
     const value = stage.master?.[key];

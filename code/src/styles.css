@@ -1,5 +1,7 @@
 :root {
-  font-family: system-ui, sans-serif;
+  --font-sans: "Segoe UI Variable Display", "Segoe UI Variable Text", "Segoe UI", -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Ubuntu", "Cantarell", "Noto Sans", "Liberation Sans", system-ui, sans-serif;
+  --font-mono: "Cascadia Code PL", "Cascadia Code", "Cascadia Mono", "SF Mono", "JetBrains Mono", "Fira Code", "Ubuntu Mono", ui-monospace, "Consolas", "Menlo", "DejaVu Sans Mono", "Liberation Mono", monospace;
+  font-family: var(--font-sans);
   color: #1b2534;
   background: #f4f6f9;
   font-synthesis: none;
@@ -169,7 +171,7 @@ a { color: #1752ad; }
 .pane-heading strong { flex: none; font-size: 13px; color: #1b2534; }
 .pane-heading span { flex: 1; min-width: 0; text-align: right; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pane-heading .pane-icon-button { flex: none; }
-#source { flex: 1; width: 100%; min-height: 220px; padding: 10px 14px; resize: none; border: none; border-radius: 0; background: #fafbfc; font: 13px/1.55 ui-monospace, monospace; tab-size: 2; overflow-wrap: anywhere; }
+#source { flex: 1; width: 100%; min-height: 220px; padding: 10px 14px; resize: none; border: none; border-radius: 0; background: #fafbfc; font: 13px/1.55 var(--font-mono); tab-size: 2; overflow-wrap: anywhere; }
 .preview-list { overflow: auto; flex: 1; padding: 10px 12px; }
 .preview-list > .slide-group { max-width: 900px; margin: 0 auto 14px; padding: 0 10px; }
 .preview-list > .slide-group > summary { margin: 0 -10px 12px; }
@@ -237,26 +239,26 @@ a { color: #1752ad; }
   padding: var(--slide-margin-top, 5%) var(--slide-margin-right, 5%) var(--slide-margin-bottom, 5%) var(--slide-margin-left, 5%);
   background: var(--slide-surface);
   color: var(--slide-text);
-  font-family: var(--bodyFont, system-ui);
+  font-family: var(--bodyFont, var(--font-sans));
   line-height: 1.42;
 }
-.stage h1, .stage h2, .stage h3 { font-family: var(--headingFont, system-ui); line-height: 1.16; }
+.stage h1, .stage h2, .stage h3 { font-family: var(--headingFont, var(--font-sans)); line-height: 1.16; }
 .stage h1, .stage h2 { color: var(--slide-accent); }
 .stage h1 { font-size: calc(2.5em * var(--headingSize-scale, 1)); }
 .stage .slide-markdown h1 { margin-block: 0 .32em; }
 .stage h2 { font-size: calc(1.8em * var(--headingSize-scale, 1)); }
 .stage h3 { font-size: calc(1.17em * var(--headingSize-scale, 1)); }
 .stage pre { max-width: 100%; overflow: auto; background: #e5e9f0; padding: .7em; border-radius: 0; color: #1c2733; }
-.stage pre code { font-family: var(--codeFont, ui-monospace), monospace; font-size: calc(1em * var(--codeSize-scale, 1)); }
+.stage pre code { font-family: var(--codeFont, var(--font-mono)); font-size: calc(1em * var(--codeSize-scale, 1)); }
 .stage .code-block, .stage .terminal { margin: .6em 0; border-radius: 0; overflow: hidden; }
 .stage .code-block { border: 1px solid #cbd3df; }
 .stage .code-block pre, .stage .terminal pre { margin: 0; border-radius: 0; }
 .stage .code-block pre:has(> .code-gutter) { display: grid; grid-template-columns: auto 1fr; column-gap: 1em; }
 .stage .code-block code { position: relative; isolation: isolate; grid-column: 2; display: block; padding: 0; overflow: visible; background: transparent; }
-.stage .code-header, .stage .terminal figcaption { display: flex; align-items: center; gap: .6em; padding: .3em .8em; font-size: .6em; font-family: var(--codeFont, ui-monospace), monospace; }
+.stage .code-header, .stage .terminal figcaption { display: flex; align-items: center; gap: .6em; padding: .3em .8em; font-size: .6em; font-family: var(--codeFont, var(--font-mono)); }
 .stage .code-header { background: #d5dbe5; color: #28323f; }
 .stage .code-lang { margin-left: auto; padding: .1em .5em; border-radius: 0; background: #fff; color: #173e87; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; }
-.stage .code-gutter { grid-column: 1; color: #6a7686; text-align: right; user-select: none; font-family: var(--codeFont, ui-monospace), monospace; font-size: calc(1em * var(--codeSize-scale, 1)); }
+.stage .code-gutter { grid-column: 1; color: #6a7686; text-align: right; user-select: none; font-family: var(--codeFont, var(--font-mono)); font-size: calc(1em * var(--codeSize-scale, 1)); }
 .stage .code-mark { position: absolute; z-index: -1; left: -.7em; right: -.7em; top: calc(var(--line) * 1lh); height: 1lh; background: #fde68a; }
 .stage .terminal { background: #10151f; color: #d8e0ea; box-shadow: 0 .3em 1em #0003; }
 .stage .terminal figcaption { color: #9aa7b8; background: #1d2533; }
@@ -271,7 +273,7 @@ a { color: #1752ad; }
 .stage .component-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 9em), 1fr)); gap: .7em; margin: .6em 0; }
 .stage .component-card { margin: .6em 0; padding: .7em 1em; border: 1px solid color-mix(in srgb, var(--slide-accent) 30%, var(--slide-surface)); border-top: .25em solid var(--slide-accent); border-radius: 0; background: color-mix(in srgb, var(--slide-accent) 5%, var(--slide-surface)); }
 .stage .component-cards > .component-card { margin: 0; }
-.stage .component-title { margin: 0 0 .3em; font-weight: 800; font-family: var(--headingFont, system-ui); }
+.stage .component-title { margin: 0 0 .3em; font-weight: 800; font-family: var(--headingFont, var(--font-sans)); }
 .stage :is(.component-card, .callout) > :last-child { margin-bottom: 0; }
 .stage .callout { --callout: #2563eb; margin: .6em 0; padding: .6em 1em; border-left: .3em solid var(--callout); border-radius: 0; background: color-mix(in srgb, var(--callout) 10%, var(--slide-surface)); }
 .stage .callout[data-type="tip"] { --callout: #15803d; }
@@ -408,7 +410,7 @@ dialog::backdrop { background: #101c30a8; }
 dialog label { display: block; margin: 10px 0; }
 dialog input, dialog select { display: block; width: 100%; margin-top: 5px; }
 .conflict-columns { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-.conflict-columns textarea { display: block; width: 100%; height: 240px; margin-top: 6px; resize: vertical; font-family: ui-monospace, monospace; }
+.conflict-columns textarea { display: block; width: 100%; height: 240px; margin-top: 6px; resize: vertical; font-family: var(--font-mono); }
 .dialog-actions { justify-content: flex-end; flex-wrap: wrap; margin-top: 20px; }
 @media (max-width: 1200px) {
   .editor-page:not([data-outline="collapsed"]) { grid-template-columns: 200px minmax(0, 1fr); }
