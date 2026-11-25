@@ -133,7 +133,7 @@ md.renderer.rules.fence = (tokens, index) => {
 };
 
 // Static MDX-style components: attributes are plain strings, never evaluated.
-const componentTag = /^<(Cards|Card|Callout|Flow|Lane|Step)((?:\s+[a-z]+="[^"<>{}]*")*)\s*>$/;
+const componentTag = /^<(Cards|Card|Callout|Flow|Lane|Step|Panels|Panel)((?:\s+[a-z]+="[^"<>{}]*")*)\s*>$/;
 const arrowTag = /^<Arrow((?:\s+[a-z]+="[^"<>{}]*")+)\s*\/>$/;
 const calloutTypes: Record<string, string> = { note: 'Note', tip: 'Tip', warning: 'Warning' };
 md.block.ruler.before('fence', 'flow_arrow', (state, start, _end, silent) => {
@@ -177,7 +177,9 @@ md.block.ruler.before('fence', 'component', (state, start, end, silent) => {
   state.md.block.tokenize(state, start + 1, next);
   state.lineMax = lineMax;
   state.parentType = parentType;
-  state.push('component_close', 'div', -1).info = name;
+  const closing = state.push('component_close', 'div', -1);
+  closing.info = name;
+  closing.meta = opening.meta;
   state.line = next + 1;
   return true;
 }, { alt: ['paragraph', 'reference', 'blockquote', 'list'] });
@@ -185,6 +187,17 @@ md.renderer.rules.component_open = (tokens, index) => {
   const { info: name, meta } = tokens[index] as { info: string; meta: Record<string, string> };
   if (name === 'Cards') return '<div class="component-cards">';
   if (name === 'Card') return `<section class="component-card">${meta.title ? `<p class="component-title">${escapeHtml(meta.title)}</p>` : ''}`;
+  if (name === 'Panels') return '<div class="showcase-panels">';
+  if (name === 'Panel') {
+    const href = meta.href && /^https?:\/\/[^\s"<>{}]+$/i.test(meta.href) ? meta.href : '';
+    const linkHtml = href
+      ? ` <span class="panel-sep">—</span> <a href="${escapeHtml(href)}" rel="noopener noreferrer" target="_blank">${escapeHtml(meta.link || href)}</a>`
+      : '';
+    const headerHtml = meta.title || href
+      ? `<header class="panel-header">${meta.title ? `<strong>${escapeHtml(meta.title)}</strong>` : ''}${linkHtml}</header>`
+      : '';
+    return `<section class="showcase-panel">${headerHtml}<div class="panel-body">`;
+  }
   if (name === 'Flow') return '<div class="flow-board"><div class="flow-lanes">';
   if (name === 'Lane') return `<section class="flow-lane">${meta.title ? `<p class="flow-lane-title">${escapeHtml(meta.title)}</p>` : ''}<div class="flow-lane-steps">`;
   if (name === 'Step') {
@@ -197,8 +210,14 @@ md.renderer.rules.component_open = (tokens, index) => {
 };
 md.renderer.rules.component_close = (tokens, index) => {
   const name = tokens[index].info;
-  if (name === 'Cards' || name === 'Flow') return name === 'Flow' ? '</div></div>' : '</div>';
+  if (name === 'Cards' || name === 'Panels') return '</div>';
+  if (name === 'Flow') return '</div></div>';
   if (name === 'Card') return '</section>';
+  if (name === 'Panel') {
+    const meta = (tokens[index].meta ?? {}) as Record<string, string>;
+    const footerHtml = meta.footer ? `<footer class="panel-footer">${escapeHtml(meta.footer)}</footer>` : '';
+    return `</div>${footerHtml}</section>`;
+  }
   if (name === 'Lane') return '</div></section>';
   if (name === 'Step') return '</article>';
   return '</aside>';

@@ -426,6 +426,38 @@ Reads sequentially & wraps around file
 Place Step cards directly inside Flow without Lane wrappers to build a horizontal step-by-step pipeline with routed arrows above a detailed comparison or bottleneck table.
 :::
 
+::slide{id="portal-panels" section="Diagrams" metadataTopLeft="none"}
+# Step U4: Previous Runs List · Step U5: Capacity Run Summary (#6798)
+
+<Status tone="accent">U4 Overview:</Status> Lists all triggered runs with 1-click origin link | <Status tone="accent">U5 Summary:</Status> Shows locked `Host:Port/Service`, SAS URL & telemetry links
+
+<Panels>
+<Panel title="Step U4 · Previous Runs" href="https://example.com/overview" link="capacity-portal/overview#single-host" footer="Tip: If a cold deep link shows the welcome screen, click Capacity Testing top-left once.">
+| Run Name | Environment | Status | Reached QPS |
+| --- | --- | --- | --- |
+| `[PPE] PR 7401 smoke` | `Service-Prod-01` | <Status tone="ok">Completed</Status> | `344` |
+| `[PPE] PR 7401 parity` | `Service-Prod-01` | <Status tone="ok">Completed</Status> | `332` |
+| `[WR46] Combined run-3` | `Service-Prod-01` | <Status tone="muted">Aborted</Status> | `237` |
+| `[WR46] Combined run-1` | `Service-Prod-01` | <Status tone="accent">Threshold</Status> | `309` |
+
+![Portal preview](assets/sample-landscape.svg)
+</Panel>
+<Panel title="Step U5 · Run #6798 Basic Info" href="https://example.com/report/6798" link="capacity-portal/report-summary/6798" footer="Direct buttons at bottom of Basic Info jump straight to Workflow Run and Host Telemetry.">
+| Field | Value |
+| --- | --- |
+| **Product / Mode** | `[SingleBox] Service Capacity (Run #1479)` |
+| **Locked Endpoint** | `app-node-01:4025/Service` (`US`) |
+| **Throughput Ramp** | `6,000` start → `12,000` max QPS |
+| **Final Status** | <Status tone="ok">Completed</Status> — stopped cleanly at threshold |
+
+![Summary preview](assets/sample-landscape.svg)
+</Panel>
+</Panels>
+
+:::notes
+Panels and Panel frame side-by-side screenshots, portal views, or tables with a linked header bar and a persistent tip/caption strip along the bottom.
+:::
+
 ::slide{id="reveal" section="Presenting"}
 # A reveal and private notes
 

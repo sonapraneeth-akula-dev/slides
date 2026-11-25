@@ -395,30 +395,87 @@ a { color: #1752ad; }
 .stage .slide-content:has(> .slide-markdown > .special-fence[data-kind="chart"]),
 .stage .slide-content > .slide-markdown:has(> .special-fence[data-kind="chart"]),
 .stage .slide-content:has(> .slide-markdown > .flow-board),
-.stage .slide-content > .slide-markdown:has(> .flow-board) { height: 100%; }
+.stage .slide-content > .slide-markdown:has(> .flow-board),
+.stage .slide-content:has(> .slide-markdown > .showcase-panels),
+.stage .slide-content > .slide-markdown:has(> .showcase-panels) { height: 100%; }
 .stage:has(> .slide-meta[data-position^="Bottom"]) .slide-content:has(> .slide-markdown > :is(h1, h2, h3):first-child + .special-fence[data-kind="mermaid"]:last-child) {
   height: calc(100% - 2.5em);
 }
 .stage:has(> .slide-meta[data-position^="Bottom"]) .slide-content:has(> .slide-markdown > .special-fence[data-kind="chart"]),
-.stage:has(> .slide-meta[data-position^="Bottom"]) .slide-content:has(> .slide-markdown > .flow-board) {
+.stage:has(> .slide-meta[data-position^="Bottom"]) .slide-content:has(> .slide-markdown > .flow-board),
+.stage:has(> .slide-meta[data-position^="Bottom"]) .slide-content:has(> .slide-markdown > .showcase-panels) {
   height: calc(100% - 1.8em);
 }
 .stage .slide-content > .slide-markdown:has(> .special-fence[data-kind="mermaid"]),
 .stage .slide-content > .slide-markdown:has(> .special-fence[data-kind="chart"]),
-.stage .slide-content > .slide-markdown:has(> .flow-board) {
+.stage .slide-content > .slide-markdown:has(> .flow-board),
+.stage .slide-content > .slide-markdown:has(> .showcase-panels) {
   display: flex;
   flex-direction: column;
+}
+.stage .slide-content > .slide-markdown:has(> .flow-board, > .showcase-panels) {
   font-size: calc(1.85cqw * var(--bodySize-scale, 1));
 }
-.stage .slide-content > .slide-markdown:has(> .flow-board) > :is(h1, h2, h3) {
-  font-size: calc(1.1em * var(--headingSize-scale, 1));
+.stage .slide-content > .slide-markdown:has(> .flow-board, > .showcase-panels) > :is(h1, h2, h3) {
+  font-size: calc(1.08em * var(--headingSize-scale, 1));
   margin-block: 0 .1em;
 }
-.stage .slide-content > .slide-markdown:has(> .flow-board) > p {
+.stage .slide-content > .slide-markdown:has(> .flow-board, > .showcase-panels) > p {
   font-size: .52em;
   margin-block: 0 .22em;
 }
 .stage .slide-content > .slide-markdown:has(> .flow-board) > p a::after { content: " ↗"; }
+.stage .showcase-panels {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
+  gap: 0;
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  border: 1px solid color-mix(in srgb, var(--slide-muted) 48%, var(--slide-surface));
+  background: var(--slide-surface);
+}
+.stage .showcase-panel {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  border-right: 1px solid color-mix(in srgb, var(--slide-muted) 48%, var(--slide-surface));
+}
+.stage .showcase-panel:last-child { border-right: 0; }
+.stage .panel-header {
+  padding: .28em .55em;
+  border-bottom: 1px solid color-mix(in srgb, var(--slide-muted) 42%, var(--slide-surface));
+  background: color-mix(in srgb, var(--slide-muted) 8%, var(--slide-surface));
+  font-size: .52em;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+.stage .panel-header a::after { content: " ↗"; }
+.stage .panel-body {
+  flex: 1;
+  min-height: 0;
+  padding: .42em .55em;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: .28em;
+  font-size: .44em;
+  line-height: 1.28;
+}
+.stage .panel-body > :first-child { margin-top: 0; }
+.stage .panel-body > :last-child { margin-bottom: 0; }
+.stage .panel-body > p:has(> img.slide-image) { flex: 1; min-height: 0; margin: 0; display: grid; place-items: center; }
+.stage .panel-body img.slide-image { width: 100%; height: 100%; max-width: 100%; max-height: 100%; object-fit: contain; }
+.stage .panel-body table :is(td, th) { padding: .26em .42em; vertical-align: top; }
+.stage .panel-footer {
+  padding: .26em .55em;
+  border-top: 1px solid color-mix(in srgb, var(--slide-muted) 42%, var(--slide-surface));
+  background: color-mix(in srgb, var(--slide-muted) 5%, var(--slide-surface));
+  color: var(--slide-muted);
+  font-size: .46em;
+  line-height: 1.25;
+}
 .stage .slide-content > .slide-markdown > .flow-board { flex: 1; min-height: 0; min-width: 0; }
 .stage .slide-content > .slide-markdown:has(> .flow-board):has(> table) > .flow-board { flex: 0 0 auto; padding: .42em .55em; }
 .stage .slide-content > .slide-markdown:has(> .flow-board) > table { margin-top: .38em; font-size: .45em; line-height: 1.26; }

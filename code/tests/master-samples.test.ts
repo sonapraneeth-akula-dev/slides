@@ -4,7 +4,7 @@ import { layouts } from '../src/source-edit';
 import { sampleImageReference } from '../src/sample-image-reference';
 
 test('master gallery covers supported layouts and composition families without modifying a deck', () => {
-  expect(masterSamples).toHaveLength(23);
+  expect(masterSamples).toHaveLength(24);
   expect(new Set(masterSamples.map(sample => sample.slide.layout))).toEqual(new Set(layouts));
   expect(masterSamples.map(sample => sample.slide.id)).toEqual(
     masterSamples.map((_, index) => `master-sample-${index + 1}`)
@@ -21,7 +21,7 @@ test('master gallery covers supported layouts and composition families without m
   }
   expect(masterSamples.filter(sample => /!\[[^\]]+\]\(assets\/[^)]+\)/.test(
     `${sample.slide.body}\n${Object.values(sample.slide.slots).join('\n')}`
-  ))).toHaveLength(8);
+  ))).toHaveLength(9);
   expect(masterSamples.map(sample => sample.title)).toContain('Image only');
   expect(masterSamples.map(sample => sample.title)).toContain('Heading and chart');
   expect(masterSamples.filter(sample => sample.section === 'Charts')).toHaveLength(3);

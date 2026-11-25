@@ -98,6 +98,7 @@ export async function lintDeck(
     let fenceStartLine = directiveLine;
     let fenceBody: string[] = [];
     let flowDepth = 0;
+    let panelsDepth = 0;
     let flowStepIds = new Set<string>();
     let flowArrows: Array<{ from: string; to: string; line: number }> = [];
     let proseLines = 0;
@@ -183,8 +184,10 @@ export async function lintDeck(
           if (from && to) flowArrows.push({ from, to, line: item.line });
         }
       }
-      const isComponentWrapper = /^<\/?(?:Cards|Card|Callout|Flow|Lane|Step)\b.*>$/.test(trimmed) || /^<Arrow\b.*\/>$/.test(trimmed);
-      if (trimmed && flowDepth === 0 && !isComponentWrapper) {
+      if (/^<Panels\b/.test(trimmed)) { panelsDepth++; continue; }
+      if (trimmed === '</Panels>') { if (panelsDepth > 0) panelsDepth--; continue; }
+      const isComponentWrapper = /^<\/?(?:Cards|Card|Callout|Flow|Lane|Step|Panels|Panel)\b.*>$/.test(trimmed) || /^<Arrow\b.*\/>$/.test(trimmed);
+      if (trimmed && flowDepth === 0 && panelsDepth === 0 && !isComponentWrapper) {
         proseLines++;
         proseChars += trimmed.length;
       }

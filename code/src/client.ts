@@ -317,7 +317,7 @@ function sectionName(slide: Slide): string {
   if (slide.layout.startsWith('title-image-')) return 'Title slides';
   if (slide.body.includes('```chart')) return 'Chart slides';
   if (slide.body.includes('```mermaid') || slide.body.includes('<Flow>')) return 'Diagram slides';
-  if (slide.layout === 'image-full' || slide.layout === 'picture-text' ||
+  if (slide.layout === 'image-full' || slide.layout === 'picture-text' || slide.body.includes('<Panels>') ||
       slide.body.includes('![') || Object.values(slide.slots).some(value => value.includes('!['))) return 'Image slides';
   if (slide.body.includes('```')) return 'Code slides';
   if (!Object.keys(slide.slots).length && !slide.reveals.length &&

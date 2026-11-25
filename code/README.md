@@ -80,7 +80,7 @@ Plain **Markdown** inside every card.
 
 Inline <Mark note="optional note">highlighted text</Mark> with a visible note, or <Status tone="ok">colored status text</Status> (`ok`, `accent`, `muted`).
 
-Multi-plane architecture flows combine swimlane `<Lane>` columns, `<Step id="...">` cards, and auto-routed `<Arrow from="..." to="..." style="solid|dashed" />` SVG connectors:
+Multi-plane architecture flows combine swimlane `<Lane>` columns (or direct horizontal `<Step>` cards without `<Lane>`), `<Step id="...">` cards, and auto-routed `<Arrow from="..." to="..." style="solid|dashed" />` SVG connectors, while `<Panels>` / `<Panel title="..." href="..." link="..." footer="...">` frames side-by-side screenshots or tables with a linked header bar and bottom caption strip:
 
 ````mdx
 <Flow>
