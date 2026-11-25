@@ -175,6 +175,8 @@ function buildFrames(sourceDeck: SourceDeck, assetMap: Record<string, string>, s
   return { stage, frames };
 }
 
+const inlineFaviconHref = `data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect width="32" height="32" fill="#152c54"/><rect x="0.5" y="0.5" width="31" height="31" fill="none" stroke="#3468d2"/><rect x="9" y="5" width="18" height="13" fill="#2b5fc2"/><rect x="4" y="10" width="19" height="14" fill="#ffffff"/><rect x="7" y="13" width="11" height="2.5" fill="#152c54"/><rect x="7" y="17.5" width="8" height="2" fill="#416ab8"/><circle cx="19" cy="19.5" r="2.3" fill="#e6695f"/></svg>')}`;
+
 function bootstrapRenderHtml(title: string, css: string, playerJs: string, data: ExportDocumentData, includeToolbar = false): string {
   const safeJson = JSON.stringify(data).replace(/</g, '\\u003c');
   const safeJs = playerJs.replace(/<\/script/gi, '<\\/script');
@@ -188,6 +190,7 @@ function bootstrapRenderHtml(title: string, css: string, playerJs: string, data:
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data:; style-src 'unsafe-inline'; script-src 'unsafe-inline'" />
+  <link rel="icon" type="image/svg+xml" href="${inlineFaviconHref}" />
   <title>${escapeHtml(title)}</title>
   <style>${css.replace(/<\/style/gi, '<\\/style')}</style>
 </head>
@@ -208,6 +211,7 @@ function wrapStaticHtml(title: string, css: string, renderedInnerHtml: string): 
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data:; style-src 'unsafe-inline'; script-src 'unsafe-inline'" />
+  <link rel="icon" type="image/svg+xml" href="${inlineFaviconHref}" />
   <title>${escapeHtml(title)}</title>
   <style>${css.replace(/<\/style/gi, '<\\/style')}</style>
 </head>

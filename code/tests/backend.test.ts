@@ -668,6 +668,9 @@ describe('persistent library and presentation', () => {
       expect(manifest).not.toContain(ownerScript!);
       const get = (path: string, key?: string) => fetch(`${base}${path}`, key ? { headers: { 'X-Slides-Public': key } } : {});
       expect((await get('/audience/')).status).toBe(200);
+      const favicon = await get('/favicon.svg');
+      expect(favicon.status).toBe(200);
+      expect(favicon.headers.get('content-type')).toContain('image/svg+xml');
       expect((await get(`/${audienceScript}`)).status).toBe(200);
       expect((await get('/')).status).toBe(404);
       expect((await get(`/${ownerScript}`)).status).toBe(404);

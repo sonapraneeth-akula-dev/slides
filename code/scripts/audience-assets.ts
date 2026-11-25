@@ -25,4 +25,7 @@ while (pending.length) {
   }
 }
 await mkdir(join(process.cwd(), 'build'), { recursive: true });
+if (await stat(join(dist, 'favicon.svg')).then(() => true, () => false)) {
+  assets.add('favicon.svg');
+}
 await writeFile(join(process.cwd(), 'build', 'audience-assets.json'), `${JSON.stringify([...assets].sort(), null, 2)}\n`);

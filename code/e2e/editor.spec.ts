@@ -1882,10 +1882,17 @@ test('framed <Panels> render side-by-side linked headers, fitted visuals/tables,
   await page.locator('#jump').selectOption('portal-panels');
   await expect(page.locator('#stage .showcase-panel')).toHaveCount(2);
   const [audience] = await Promise.all([context.waitForEvent('page'), page.locator('#local-audience').click()]);
+  await expect(audience.locator('head link[rel="icon"]')).toHaveAttribute('href', '/favicon.svg');
   await expect(audience.locator('#audience-stage .showcase-panel')).toHaveCount(2);
   await expect(audience.locator('#audience-stage .panel-header a')).toHaveCount(2);
   await expect(audience.locator('#audience-stage .panel-footer')).toHaveCount(2);
   await audience.close();
   await page.locator('#end').click();
   await page.locator('#confirm-end').click();
+
+  const iconRes = await page.request.get(`${origin}/favicon.svg`);
+  expect(iconRes.status()).toBe(200);
+  expect(iconRes.headers()['content-type']).toContain('image/svg+xml');
+  expect(await iconRes.text()).toContain('<svg');
+  await expect(page.locator('head link[rel="icon"]')).toHaveAttribute('href', '/favicon.svg');
 });

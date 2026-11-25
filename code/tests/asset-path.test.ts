@@ -5,6 +5,7 @@ describe('private host asset allowlist', () => {
   test('serves only the static entry and built assets', () => {
     expect(publicAssetPath('/')).toBe('index.html');
     expect(publicAssetPath('/index.html')).toBe('index.html');
+    expect(publicAssetPath('/favicon.svg')).toBe('favicon.svg');
     expect(publicAssetPath('/_astro/page.Ab12-Cd.css')).toBe('_astro/page.Ab12-Cd.css');
   });
 
