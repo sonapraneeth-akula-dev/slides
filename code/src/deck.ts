@@ -9,7 +9,7 @@ export interface Diagnostic { line: number; column: number; message: string }
 export interface SlideItem { text: string; line: number; step: number; slot: string }
 export interface Slide {
   id: string; parent: string | null; title: string; number: string; index: number;
-  layout: Layout; section?: string; metadata: Record<string, string>;
+  layout: Layout; section?: string; hideTitle?: boolean; metadata: Record<string, string>;
   items: SlideItem[]; notes: string[]; reveals: number;
 }
 export interface Deck { title: string; master: Record<string, unknown>; slides: Slide[] }
@@ -141,14 +141,20 @@ export function compileDeck(source: string, filenameTitle?: string): Compilation
       const match = /^::slide\{(.*)\}$/.exec(trimmed);
       const attrs = match && attributes(match[1]);
       if (!attrs || !attrs.id || !slideId.test(attrs.id) ||
-          Object.keys(attrs).some(k => !['id', 'parent', 'layout', 'section'].includes(k) && !metadataKeys.has(k))) {
-        fail(line, 'Invalid slide directive (expected id, optional parent, layout, section and metadata positions)');
+          Object.keys(attrs).some(k => !['id', 'parent', 'layout', 'section', 'title', 'hideTitle'].includes(k) && !metadataKeys.has(k))) {
+        fail(line, 'Invalid slide directive (expected id, optional parent, layout, section, title, hideTitle and metadata positions)');
         current = undefined;
         container = undefined;
         continue;
       }
       if (attrs.section !== undefined && (!attrs.section.trim() || attrs.section.length > 60 || /[{}<>]/.test(attrs.section))) {
         fail(line, 'Section must be 1–60 characters without markup');
+      }
+      if (attrs.title !== undefined && (!attrs.title.trim() || attrs.title.length > 120 || /[{}<>]/.test(attrs.title))) {
+        fail(line, 'Slide title must be 1–120 characters without markup');
+      }
+      if (attrs.hideTitle !== undefined && attrs.hideTitle !== 'true' && attrs.hideTitle !== 'false') {
+        fail(line, 'hideTitle must be "true" or "false"');
       }
       for (const key of metadataKeys) if (attrs[key] !== undefined && !allowedMetadata.has(attrs[key] as typeof metadataValues[number])) {
         fail(line, `Invalid metadata for ${key}`);
@@ -158,9 +164,11 @@ export function compileDeck(source: string, filenameTitle?: string): Compilation
       const chosen = attrs.layout ?? configuredLayouts[attrs.id] ?? 'title-content';
       if (!layouts.includes(chosen as Layout)) fail(line, `Invalid slide layout: ${chosen}`);
       current = {
-        id: attrs.id, parent: attrs.parent || null, title: '', number: '', index: slides.length,
+        id: attrs.id, parent: attrs.parent || null, title: attrs.title?.trim() || '', number: '', index: slides.length,
         layout: layouts.includes(chosen as Layout) ? chosen as Layout : 'title-content',
-        section: attrs.section?.trim(), metadata: Object.fromEntries(Object.entries(attrs).filter(([key]) => metadataKeys.has(key))),
+        section: attrs.section?.trim(),
+        ...(attrs.hideTitle === 'true' ? { hideTitle: true } : {}),
+        metadata: Object.fromEntries(Object.entries(attrs).filter(([key]) => metadataKeys.has(key))),
         items: [], notes: [], reveals: 0
       };
       slides.push(current);
@@ -259,6 +267,7 @@ export function audienceProjection(deck: Deck, slideId: string, step: number) {
     slide: {
       id: slide.id, title: slide.title, number: slide.number, index: slide.index,
       layout: slide.layout, reveals: slide.reveals, metadata: slide.metadata,
+      ...(slide.hideTitle ? { hideTitle: true } : {}),
       items: slide.items.filter(item => item.step <= step).map(({ text, step, slot }) => ({ text, step, slot }))
     },
     total: deck.slides.length, step

@@ -1,4 +1,4 @@
-import { clearTheme, editableLines, hasUniqueSlideIds, insertSlide, layouts, propagateSlideIdChange, replacePlainLine, setDeckTitle, setLayout, setMaster, setSlideMetadata, setSlideSection, setTheme, themeNames } from './source-edit';
+import { clearTheme, editableLines, hasUniqueSlideIds, insertSlide, layouts, propagateSlideIdChange, replacePlainLine, setDeckTitle, setLayout, setMaster, setSlideHideTitle, setSlideMetadata, setSlideSection, setTheme, themeNames } from './source-edit';
 import { markdown, overlayMode, renderStage, themePresets, type Deck, type Slide, type Snapshot, type Stage, type Stroke } from './render';
 import { drawStage } from './stage-view';
 import { masterSamples } from './master-samples';
@@ -419,7 +419,7 @@ function updateOutline(): void {
       button.className = 'outline-item';
       button.dataset.slideId = slide.id;
       button.style.paddingInlineStart = `${12 + Math.min(depth, 5) * 16}px`;
-      button.textContent = `${slide.index + 1}. ${slide.body.match(/^#{1,3}\s+(.+)$/m)?.[1] || slide.id}`;
+      button.textContent = `${slide.index + 1}. ${slide.title || slide.body.match(/^#{1,3}\s+(.+)$/m)?.[1] || slide.id}`;
       button.addEventListener('click', () => selectSlide(slide.id));
       group.append(button);
     }
@@ -515,6 +515,19 @@ async function updatePreview(): Promise<void> {
       });
       sectionLabel.append(sectionInput);
       fields.append(sectionLabel);
+      const hideTitleLabel = document.createElement('label');
+      hideTitleLabel.className = 'slide-option-toggle';
+      const hideTitleInput = document.createElement('input');
+      hideTitleInput.type = 'checkbox';
+      hideTitleInput.checked = slide.hideTitle === true;
+      hideTitleInput.disabled = !canEditPreview();
+      hideTitleInput.setAttribute('aria-label', `Hide title on slide ${slide.index + 1}`);
+      hideTitleInput.addEventListener('change', () => {
+        try { editSource(setSlideHideTitle(sourceInput.value, slide.id, hideTitleInput.checked)); }
+        catch (error) { errorNotice(error); }
+      });
+      hideTitleLabel.append(hideTitleInput, document.createTextNode('Hide slide title'));
+      fields.append(hideTitleLabel);
       for (const position of metadataPositions) {
         const field = `metadata${position}` as MetadataKey;
         const fieldLabel = document.createElement('label');
@@ -924,7 +937,7 @@ function drawPresenter(): void {
   const nextLabel = snapshot.step < (slide?.reveals.length || 0)
     ? `Next reveal (${snapshot.step + 1} / ${slide!.reveals.length}) on ${slide?.id}`
     : slides[index + 1]
-      ? `${index + 2}. ${slides[index + 1].body.match(/^#{1,3}\s+(.+)$/m)?.[1] || slides[index + 1].id}`
+      ? `${index + 2}. ${slides[index + 1].title || slides[index + 1].body.match(/^#{1,3}\s+(.+)$/m)?.[1] || slides[index + 1].id}`
       : 'End of deck';
   const upNext = $('up-next');
   const nextKey = nextSlide ? `${session.sessionId}:${nextSlide.id}:${nextStep}` : `${session.sessionId}:end`;
@@ -948,7 +961,7 @@ function drawPresenter(): void {
   $('speaker-notes').replaceChildren(markdown(notes));
   const jump = $<HTMLSelectElement>('jump');
   jump.replaceChildren();
-  slides.forEach((item, position) => jump.add(new Option(`${position + 1}. ${optionLabel(item.body.match(/^#{1,3}\s+(.+)$/m)?.[1] || item.id)}`, item.id)));
+  slides.forEach((item, position) => jump.add(new Option(`${position + 1}. ${optionLabel(item.title || item.body.match(/^#{1,3}\s+(.+)$/m)?.[1] || item.id)}`, item.id)));
   jump.value = snapshot.slideId;
   const byId = new Map(slides.map(item => [item.id, item]));
   const children = slides.filter(item => item.parent === snapshot.slideId);

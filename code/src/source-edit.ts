@@ -202,6 +202,10 @@ export function setSlideSection(source: string, slideId: string, section?: strin
   return changeSlideAttribute(source, slideId, 'section', section?.trim());
 }
 
+export function setSlideHideTitle(source: string, slideId: string, hideTitle: boolean): string {
+  return changeSlideAttribute(source, slideId, 'hideTitle', hideTitle ? 'true' : undefined);
+}
+
 export function setSlideMetadata(source: string, slideId: string, key: MetadataKey, value?: string): string {
   if (!metadataPositions.some(position => `metadata${position}` === key)) throw new Error(`Unknown metadata position: ${key}`);
   if (value !== undefined && !metadataValues.includes(value as typeof metadataValues[number])) {
@@ -325,7 +329,7 @@ function sourceSlides(source: string): SlideIds[] | null {
       offset += spaces;
       const attribute = /^([a-zA-Z][\w-]*)="([^"]*)"(?:\s+|$)/.exec(rest);
       if (!attribute || attributes.has(attribute[1]) ||
-          !['id', 'parent', 'layout', 'section'].includes(attribute[1]) &&
+          !['id', 'parent', 'layout', 'section', 'title', 'hideTitle'].includes(attribute[1]) &&
           !metadataPositions.some(position => attribute[1] === `metadata${position}`)) return null;
       const start = offset + attribute[1].length + 2;
       attributes.set(attribute[1], { value: attribute[2], start, end: start + attribute[2].length });

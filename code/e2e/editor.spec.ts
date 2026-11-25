@@ -1682,3 +1682,54 @@ test('chart slides fit without scrollbars and keep footers anchored at the botto
     }
   }
 });
+
+test('slide title can be hidden via slide settings or omitted entirely while keeping outline and metadata titles', async ({ page, context }) => {
+  await page.goto(origin);
+  await page.locator('#deck-name').fill('Titleless and hidden titles');
+  await page.locator('#create').click();
+  await page.locator('#source').fill(`---
+slides:
+  title: Title options
+---
+::slide{id="toggle-slide" metadataTopCenter="slideTitle"}
+# Visible then hidden
+
+Body paragraph remains visible.
+
+::slide{id="no-heading" title="Metrics overview" metadataTopCenter="slideTitle"}
+Direct content with no Markdown heading at all.
+`);
+
+  await expect(page.locator('#outline .outline-item')).toHaveText([
+    '1. Visible then hidden',
+    '2. Metrics overview',
+  ]);
+  const firstCard = page.locator('.preview-card[data-slide-id="toggle-slide"]');
+  const secondCard = page.locator('.preview-card[data-slide-id="no-heading"]');
+  await expect(firstCard.locator('.preview-stage h1')).toHaveText('Visible then hidden');
+  await expect(secondCard.locator('.preview-stage :is(h1, h2, h3)')).toHaveCount(0);
+  await expect(secondCard.locator('.preview-stage .slide-meta[data-position="TopCenter"]')).toHaveText('Metrics overview');
+
+  await firstCard.locator('.slide-options summary').click();
+  await firstCard.getByLabel('Hide title on slide 1').check();
+  await expect(page.locator('#source')).toHaveValue(/hideTitle="true"/);
+  await expect(firstCard.locator('.preview-stage :is(h1, h2, h3)')).toHaveCount(0);
+  await expect(firstCard.locator('.preview-stage')).toContainText('Body paragraph remains visible.');
+  await expect(firstCard.locator('.preview-stage .slide-meta[data-position="TopCenter"]')).toHaveText('Visible then hidden');
+  await expect(page.locator('#outline .outline-item').first()).toHaveText('1. Visible then hidden');
+
+  await page.locator('#save').click();
+  await expect(page.locator('#save')).toBeDisabled();
+  await page.locator('#present').click();
+  await expect(page.locator('#stage :is(h1, h2, h3)')).toHaveCount(0);
+  await expect(page.locator('#stage .slide-meta[data-position="TopCenter"]')).toHaveText('Visible then hidden');
+  await expect(page.locator('#jump option')).toHaveText(['1. Visible Then Hidden', '2. Metrics Overview']);
+
+  const [audience] = await Promise.all([context.waitForEvent('page'), page.locator('#local-audience').click()]);
+  await expect(audience.locator('#audience-stage :is(h1, h2, h3)')).toHaveCount(0);
+  await expect(audience.locator('#audience-stage')).toContainText('Body paragraph remains visible.');
+  await expect(audience.locator('#audience-stage .slide-meta[data-position="TopCenter"]')).toHaveText('Visible then hidden');
+  await audience.close();
+  await page.locator('#end').click();
+  await page.locator('#confirm-end').click();
+});

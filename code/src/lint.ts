@@ -75,7 +75,11 @@ export async function lintDeck(
 
   for (const slide of compilation.deck.slides) {
     const directiveLine = ranges.find(range => range.id === slide.id)?.startLine ?? slide.items[0]?.line ?? 1;
-    const hasContent = slide.items.some(item => item.text.trim().length > 0);
+    const firstNonEmpty = slide.items.findIndex(item => item.text.trim().length > 0);
+    const visibleItems = slide.hideTitle
+      ? slide.items.filter((item, idx) => !(idx === firstNonEmpty && !item.slot && item.step === 0 && /^#{1,3}\s+/.test(item.text.trim())))
+      : slide.items;
+    const hasContent = visibleItems.some(item => item.text.trim().length > 0);
     if (slide.layout !== 'blank' && !hasContent) {
       diagnostics.push({
         line: directiveLine,

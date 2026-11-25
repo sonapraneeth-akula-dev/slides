@@ -123,8 +123,21 @@ slides:
     expect(snapshot.stage.slides[0].metadata).toEqual({ metadataBottomRight: 'none', metadataTopLeft: 'slideTitle' });
     for (const directive of [
       'section=""', 'section="<script>"', 'metadataBottomRight="invalid"',
-      'metadataUnknown="none"', 'metadataBottomRight="none" metadataBottomRight="slideNumber"'
+      'metadataUnknown="none"', 'metadataBottomRight="none" metadataBottomRight="slideNumber"',
+      'hideTitle="yes"', 'title=""', 'title="<b>bad</b>"'
     ]) expect(compileDeck(input.replace('section="Findings"', directive)).deck).toBeNull();
+
+    const hiddenAndTitleless = compileDeck(`::slide{id="hidden" hideTitle="true"}
+# Hidden heading
+Body stays visible
+
+::slide{id="titleless" title="Custom label"}
+Direct body with no heading
+`);
+    expect(hiddenAndTitleless.diagnostics).toEqual([]);
+    expect(hiddenAndTitleless.deck?.slides[0]).toMatchObject({ id: 'hidden', title: 'Hidden heading', hideTitle: true });
+    expect(hiddenAndTitleless.deck?.slides[1]).toMatchObject({ id: 'titleless', title: 'Custom label' });
+    expect(audienceProjection(hiddenAndTitleless.deck!, 'hidden', 0).slide.hideTitle).toBe(true);
   });
 
   test('bundled feature tour is a valid comprehensive authored deck', async () => {

@@ -16,6 +16,8 @@ export interface Slide {
   parent?: string;
   index: number;
   layout: string;
+  title?: string;
+  hideTitle?: boolean;
   section?: string;
   metadata?: Record<string, string>;
   body: string;
@@ -466,11 +468,14 @@ export async function renderStage(host: HTMLElement, stage: Stage, slide: Slide 
     return;
   }
   host.dataset.layout = slide.layout;
+  if (slide.hideTitle) host.dataset.hideTitle = 'true';
+  else delete host.dataset.hideTitle;
   if (slide.layout !== 'blank') {
     const content = document.createElement('div');
     content.className = 'slide-content';
     if (slide.layout === 'title-image-left' || slide.layout === 'title-image-right') {
       const text = markdown(slide.body, stage.assetBase, stage.assetMap);
+      if (slide.hideTitle) text.querySelector(':scope > :is(h1, h2, h3):first-child')?.remove();
       text.classList.add('slide-cover-text');
       const image = markdown(slide.slots?.image || '', stage.assetBase, stage.assetMap);
       image.classList.add('slide-cover-image');
@@ -478,6 +483,7 @@ export async function renderStage(host: HTMLElement, stage: Stage, slide: Slide 
       content.append(text, image);
     } else {
       const body = markdown(slide.body, stage.assetBase, stage.assetMap);
+      if (slide.hideTitle) body.querySelector(':scope > :is(h1, h2, h3):first-child')?.remove();
       if (slide.layout === 'image-full') body.classList.add('slide-full-image');
       content.append(body);
     }
@@ -512,7 +518,7 @@ export async function renderStage(host: HTMLElement, stage: Stage, slide: Slide 
       : configured;
     const value = kind === 'slideNumber' ? `${slide.index + 1} / ${stage.total ?? stage.slides.length}`
       : kind === 'deckTitle' ? stage.title
-      : kind === 'slideTitle' ? slide.body.match(/^#{1,3}\s+(.+)$/m)?.[1] || slide.id
+      : kind === 'slideTitle' ? slide.title || slide.body.match(/^#{1,3}\s+(.+)$/m)?.[1] || slide.id
       : kind === 'footer' || kind === 'logo' ? master[kind] : '';
     if (typeof value !== 'string' || !value) continue;
     const element = document.createElement('span');

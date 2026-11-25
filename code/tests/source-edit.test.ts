@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 import { compileDeck } from '../src/deck';
-import { addSlide, clearTheme, editableLines, hasUniqueSlideIds, insertSlide, propagateSlideIdChange, replacePlainLine, setDeckTitle, setLayout, setMaster, setSlideMetadata, setSlideSection, setTheme } from '../src/source-edit';
+import { addSlide, clearTheme, editableLines, hasUniqueSlideIds, insertSlide, propagateSlideIdChange, replacePlainLine, setDeckTitle, setLayout, setMaster, setSlideHideTitle, setSlideMetadata, setSlideSection, setTheme } from '../src/source-edit';
 
 const source = `---
 slides:
@@ -133,6 +133,13 @@ describe('source-backed editing', () => {
     expect(() => setSlideSection(crlf, 'detail', '<script>')).toThrow('Section');
     expect(() => setSlideMetadata(crlf, 'detail', 'metadataBottomRight', 'invalid')).toThrow('Invalid metadata');
     expect(() => setSlideMetadata(crlf, 'detail', 'metadataNowhere' as 'metadataBottomRight', 'none')).toThrow('Unknown metadata');
+
+    const hidden = setSlideHideTitle(crlf, 'detail', true);
+    expect(hidden).toContain('::slide{id="detail" parent="intro" hideTitle="true"}\r\n');
+    expect(compileDeck(hidden).deck?.slides[1].hideTitle).toBe(true);
+    const restored = setSlideHideTitle(hidden, 'detail', false);
+    expect(restored).not.toContain('hideTitle=');
+    expect(compileDeck(restored).deck?.slides[1].hideTitle).toBeUndefined();
   });
 
   test('inserts a child after its selected slide subtree, before unrelated slides', () => {

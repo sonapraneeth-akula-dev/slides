@@ -5,12 +5,14 @@ function content(items: SlideItem[], step: number, slot = ''): string {
   return items.filter(item => item.step === step && item.slot === slot).map(item => item.text).join('\n').trim();
 }
 
-function slide(source: Pick<SourceSlide, 'id' | 'parent' | 'index' | 'layout' | 'items' | 'reveals' | 'metadata'> & { section?: string }): Slide {
+function slide(source: Pick<SourceSlide, 'id' | 'parent' | 'index' | 'layout' | 'items' | 'reveals' | 'metadata'> & { section?: string; title?: string; hideTitle?: boolean }): Slide {
   const slots: Record<string, string> = {};
   for (const item of source.items) if (item.slot) slots[item.slot] = content(source.items, 0, item.slot);
   return {
     id: source.id, parent: source.parent ?? undefined, index: source.index, layout: source.layout,
     section: source.section, metadata: source.metadata,
+    ...(source.title ? { title: source.title } : {}),
+    ...(source.hideTitle ? { hideTitle: true } : {}),
     body: content(source.items, 0),
     slots,
     reveals: Array.from({ length: source.reveals }, (_, index) => content(source.items, index + 1)),
@@ -58,6 +60,8 @@ export interface PublicState {
     master: Record<string, unknown>;
     total: number;
     slide: Pick<SourceSlide, 'id' | 'index' | 'layout' | 'reveals' | 'metadata'> & {
+      title?: string;
+      hideTitle?: boolean;
       items: Array<Pick<SlideItem, 'text' | 'step' | 'slot'>>;
     };
   };
