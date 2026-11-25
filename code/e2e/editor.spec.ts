@@ -187,7 +187,7 @@ Audience sees this.
     await samples.nth(index).click();
     await expect(samples.nth(index)).toHaveAttribute('aria-current', 'true');
   };
-  await expect(samples).toHaveCount(21);
+  await expect(samples).toHaveCount(22);
   await expect(samples).toHaveText([
     '1. Blank', '2. Title and subtitle', '3. Title, subtitle and image', '4. Heading only',
     '5. Heading and content', '6. Heading and two text columns', '7. Heading and three columns',
@@ -195,9 +195,10 @@ Audience sees this.
     '11. Image only', '12. Picture with caption', '13. Heading and table', '14. Heading and code',
     '15. Heading and chart', '16. Line chart with two series', '17. Donut chart',
     '18. Heading and diagram', '19. Heading and equation',
-    '20. Title with image on the left', '21. Title with image on the right'
+    '20. Title with image on the left', '21. Title with image on the right',
+    '22. Four-plane architecture flow'
   ]);
-  await expect(page.locator('#master-preview .slide-group')).toHaveCount(9);
+  await expect(page.locator('#master-preview .slide-group')).toHaveCount(10);
   await page.locator('#master-preview .slide-group').nth(1).locator('summary').click();
   await expect(page.locator('#master-preview .slide-group').nth(1)).not.toHaveAttribute('open');
   await page.locator('#master-preview .slide-group').nth(1).locator('summary').click();
@@ -264,6 +265,9 @@ Audience sees this.
   expect(diagramCoverage.inFrame).toBe(true);
   await choose(18);
   await expect(viewer.locator('.katex')).toHaveCount(1);
+  await choose(21);
+  await expect(viewer.locator('.flow-lane')).toHaveCount(4);
+  await expect(viewer.locator('svg.flow-arrows > path')).toHaveCount(7);
   for (const [index, direction] of [[19, 'left'], [20, 'right']] as const) {
     await choose(index);
     await expect(viewer.locator('.stage')).toHaveAttribute('data-layout', `title-image-${direction}`);
@@ -305,15 +309,15 @@ Audience sees this.
   await expect(viewer.locator('pre code')).toHaveCSS('font-family', /Consolas/);
   await choose(1);
   await page.getByLabel('Bottom Right').selectOption('slideNumber');
-  await expect(page.locator('#master-preview .slide-meta[data-position="BottomRight"]')).toHaveText('2 / 21');
+  await expect(page.locator('#master-preview .slide-meta[data-position="BottomRight"]')).toHaveText('2 / 22');
   await page.getByLabel('Top Left').selectOption('slideNumber');
-  await expect(page.locator('#master-preview .slide-meta[data-position="TopLeft"]')).toHaveText('2 / 21');
+  await expect(page.locator('#master-preview .slide-meta[data-position="TopLeft"]')).toHaveText('2 / 22');
   await expect(page.locator('#source')).toHaveValue(/    metadata:\n      metadataBottomRight: "slideNumber"/);
   await page.getByLabel('Top Center').selectOption('deckTitle');
   await expect(page.locator('#source')).toHaveValue(/metadataTopCenter: "deckTitle"/);
   await expect(page.locator('#source')).toHaveValue(/      metadataTopLeft: "slideNumber"/);
   await expect(page.locator('#master-preview .slide-meta[data-position="TopCenter"]')).toHaveText('Browser acceptance');
-  await expect(page.locator('#master-preview .slide-meta[data-position="BottomRight"]')).toHaveText('2 / 21');
+  await expect(page.locator('#master-preview .slide-meta[data-position="BottomRight"]')).toHaveText('2 / 22');
   await page.locator('[data-view="source"]').click();
   await expect(page.locator('#editor-panes')).toHaveAttribute('data-view', 'source');
   await page.locator('#save').click();
@@ -541,7 +545,7 @@ test('one feature tour action opens the latest edition without overwriting edits
   await expect(page.locator('#open-demo')).toHaveText('Explore latest feature tour');
   await page.locator('#open-demo').click();
   await expect(page.locator('#editor-page')).toBeVisible();
-  await expect(page.locator('.preview-card')).toHaveCount(19);
+  await expect(page.locator('.preview-card')).toHaveCount(20);
   await expect(page.locator('#source')).toHaveValue(/# Bundled feature tour: [a-f0-9]{64}/);
   await expect(page.locator('.preview-card[data-slide-id="welcome"] .slide-cover-image img')).toBeVisible();
   await expect(page.locator('.preview-card[data-slide-id="diagram"] .special-fence svg')).toBeVisible();
@@ -562,7 +566,7 @@ test('one feature tour action opens the latest edition without overwriting edits
   await page.locator('#open-demo').click();
   await expect(page.locator('#editor-page')).toBeVisible();
   await expect(page.locator('#source')).toHaveValue(/# My personalized tour/);
-  await expect(page.locator('.preview-card')).toHaveCount(19);
+  await expect(page.locator('.preview-card')).toHaveCount(20);
   await page.locator('#home').click();
   await expect(page.locator('#library-page')).toBeVisible();
   const olderText = (await readFile(original, 'utf8')).replace(
@@ -570,11 +574,11 @@ test('one feature tour action opens the latest edition without overwriting edits
   await writeFile(original, olderText);
   await page.locator('#open-demo').click();
   await expect(page.locator('#editor-page')).toBeVisible();
-  await expect(page.locator('.preview-card')).toHaveCount(19);
+  await expect(page.locator('.preview-card')).toHaveCount(20);
   await expect(page.locator('#source-file')).toContainText('Slides-Feature-Tour-2.mdx');
   await expect(page.locator('#source')).toHaveValue(/# A reveal and private notes/);
   await expect(page.locator('#source')).toHaveValue(/Mermaid renders this left-to-right flow from idea to presentation/);
-  expect((await page.locator('#source').inputValue()).match(/^:::notes$/gm)).toHaveLength(19);
+  expect((await page.locator('#source').inputValue()).match(/^:::notes$/gm)).toHaveLength(20);
   expect(await readFile(original, 'utf8')).toBe(olderText);
   await page.locator('#home').click();
   await expect(page.locator('#library-page')).toBeVisible();
@@ -752,7 +756,7 @@ test('presenter fits charts and Mermaid, shows private notes, and groups legible
   await page.setViewportSize({ width: 1920, height: 1080 });
   await page.goto(origin);
   await page.locator('#open-demo').click();
-  await expect(page.locator('.preview-card')).toHaveCount(19);
+  await expect(page.locator('.preview-card')).toHaveCount(20);
   await expect(page.locator('#present')).toBeEnabled();
   await page.locator('#present').click();
   await page.locator('#jump').selectOption('diagram');
@@ -1132,7 +1136,7 @@ slides:
   await page.locator('#settings-button').click();
   await expect(page.getByLabel('Slide number in footer')).toHaveCount(0);
   await expect(page.getByLabel('Bottom Right')).toHaveValue('slideNumber');
-  await expect(page.locator('#master-preview .slide-meta[data-position="BottomRight"]')).toHaveText('5 / 21');
+  await expect(page.locator('#master-preview .slide-meta[data-position="BottomRight"]')).toHaveText('5 / 22');
   await page.getByLabel('Bottom Right').selectOption('none');
   await expect(page.locator('#master-preview .slide-meta[data-position="BottomRight"]')).toHaveCount(0);
   await expect(page.locator('#source')).toHaveValue(/    metadata:\n      metadataBottomRight: "none"/);
@@ -1748,6 +1752,56 @@ Direct content with no Markdown heading at all.
   await expect(audience.locator('#audience-stage :is(h1, h2, h3)')).toHaveCount(0);
   await expect(audience.locator('#audience-stage')).toContainText('Body paragraph remains visible.');
   await expect(audience.locator('#audience-stage .slide-meta[data-position="TopCenter"]')).toHaveText('Visible then hidden');
+  await audience.close();
+  await page.locator('#end').click();
+  await page.locator('#confirm-end').click();
+});
+
+test('multi-plane architecture flow renders 4 swimlanes, routed solid/dashed SVG arrows, and 5-column KPI strip without overflow', async ({ page, context }) => {
+  await page.goto(origin);
+  await page.locator('#open-demo').click();
+  const card = page.locator('.preview-card[data-slide-id="architecture-flow"]');
+  const stage = card.locator('.preview-stage');
+  await stage.scrollIntoViewIfNeeded();
+  await expect(stage.locator('.flow-lane')).toHaveCount(4);
+  await expect(stage.locator('.flow-step')).toHaveCount(11);
+  await expect(stage.locator('.flow-step[data-tone="accent"]')).toHaveCount(4);
+  await expect(stage.locator('svg.flow-arrows > path')).toHaveCount(7);
+  await expect(stage.locator('svg.flow-arrows > path[stroke-dasharray]')).toHaveCount(1);
+  await expect(stage.locator('.component-cards > .component-card')).toHaveCount(5);
+
+  for (const [width, height] of [[1920, 1080], [1366, 768], [1280, 720]] as const) {
+    await page.setViewportSize({ width, height });
+    await stage.scrollIntoViewIfNeeded();
+    const layout = await stage.evaluate(el => {
+      const stageRect = el.getBoundingClientRect();
+      const boardRect = el.querySelector('.flow-board')!.getBoundingClientRect();
+      const kpiRect = el.querySelector('.component-cards')!.getBoundingClientRect();
+      const footerRect = el.querySelector('.slide-meta[data-position="BottomLeft"]')!.getBoundingClientRect();
+      const lanes = [...el.querySelectorAll('.flow-lane')].map(lane => lane.getBoundingClientRect());
+      return {
+        overflow: el.scrollHeight > el.clientHeight + 1,
+        boardAboveKpi: boardRect.bottom <= kpiRect.top + 2,
+        kpiAboveFooter: kpiRect.bottom <= footerRect.top + 2,
+        footerBottomGap: stageRect.bottom - footerRect.bottom,
+        stageHeight: stageRect.height,
+        fourColumns: lanes.length === 4 && lanes.every((lane, idx) => idx === 0 || lane.left > lanes[idx - 1].right),
+      };
+    });
+    expect(layout.overflow).toBe(false);
+    expect(layout.boardAboveKpi).toBe(true);
+    expect(layout.kpiAboveFooter).toBe(true);
+    expect(layout.footerBottomGap).toBeLessThan(layout.stageHeight * 0.08);
+    expect(layout.fourColumns).toBe(true);
+  }
+
+  await page.locator('#present').click();
+  await page.locator('#jump').selectOption('architecture-flow');
+  await expect(page.locator('#stage svg.flow-arrows > path')).toHaveCount(7);
+  const [audience] = await Promise.all([context.waitForEvent('page'), page.locator('#local-audience').click()]);
+  await expect(audience.locator('#audience-stage .flow-lane')).toHaveCount(4);
+  await expect(audience.locator('#audience-stage svg.flow-arrows > path')).toHaveCount(7);
+  await expect(audience.locator('#audience-stage .component-cards > .component-card')).toHaveCount(5);
   await audience.close();
   await page.locator('#end').click();
   await page.locator('#confirm-end').click();

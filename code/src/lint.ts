@@ -97,6 +97,9 @@ export async function lintDeck(
     let fenceLang = '';
     let fenceStartLine = directiveLine;
     let fenceBody: string[] = [];
+    let flowDepth = 0;
+    let flowStepIds = new Set<string>();
+    let flowArrows: Array<{ from: string; to: string; line: number }> = [];
     let proseLines = 0;
     let proseChars = 0;
 
@@ -145,7 +148,43 @@ export async function lintDeck(
         fenceBody.push(item.text);
         continue;
       }
-      if (trimmed) {
+      if (/^<Flow\b/.test(trimmed)) {
+        if (flowDepth++ === 0) {
+          flowStepIds = new Set();
+          flowArrows = [];
+        }
+        continue;
+      }
+      if (trimmed === '</Flow>') {
+        if (flowDepth > 0 && --flowDepth === 0) {
+          for (const arrow of flowArrows) {
+            if (!flowStepIds.has(arrow.from) || !flowStepIds.has(arrow.to)) {
+              diagnostics.push({
+                line: arrow.line,
+                column: 1,
+                severity: 'warning',
+                code: 'FLOW_ARROW_TARGET',
+                message: `Arrow "${arrow.from}" -> "${arrow.to}" references an unknown Step id`,
+                slideId: slide.id,
+                sourceSpan: spanForLine(lines, arrow.line),
+              });
+            }
+          }
+        }
+        continue;
+      }
+      if (flowDepth > 0) {
+        const stepId = /^<Step\b[^>]*\bid="([A-Za-z][\w-]*)"/.exec(trimmed)?.[1];
+        if (stepId) flowStepIds.add(stepId);
+        const arrowMatch = /^<Arrow\b(.*)$/.exec(trimmed);
+        if (arrowMatch) {
+          const from = /\bfrom="([^"]+)"/.exec(arrowMatch[1])?.[1];
+          const to = /\bto="([^"]+)"/.exec(arrowMatch[1])?.[1];
+          if (from && to) flowArrows.push({ from, to, line: item.line });
+        }
+      }
+      const isComponentWrapper = /^<\/?(?:Cards|Card|Callout|Flow|Lane|Step)\b.*>$/.test(trimmed) || /^<Arrow\b.*\/>$/.test(trimmed);
+      if (trimmed && flowDepth === 0 && !isComponentWrapper) {
         proseLines++;
         proseChars += trimmed.length;
       }

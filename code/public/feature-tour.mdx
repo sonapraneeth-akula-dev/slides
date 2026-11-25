@@ -267,6 +267,110 @@ flowchart LR
 Mermaid renders this left-to-right flow from idea to presentation. The diagram fits within the slide and leaves room for the footer.
 :::
 
+::slide{id="architecture-flow" section="Diagrams" metadataTopLeft="none"}
+# Service-Level Machine Capacity — End-to-End 4-Plane Flow
+
+[Runner PR #104](https://example.com/runner) · [Scheduler PR #105](https://example.com/scheduler) · [Service PR #108](https://example.com/service) · [Live Weekly Capacity UI](https://example.com/capacity)
+
+<Flow>
+<Lane title="1 · Workflow Plane">
+<Step id="u1" title="U1 · Batch Submit / Weekly Cron">
+Sub-test = Capacity (skips baseline)
+</Step>
+<Step id="u2" title="U2 · Auto-Lock + Pin + Deploy">
+Locks client + downstream · opens TCP port
+</Step>
+<Step id="u3-trigger" title="U3 · TriggerCapacityTask (3.3s)" tone="accent">
+1 fresh `.bin` (8h SAS) + host bindings
+
+<Status tone="ok">Exits immediately (PendingCallback)</Status>
+</Step>
+<Step id="u9" title="U9 · Webhook → Pass + Unlock">
+<Status tone="ok">Completed = Green Pass · 0 stuck locks</Status>
+</Step>
+</Lane>
+<Lane title="2 · Orchestration Plane">
+<Step id="u4" title="U4–U5 · POST /api/CapacityTests">
+Stores JSON scenario · auto-maps profile
+</Step>
+<Step id="u6" title="U6 · Step Ramp + Auto-Stop">
+StartQps → +StepQps → MaxQps
+
+<Status tone="accent">StopOnBreach saves host locks</Status>
+</Step>
+<Step id="u8" title="U8 · Multi-Role Counter Isolation" tone="accent">
+- Bound role: locked host validated
+- Unbound role: env collected (non-fatal)
+- Webhook + 3m reconciler backup
+</Step>
+</Lane>
+<Lane title="3 · Load Agents & Telemetry">
+<Step id="agents" title="U7 · Replay Agents (LoadGen)" tone="accent">
+- Sequential `.bin` replay across N agents
+- Copies `.bin` to local NVMe once (Step 1)
+- <Status tone="ok">Retail speed · exact failure count</Status>
+</Step>
+<Step id="telemetry" title="Telemetry & Health Counters">
+`AppStore_PS` → `app-node-01`
+
+`Inference_GPU` → `gpu-node-04`
+</Step>
+</Lane>
+<Lane title="4 · Locked Target Hosts">
+<Step id="client-host" title="Client Host (Exclusive Lock)" tone="accent">
+`app-node-01:4025/Service`
+
+Candidate build + co-located sidecar
+
+<Status tone="accent">89.6% CPU @ 5,160 Reached QPS</Status>
+</Step>
+<Step id="downstream-host" title="Downstream Host (Exclusive Lock)">
+`gpu-node-04` (Model GPU)
+
+Pinned 1:1 from service config
+</Step>
+</Lane>
+<Arrow from="u3-trigger" to="u4" />
+<Arrow from="u6" to="agents" />
+<Arrow from="agents" to="client-host" />
+<Arrow from="client-host" to="downstream-host" />
+<Arrow from="downstream-host" to="telemetry" style="dashed" />
+<Arrow from="telemetry" to="u8" />
+<Arrow from="u8" to="u9" />
+</Flow>
+
+<Cards>
+<Card title="DB Schema Changes">
+<Status tone="accent">Zero (0 DDL)</Status>
+
+Uses existing JSON columns
+</Card>
+<Card title="Worker Hold Time">
+<Status tone="accent">3.3 Seconds</Status>
+
+Webhook + 3m reconciler
+</Card>
+<Card title="QuerySet Strategy">
+<Status tone="accent">1 Fresh .bin (8h SAS)</Status>
+
+Reused across ramp steps
+</Card>
+<Card title="Gate Verdict">
+<Status tone="accent">Completed = Pass</Status>
+
+Threshold runs never false-fail
+</Card>
+<Card title="Workflows Wired">
+<Status tone="accent">10 Pipelines (~35 Jobs)</Status>
+
+Default capacity mode safe
+</Card>
+</Cards>
+
+:::notes
+Flow, Lane, Step, Arrow, and Status compose multi-plane architecture diagrams as native Markdown cards with auto-routed SVG connectors and a KPI summary strip below.
+:::
+
 ::slide{id="reveal" section="Presenting"}
 # A reveal and private notes
 

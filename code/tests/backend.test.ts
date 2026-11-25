@@ -144,7 +144,7 @@ Direct body with no heading
     const source = await readFile(join(process.cwd(), 'public', 'feature-tour.mdx'), 'utf8');
     const compiled = compileDeck(source);
     expect(compiled.diagnostics).toEqual([]);
-    expect(compiled.deck?.slides.length).toBe(19);
+    expect(compiled.deck?.slides.length).toBe(20);
     expect(new Set(compiled.deck?.slides.map(slide => slide.layout))).toEqual(new Set([
       'title-content', 'title-image-left', 'title-image-right', 'two-columns',
       'three-columns', 'picture-text', 'image-full', 'blank'
@@ -155,6 +155,8 @@ Direct body with no heading
       title: 'Performance metrics',
       hideTitle: true,
     });
+    expect(compiled.deck?.slides.find(slide => slide.id === 'architecture-flow')?.title)
+      .toContain('End-to-End 4-Plane Flow');
   });
 
   test('accepts only static built-in components with string attributes', async () => {

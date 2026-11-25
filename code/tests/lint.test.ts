@@ -33,6 +33,17 @@ describe('deck lint engine and CLI', () => {
 ::slide{id="dense"}
 # Dense
 ${denseBody}
+
+::slide{id="flow-warn"}
+# Flow
+<Flow>
+<Lane title="One">
+<Step id="a" title="A">
+Step A
+</Step>
+</Lane>
+<Arrow from="a" to="missing" />
+</Flow>
 `);
       const out: string[] = [];
       const err: string[] = [];
@@ -48,6 +59,7 @@ ${denseBody}
       expect(codes).toContain('IMAGE_ALT_MISSING');
       expect(codes).toContain('ASSET_MISSING');
       expect(codes).toContain('SLIDE_DENSE');
+      expect(codes).toContain('FLOW_ARROW_TARGET');
       expect(parsed[0].diagnostics.some(diag => diag.slideId === 'blank-ok')).toBe(false);
     } finally {
       await rm(workspace, { recursive: true, force: true });

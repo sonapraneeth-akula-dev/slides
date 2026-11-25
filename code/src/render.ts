@@ -133,8 +133,26 @@ md.renderer.rules.fence = (tokens, index) => {
 };
 
 // Static MDX-style components: attributes are plain strings, never evaluated.
-const componentTag = /^<(Cards|Card|Callout)((?:\s+[a-z]+="[^"<>{}]*")*)\s*>$/;
+const componentTag = /^<(Cards|Card|Callout|Flow|Lane|Step)((?:\s+[a-z]+="[^"<>{}]*")*)\s*>$/;
+const arrowTag = /^<Arrow((?:\s+[a-z]+="[^"<>{}]*")+)\s*\/>$/;
 const calloutTypes: Record<string, string> = { note: 'Note', tip: 'Tip', warning: 'Warning' };
+md.block.ruler.before('fence', 'flow_arrow', (state, start, _end, silent) => {
+  const text = state.src.slice(state.bMarks[start] + state.tShift[start], state.eMarks[start]).trim();
+  const match = arrowTag.exec(text);
+  if (!match) return false;
+  const attrs = Object.fromEntries([...match[1].matchAll(/([a-z]+)="([^"]*)"/g)].map(item => [item[1], item[2]]));
+  if (!attrs.from || !attrs.to || !/^[A-Za-z][\w-]*$/.test(attrs.from) || !/^[A-Za-z][\w-]*$/.test(attrs.to)) return false;
+  if (silent) return true;
+  const token = state.push('flow_arrow', 'span', 0);
+  token.meta = { from: attrs.from, to: attrs.to, style: attrs.style === 'dashed' ? 'dashed' : 'solid' };
+  token.map = [start, start + 1];
+  state.line = start + 1;
+  return true;
+}, { alt: ['paragraph', 'reference', 'blockquote', 'list'] });
+md.renderer.rules.flow_arrow = (tokens, index) => {
+  const { from, to, style } = tokens[index].meta as { from: string; to: string; style: string };
+  return `<span class="flow-arrow-spec" data-from="${escapeHtml(from)}" data-to="${escapeHtml(to)}" data-style="${escapeHtml(style)}" hidden></span>`;
+};
 md.block.ruler.before('fence', 'component', (state, start, end, silent) => {
   const lineText = (line: number) => state.src.slice(state.bMarks[line] + state.tShift[line], state.eMarks[line]).trim();
   const open = componentTag.exec(lineText(start));
@@ -167,11 +185,24 @@ md.renderer.rules.component_open = (tokens, index) => {
   const { info: name, meta } = tokens[index] as { info: string; meta: Record<string, string> };
   if (name === 'Cards') return '<div class="component-cards">';
   if (name === 'Card') return `<section class="component-card">${meta.title ? `<p class="component-title">${escapeHtml(meta.title)}</p>` : ''}`;
+  if (name === 'Flow') return '<div class="flow-board"><div class="flow-lanes">';
+  if (name === 'Lane') return `<section class="flow-lane">${meta.title ? `<p class="flow-lane-title">${escapeHtml(meta.title)}</p>` : ''}<div class="flow-lane-steps">`;
+  if (name === 'Step') {
+    const idAttr = meta.id && /^[A-Za-z][\w-]*$/.test(meta.id) ? ` data-step-id="${escapeHtml(meta.id)}"` : '';
+    const toneAttr = meta.tone === 'accent' ? ' data-tone="accent"' : '';
+    return `<article class="flow-step"${idAttr}${toneAttr}>${meta.title ? `<p class="flow-step-title">${escapeHtml(meta.title)}</p>` : ''}`;
+  }
   const type = calloutTypes[meta.type] ? meta.type : 'note';
   return `<aside class="callout" data-type="${type}"><p class="component-title">${escapeHtml(meta.title || calloutTypes[type])}</p>`;
 };
-md.renderer.rules.component_close = (tokens, index) =>
-  tokens[index].info === 'Cards' ? '</div>' : tokens[index].info === 'Card' ? '</section>' : '</aside>';
+md.renderer.rules.component_close = (tokens, index) => {
+  const name = tokens[index].info;
+  if (name === 'Cards' || name === 'Flow') return name === 'Flow' ? '</div></div>' : '</div>';
+  if (name === 'Card') return '</section>';
+  if (name === 'Lane') return '</div></section>';
+  if (name === 'Step') return '</article>';
+  return '</aside>';
+};
 
 md.inline.ruler.before('escape', 'mark_note', (state, silent) => {
   if (state.src.charCodeAt(state.pos) !== 0x3c) return false;
@@ -190,6 +221,23 @@ md.renderer.rules.mark_note = (tokens, index) => {
   const note = (meta as { note?: string } | null)?.note;
   const marked = `<mark class="highlight">${md.renderInline(content)}</mark>`;
   return note ? `<span class="highlight-group">${marked}<span class="highlight-note">${escapeHtml(note)}</span></span>` : marked;
+};
+md.inline.ruler.before('escape', 'status_note', (state, silent) => {
+  if (state.src.charCodeAt(state.pos) !== 0x3c) return false;
+  const match = /^<Status(?:\s+tone="(ok|accent|muted)")?\s*>([^<]{1,500})<\/Status>/.exec(state.src.slice(state.pos));
+  if (!match) return false;
+  if (!silent) {
+    const token = state.push('status_note', '', 0);
+    token.content = match[2];
+    token.meta = { tone: match[1] || 'ok' };
+  }
+  state.pos += match[0].length;
+  return true;
+});
+md.renderer.rules.status_note = (tokens, index) => {
+  const { content, meta } = tokens[index];
+  const tone = (meta as { tone?: string } | null)?.tone || 'ok';
+  return `<span class="flow-status" data-tone="${escapeHtml(tone)}">${md.renderInline(content)}</span>`;
 };
 md.renderer.rules.link_open = (tokens, index, options, env, self) => {
   tokens[index].attrSet('rel', 'noopener noreferrer');
@@ -283,6 +331,7 @@ function textFallback(target: HTMLElement, label: string, source: string): void 
 }
 
 let diagramCounter = 0;
+let flowCounter = 0;
 const mountedCharts = new Map<HTMLElement, () => void>();
 let chartCleanup: MutationObserver | undefined;
 function cleanCharts(): void {
@@ -293,6 +342,91 @@ function cleanCharts(): void {
     }
   }
   if (!mountedCharts.size) chartCleanup?.disconnect();
+}
+
+function drawFlowArrows(board: HTMLElement, boardId: number): void {
+  const rect = board.getBoundingClientRect();
+  let svg = board.querySelector<SVGSVGElement>(':scope > svg.flow-arrows');
+  if (!svg) {
+    svg = document.createElementNS(svgNamespace, 'svg');
+    svg.setAttribute('class', 'flow-arrows');
+    svg.setAttribute('aria-hidden', 'true');
+    board.append(svg);
+  }
+  svg.replaceChildren();
+  if (rect.width < 4 || rect.height < 4) return;
+  svg.setAttribute('viewBox', `0 0 ${rect.width} ${rect.height}`);
+  const specs = [...board.querySelectorAll<HTMLElement>('.flow-arrow-spec[data-from][data-to]')];
+  if (!specs.length) return;
+  const defs = document.createElementNS(svgNamespace, 'defs');
+  for (const [kind, color] of [['solid', 'var(--flow-arrow, var(--slide-accent))'], ['dashed', 'var(--slide-muted)']] as const) {
+    const marker = document.createElementNS(svgNamespace, 'marker');
+    marker.setAttribute('id', `flow-head-${kind}-${boardId}`);
+    marker.setAttribute('viewBox', '0 0 8 8');
+    marker.setAttribute('refX', '7');
+    marker.setAttribute('refY', '4');
+    marker.setAttribute('markerWidth', '6');
+    marker.setAttribute('markerHeight', '6');
+    marker.setAttribute('orient', 'auto');
+    const tip = document.createElementNS(svgNamespace, 'path');
+    tip.setAttribute('d', 'M 0 1 L 7 4 L 0 7 z');
+    tip.setAttribute('fill', color);
+    marker.append(tip);
+    defs.append(marker);
+  }
+  svg.append(defs);
+  for (const spec of specs) {
+    const fromId = spec.dataset.from;
+    const toId = spec.dataset.to;
+    const style = spec.dataset.style === 'dashed' ? 'dashed' : 'solid';
+    if (!fromId || !toId) continue;
+    const fromEl = board.querySelector<HTMLElement>(`[data-step-id="${CSS.escape(fromId)}"]`);
+    const toEl = board.querySelector<HTMLElement>(`[data-step-id="${CSS.escape(toId)}"]`);
+    if (!fromEl || !toEl) continue;
+    const a = fromEl.getBoundingClientRect();
+    const b = toEl.getBoundingClientRect();
+    if (!a.width || !b.width) continue;
+    const ax = (x: number) => Math.round((x - rect.left) * 10) / 10;
+    const ay = (y: number) => Math.round((y - rect.top) * 10) / 10;
+    let x1: number, y1: number, x2: number, y2: number;
+    if (b.left >= a.right - 4) {
+      x1 = ax(a.right); y1 = ay(a.top + a.height / 2);
+      x2 = ax(b.left) - 2; y2 = ay(b.top + b.height / 2);
+    } else if (a.left >= b.right - 4) {
+      x1 = ax(a.left); y1 = ay(a.top + a.height / 2);
+      x2 = ax(b.right) + 2; y2 = ay(b.top + b.height / 2);
+    } else if (b.top >= a.bottom - 4) {
+      x1 = ax(a.left + a.width / 2); y1 = ay(a.bottom);
+      x2 = ax(b.left + b.width / 2); y2 = ay(b.top) - 2;
+    } else {
+      x1 = ax(a.left + a.width / 2); y1 = ay(a.top);
+      x2 = ax(b.left + b.width / 2); y2 = ay(b.bottom) + 2;
+    }
+    const path = document.createElementNS(svgNamespace, 'path');
+    path.setAttribute('d', `M ${x1} ${y1} L ${x2} ${y2}`);
+    path.setAttribute('fill', 'none');
+    path.setAttribute('stroke', style === 'dashed' ? 'var(--slide-muted)' : 'var(--flow-arrow, var(--slide-accent))');
+    path.setAttribute('stroke-width', '1.6');
+    if (style === 'dashed') path.setAttribute('stroke-dasharray', '4 3');
+    path.setAttribute('marker-end', `url(#flow-head-${style}-${boardId})`);
+    svg.append(path);
+  }
+}
+
+function mountFlows(root: HTMLElement): void {
+  for (const board of root.querySelectorAll<HTMLElement>('.flow-board')) {
+    if (!board.isConnected) continue;
+    const id = ++flowCounter;
+    drawFlowArrows(board, id);
+    if (document.documentElement.dataset.exportStatic === 'true') continue;
+    const observer = new ResizeObserver(() => {
+      if (board.isConnected) drawFlowArrows(board, id);
+    });
+    observer.observe(board);
+    mountedCharts.set(board, () => observer.disconnect());
+    chartCleanup ??= new MutationObserver(cleanCharts);
+    chartCleanup.observe(document.body, { childList: true, subtree: true });
+  }
 }
 
 // Mermaid measures its viewBox in a detached scratch container; re-measure the live SVG so drawn content is never clipped.
@@ -528,6 +662,7 @@ export async function renderStage(host: HTMLElement, stage: Stage, slide: Slide 
     host.append(element);
   }
   await renderFences(host);
+  mountFlows(host);
 }
 
 const svgNamespace = 'http://www.w3.org/2000/svg';

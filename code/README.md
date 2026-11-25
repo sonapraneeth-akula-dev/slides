@@ -78,7 +78,25 @@ Plain **Markdown** inside every card.
 `type` is `note` (default), `tip`, or `warning`.
 </Callout>
 
-Inline <Mark note="optional note">highlighted text</Mark> with a visible note.
+Inline <Mark note="optional note">highlighted text</Mark> with a visible note, or <Status tone="ok">colored status text</Status> (`ok`, `accent`, `muted`).
+
+Multi-plane architecture flows combine swimlane `<Lane>` columns, `<Step id="...">` cards, and auto-routed `<Arrow from="..." to="..." style="solid|dashed" />` SVG connectors:
+
+````mdx
+<Flow>
+<Lane title="1 · Workflow">
+<Step id="trigger" title="Trigger" tone="accent">
+Starts async job · <Status tone="ok">3.3s hold</Status>
+</Step>
+</Lane>
+<Lane title="2 · Target">
+<Step id="host" title="Locked Host">
+Runs isolated replay
+</Step>
+</Lane>
+<Arrow from="trigger" to="host" />
+</Flow>
+````
 
 ```typescript title="slides.ts" showLineNumbers {2,4-5}
 // filename header, language badge, line numbers, highlighted lines 2 and 4-5

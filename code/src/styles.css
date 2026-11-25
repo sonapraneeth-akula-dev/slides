@@ -285,6 +285,58 @@ a { color: #1752ad; }
 .stage mark.highlight { padding: 0 .15em; border-radius: 0; color: inherit; background: linear-gradient(transparent 35%, #fde047 35%); }
 .stage .highlight-note { display: inline-block; margin-left: .35em; padding: .05em .45em; border-radius: 0; font-size: .7em; vertical-align: .15em; color: #713f12; background: #fef3c7; border: 1px dashed #d97706; }
 .stage .highlight-note::before { content: "← " / ""; }
+.stage .flow-status { font-weight: 700; color: #15803d; }
+.stage .flow-status[data-tone="accent"] { color: var(--flow-arrow, var(--slide-accent)); }
+.stage .flow-status[data-tone="muted"] { color: var(--slide-muted); font-weight: 600; }
+.stage .flow-board {
+  --flow-arrow: color-mix(in srgb, #be123c 72%, var(--slide-accent));
+  position: relative;
+  padding: .36em .45em;
+  border: 1px solid color-mix(in srgb, var(--slide-muted) 28%, var(--slide-surface));
+  background: color-mix(in srgb, var(--slide-muted) 4%, var(--slide-surface));
+}
+.stage .flow-lanes { display: grid; grid-template-columns: repeat(auto-fit, minmax(0, 1fr)); gap: .85em; height: 100%; align-items: stretch; }
+.stage .flow-lanes > :not(.flow-lane) { display: none !important; }
+.stage .flow-lane {
+  display: flex;
+  flex-direction: column;
+  gap: .28em;
+  min-width: 0;
+  padding: .3em;
+  border: 1px solid color-mix(in srgb, var(--slide-muted) 38%, var(--slide-surface));
+  background: var(--slide-surface);
+}
+.stage .flow-lane-title {
+  margin: 0;
+  padding: .16em .35em;
+  border: 1px solid color-mix(in srgb, var(--flow-arrow) 48%, var(--slide-surface));
+  background: color-mix(in srgb, var(--flow-arrow) 7%, var(--slide-surface));
+  color: var(--flow-arrow);
+  font-size: .46em;
+  font-weight: 800;
+  letter-spacing: .03em;
+  text-align: center;
+  text-transform: uppercase;
+}
+.stage .flow-lane-steps { display: flex; flex-direction: column; justify-content: space-between; gap: .26em; flex: 1; min-height: 0; }
+.stage .flow-step {
+  padding: .26em .36em;
+  border: 1px solid color-mix(in srgb, var(--slide-muted) 28%, var(--slide-surface));
+  background: color-mix(in srgb, var(--slide-muted) 6%, var(--slide-surface));
+  font-size: .42em;
+  line-height: 1.24;
+}
+.stage .flow-step[data-tone="accent"] {
+  border: 1.5px solid var(--flow-arrow);
+  background: color-mix(in srgb, var(--flow-arrow) 6%, var(--slide-surface));
+}
+.stage .flow-step-title { margin: 0 0 .12em; font-weight: 800; color: var(--slide-text); font-family: var(--headingFont, var(--font-sans)); }
+.stage .flow-step[data-tone="accent"] > .flow-step-title { color: var(--flow-arrow); }
+.stage .flow-step > :not(.flow-step-title) { margin: .08em 0 0; }
+.stage .flow-step ul { padding-left: 1.05em; }
+.stage .flow-step li { margin: .04em 0; }
+.stage .flow-step code { font-family: var(--codeFont, var(--font-mono)); font-size: .92em; color: var(--flow-arrow); }
+.stage svg.flow-arrows { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; overflow: visible; }
 .stage .slide-markdown { font-size: calc(1em * var(--bodySize-scale, 1)); }
 .stage .slide-content { padding: var(--slide-padding-top, 0%) var(--slide-padding-right, 0%) var(--slide-padding-bottom, 0%) var(--slide-padding-left, 0%); }
 .stage .slide-markdown > :is(h1, h2, h3) { text-align: var(--heading-align, left); }
@@ -332,23 +384,60 @@ a { color: #1752ad; }
 }
 .presentation-page { display: grid; grid-template-columns: minmax(0, 1fr) 320px; min-height: calc(100dvh - 54px); background: #172237; color: #f5f7fc; }
 .presentation-main { min-width: 0; padding: clamp(12px, 2vw, 26px); }
-.stage-frame { position: relative; width: 100%; aspect-ratio: 16 / 9; background: #fff; color: #1b1f24; }
+.stage-frame { position: relative; width: 100%; aspect-ratio: 16 / 9; container-type: inline-size; background: #fff; color: #1b1f24; }
 .stage-frame[data-tool="pen"], .stage-frame[data-tool="highlighter"] { touch-action: none; cursor: crosshair; }
 .stage-frame > .stage { font-size: clamp(12px, 2vw, 32px); }
 .stage .slide-content:has(> .slide-markdown > .special-fence[data-kind="mermaid"]),
 .stage .slide-content > .slide-markdown:has(> .special-fence[data-kind="mermaid"]),
 .stage .slide-content:has(> .slide-markdown > .special-fence[data-kind="chart"]),
-.stage .slide-content > .slide-markdown:has(> .special-fence[data-kind="chart"]) { height: 100%; }
+.stage .slide-content > .slide-markdown:has(> .special-fence[data-kind="chart"]),
+.stage .slide-content:has(> .slide-markdown > .flow-board),
+.stage .slide-content > .slide-markdown:has(> .flow-board) { height: 100%; }
 .stage:has(> .slide-meta[data-position^="Bottom"]) .slide-content:has(> .slide-markdown > :is(h1, h2, h3):first-child + .special-fence[data-kind="mermaid"]:last-child) {
   height: calc(100% - 2.5em);
 }
-.stage:has(> .slide-meta[data-position^="Bottom"]) .slide-content:has(> .slide-markdown > .special-fence[data-kind="chart"]) {
+.stage:has(> .slide-meta[data-position^="Bottom"]) .slide-content:has(> .slide-markdown > .special-fence[data-kind="chart"]),
+.stage:has(> .slide-meta[data-position^="Bottom"]) .slide-content:has(> .slide-markdown > .flow-board) {
   height: calc(100% - 1.8em);
 }
 .stage .slide-content > .slide-markdown:has(> .special-fence[data-kind="mermaid"]),
-.stage .slide-content > .slide-markdown:has(> .special-fence[data-kind="chart"]) {
+.stage .slide-content > .slide-markdown:has(> .special-fence[data-kind="chart"]),
+.stage .slide-content > .slide-markdown:has(> .flow-board) {
   display: flex;
   flex-direction: column;
+  font-size: calc(1.85cqw * var(--bodySize-scale, 1));
+}
+.stage .slide-content > .slide-markdown:has(> .flow-board) > :is(h1, h2, h3) {
+  font-size: calc(1.1em * var(--headingSize-scale, 1));
+  margin-block: 0 .1em;
+}
+.stage .slide-content > .slide-markdown:has(> .flow-board) > p {
+  font-size: .52em;
+  margin-block: 0 .22em;
+}
+.stage .slide-content > .slide-markdown:has(> .flow-board) > p a::after { content: " ↗"; }
+.stage .slide-content > .slide-markdown > .flow-board { flex: 1; min-height: 0; min-width: 0; }
+.stage .slide-content > .slide-markdown:has(> .flow-board) > .component-cards {
+  grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
+  gap: 0;
+  margin: .24em 0 0;
+  border: 1px solid color-mix(in srgb, var(--slide-muted) 42%, var(--slide-surface));
+  font-size: .45em;
+  line-height: 1.2;
+}
+.stage .slide-content > .slide-markdown:has(> .flow-board) > .component-cards > .component-card {
+  padding: .24em .45em;
+  border: 0;
+  border-right: 1px solid color-mix(in srgb, var(--slide-muted) 42%, var(--slide-surface));
+  background: var(--slide-surface);
+}
+.stage .slide-content > .slide-markdown:has(> .flow-board) > .component-cards > .component-card:last-child { border-right: 0; }
+.stage .slide-content > .slide-markdown:has(> .flow-board) > .component-cards .component-title {
+  margin: -.24em -.45em .2em;
+  padding: .16em .45em;
+  border-bottom: 1px solid color-mix(in srgb, var(--slide-muted) 32%, var(--slide-surface));
+  background: color-mix(in srgb, var(--slide-muted) 10%, var(--slide-surface));
+  font-size: .92em;
 }
 .stage .slide-content > .slide-markdown > .special-fence[data-kind="chart"] {
   display: flex;

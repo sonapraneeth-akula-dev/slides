@@ -25,7 +25,7 @@ const metadataKeys = new Set(metadataPositions.map(position => `metadata${positi
 const allowedMetadata = new Set(metadataValues);
 const insets = new Set(['marginTop', 'marginRight', 'marginBottom', 'marginLeft', 'paddingTop', 'paddingRight', 'paddingBottom', 'paddingLeft']);
 // Built-in static components (rendered in render.ts); any other tag remains rejected as executable JSX/HTML.
-const staticComponents = /<\/?(?:Cards|Card|Callout)(?:\s+[a-z]+="[^"<>{}]*")*\s*>|<Mark(?:\s+note="[^"<>{}]*")?\s*>|<\/Mark>/g;
+const staticComponents = /<\/?(?:Cards|Card|Callout|Flow|Lane|Step)(?:\s+[a-z]+="[^"<>{}]*")*\s*>|<Arrow(?:\s+[a-z]+="[^"<>{}]*")+?\s*\/>|<Mark(?:\s+note="[^"<>{}]*")?\s*>|<\/Mark>|<Status(?:\s+tone="[^"<>{}]*")?\s*>|<\/Status>/g;
 
 function attributes(raw: string): Record<string, string> | null {
   const result: Record<string, string> = {};
