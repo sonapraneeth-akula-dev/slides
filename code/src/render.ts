@@ -136,9 +136,11 @@ md.renderer.rules.fence = (tokens, index) => {
 };
 
 // Static MDX-style components: attributes are plain strings, never evaluated.
-const componentTag = /^<(Cards|Card|Callout|Flow|Lane|Step|Panels|Panel)((?:\s+[a-z]+="[^"<>{}]*")*)\s*>$/;
-const arrowTag = /^<Arrow((?:\s+[a-z]+="[^"<>{}]*")+)\s*\/>$/;
+const componentTag = /^<(Cards|Card|Callout|Flow|Lane|Steps|StepItem|Step|Panels|Panel|Split|Stack)((?:\s+[a-z]+="[^"<{}]*")*)\s*>$/;
+const arrowTag = /^<Arrow((?:\s+[a-z]+="[^"<{}]*")+)\s*\/>$/;
 const calloutTypes: Record<string, string> = { note: 'Note', tip: 'Tip', warning: 'Warning' };
+const cardTones = new Set(['blue', 'teal', 'green', 'amber', 'red', 'purple', 'dark']);
+const splitRatios = new Set(['50-50', '56-44', '58-42', '48-52', '60-40', '40-60']);
 md.block.ruler.before('fence', 'flow_arrow', (state, start, _end, silent) => {
   const text = state.src.slice(state.bMarks[start] + state.tShift[start], state.eMarks[start]).trim();
   const match = arrowTag.exec(text);
@@ -188,8 +190,30 @@ md.block.ruler.before('fence', 'component', (state, start, end, silent) => {
 }, { alt: ['paragraph', 'reference', 'blockquote', 'list'] });
 md.renderer.rules.component_open = (tokens, index) => {
   const { info: name, meta } = tokens[index] as { info: string; meta: Record<string, string> };
-  if (name === 'Cards') return '<div class="component-cards">';
-  if (name === 'Card') return `<section class="component-card">${meta.title ? `<p class="component-title">${escapeHtml(meta.title)}</p>` : ''}`;
+  if (name === 'Cards') {
+    const cols = ['2', '3', '4'].includes(meta.columns) ? ` data-columns="${meta.columns}"` : '';
+    return `<div class="component-cards"${cols}>`;
+  }
+  if (name === 'Card') {
+    const toneAttr = cardTones.has(meta.tone) ? ` data-tone="${meta.tone}"` : '';
+    const eyebrowHtml = meta.eyebrow ? `<div class="card-eyebrow">${escapeHtml(meta.eyebrow)}</div>` : '';
+    const statHtml = meta.stat ? `<div class="card-stat">${escapeHtml(meta.stat)}</div>` : '';
+    const titleHtml = meta.title ? `<p class="component-title">${escapeHtml(meta.title)}</p>` : '';
+    const subHtml = meta.subtitle ? `<div class="card-subtitle">${escapeHtml(meta.subtitle)}</div>` : '';
+    return `<section class="component-card"${toneAttr}>${eyebrowHtml}${statHtml}${titleHtml}${subHtml}`;
+  }
+  if (name === 'Split') {
+    const ratio = splitRatios.has(meta.ratio) ? meta.ratio : '50-50';
+    return `<div class="slide-split" data-ratio="${ratio}">`;
+  }
+  if (name === 'Stack') return '<div class="slide-stack">';
+  if (name === 'Steps') return '<div class="pillar-steps">';
+  if (name === 'StepItem') {
+    const toneAttr = cardTones.has(meta.tone) && meta.tone !== 'dark' ? ` data-tone="${meta.tone}"` : ' data-tone="teal"';
+    const numHtml = meta.num ? `<span class="pillar-num">${escapeHtml(meta.num)}</span>` : '';
+    const titleHtml = meta.title ? `<p class="pillar-title">${escapeHtml(meta.title)}</p>` : '';
+    return `<div class="pillar-step"${toneAttr}>${numHtml}<div class="pillar-body">${titleHtml}`;
+  }
   if (name === 'Panels') return '<div class="showcase-panels">';
   if (name === 'Panel') {
     const href = meta.href && /^https?:\/\/[^\s"<>{}]+$/i.test(meta.href) ? meta.href : '';
@@ -213,9 +237,13 @@ md.renderer.rules.component_open = (tokens, index) => {
 };
 md.renderer.rules.component_close = (tokens, index) => {
   const name = tokens[index].info;
-  if (name === 'Cards' || name === 'Panels') return '</div>';
-  if (name === 'Flow') return '</div></div>';
-  if (name === 'Card') return '</section>';
+  if (name === 'Cards' || name === 'Panels' || name === 'Split' || name === 'Stack' || name === 'Steps') return '</div>';
+  if (name === 'Flow' || name === 'StepItem') return '</div></div>';
+  if (name === 'Card') {
+    const meta = (tokens[index].meta ?? {}) as Record<string, string>;
+    const footerHtml = meta.footer ? `<footer class="card-footer">${escapeHtml(meta.footer)}</footer>` : '';
+    return `${footerHtml}</section>`;
+  }
   if (name === 'Panel') {
     const meta = (tokens[index].meta ?? {}) as Record<string, string>;
     const footerHtml = meta.footer ? `<footer class="panel-footer">${escapeHtml(meta.footer)}</footer>` : '';
@@ -260,6 +288,23 @@ md.renderer.rules.status_note = (tokens, index) => {
   const { content, meta } = tokens[index];
   const tone = (meta as { tone?: string } | null)?.tone || 'ok';
   return `<span class="flow-status" data-tone="${escapeHtml(tone)}">${md.renderInline(content)}</span>`;
+};
+md.inline.ruler.before('escape', 'badge_pill', (state, silent) => {
+  if (state.src.charCodeAt(state.pos) !== 0x3c) return false;
+  const match = /^<Badge(?:\s+tone="(red|amber|blue|green|teal|purple|muted)")?\s*>([^<]{1,200})<\/Badge>/.exec(state.src.slice(state.pos));
+  if (!match) return false;
+  if (!silent) {
+    const token = state.push('badge_pill', '', 0);
+    token.content = match[2];
+    token.meta = { tone: match[1] || 'blue' };
+  }
+  state.pos += match[0].length;
+  return true;
+});
+md.renderer.rules.badge_pill = (tokens, index) => {
+  const { content, meta } = tokens[index];
+  const tone = (meta as { tone?: string } | null)?.tone || 'blue';
+  return `<span class="ui-badge" data-tone="${escapeHtml(tone)}">${md.renderInline(content)}</span>`;
 };
 md.renderer.rules.link_open = (tokens, index, options, env, self) => {
   tokens[index].attrSet('rel', 'noopener noreferrer');

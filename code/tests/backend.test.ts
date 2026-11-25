@@ -173,6 +173,8 @@ Direct body with no heading
     const source = await readFile(join(process.cwd(), 'public', 'feature-tour.mdx'), 'utf8');
     const line = 'Plain **Markdown** inside every card.';
     expect(compileDeck(source.replace(line, '<Mark note="tip">text</Mark> and <Mark>more</Mark>')).deck).not.toBeNull();
+    expect(compileDeck(source.replace(line, '<Badge tone="red">Alert</Badge> and `C++ <Templates>`')).deck).not.toBeNull();
+    expect(compileDeck(`::slide{id="split-test"}\n<Split ratio="58-42">\n<Card tone="teal" title="Pillars">\n<Steps>\n<StepItem num="1" tone="teal" title="Slope">\nMedian slope.\n</StepItem>\n</Steps>\n</Card>\n<Stack>\n<Card tone="dark" eyebrow="SCORECARD" stat="30.5% -> 17.7%">\nClean.\n</Card>\n</Stack>\n</Split>\n`).deck).not.toBeNull();
     for (const unsafe of ['<div>html</div>', '<Card onClick={run}>', '<Mark note={x}>text</Mark>', '<Callout type="tip" {...props}>'])
       expect(compileDeck(source.replace(line, unsafe)).deck, unsafe).toBeNull();
   });

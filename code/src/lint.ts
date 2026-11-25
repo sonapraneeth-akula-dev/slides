@@ -99,6 +99,7 @@ export async function lintDeck(
     let fenceBody: string[] = [];
     let flowDepth = 0;
     let panelsDepth = 0;
+    let structuredDepth = 0;
     let flowStepIds = new Set<string>();
     let flowArrows: Array<{ from: string; to: string; line: number }> = [];
     let proseLines = 0;
@@ -186,8 +187,10 @@ export async function lintDeck(
       }
       if (/^<Panels\b/.test(trimmed)) { panelsDepth++; continue; }
       if (trimmed === '</Panels>') { if (panelsDepth > 0) panelsDepth--; continue; }
-      const isComponentWrapper = /^<\/?(?:Cards|Card|Callout|Flow|Lane|Step|Panels|Panel)\b.*>$/.test(trimmed) || /^<Arrow\b.*\/>$/.test(trimmed);
-      if (trimmed && flowDepth === 0 && panelsDepth === 0 && !isComponentWrapper) {
+      if (/^<(?:Split|Cards|Steps)\b/.test(trimmed)) { structuredDepth++; continue; }
+      if (/^<\/(?:Split|Cards|Steps)>$/.test(trimmed)) { if (structuredDepth > 0) structuredDepth--; continue; }
+      const isComponentWrapper = /^<\/?(?:Cards|Card|Callout|Flow|Lane|Step|Panels|Panel|Split|Stack|Steps|StepItem)\b.*>$/.test(trimmed) || /^<Arrow\b.*\/>$/.test(trimmed);
+      if (trimmed && flowDepth === 0 && panelsDepth === 0 && structuredDepth === 0 && !isComponentWrapper) {
         proseLines++;
         proseChars += trimmed.length;
       }
