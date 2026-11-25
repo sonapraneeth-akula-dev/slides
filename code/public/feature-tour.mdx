@@ -371,6 +371,61 @@ Default capacity mode safe
 Flow, Lane, Step, Arrow, and Status compose multi-plane architecture diagrams as native Markdown cards with auto-routed SVG connectors and a KPI summary strip below.
 :::
 
+::slide{id="pipeline-scale" section="Diagrams" metadataTopLeft="none"}
+# High-QPS Replay Pipeline & Scaling Across ~30 Services
+
+[LoadGen PR #109](https://example.com/loadgen)
+
+<Flow>
+<Step id="p1" title="1 · Shared Replay File">
+Uses exact capture from query builder
+
+`1 latest .bin (<= 3 days old)`
+
+Shared via 8h read-only HTTPS SAS
+
+<Status tone="ok">No older or stale captures mixed</Status>
+</Step>
+<Step id="p2" title="2 · Copy Once to Local Disk" tone="accent">
+Matches local QuerySet cache model
+
+Downloads once to NVMe on Step 1
+
+Auto-cleans oldest unused cached files
+
+<Status tone="ok">Step 2, 3, 4+ reuse local disk (0 network)</Status>
+</Step>
+<Step id="p3" title="3 · Parallel Agents (Dynamic N)">
+Orchestrator adds agents as QPS ramps
+
+Each agent starts at `(agentIndex / N)`
+
+Reads sequentially & wraps around file
+
+<Status tone="ok">Avoids N agents sending Query #1 together</Status>
+</Step>
+<Step id="p4" title="4 · Standard Managed Client">
+- Exact wire protocol request bytes
+- Streams off disk (no RAM OutOfMemory)
+- Retail mode (`DebugMode="false"`)
+- <Status tone="ok">Counts server-rejected replies as Failed</Status>
+</Step>
+<Arrow from="p1" to="p2" />
+<Arrow from="p2" to="p3" />
+<Arrow from="p3" to="p4" />
+</Flow>
+
+| Potential Scale Bottleneck (~30 Services) | Simple Plain-English Fix Built In |
+| --- | --- |
+| **1. Worker Waiting 40–60 Min** | <Status tone="ok">Fixed:</Status> Handoff completes in 3 seconds and immediately frees the worker; orchestrator posts completion webhook (backed by a 3-min reconciler). |
+| **2. Storage Slowdown on Large `.bin` Files** | <Status tone="ok">Fixed:</Status> Each agent VM downloads the fresh `.bin` to local NVMe only once on Step 1 and reuses it on Step 2+ (0 re-downloading), staggered to 2–3 concurrent runs. |
+| **3. Load Generator Crashing on Huge Payloads** | <Status tone="ok">Fixed:</Status> Streams queries straight off local disk (~2 MB RAM instead of loading >2 GB into RAM) and spreads heavy services across multiple agent VMs (3,000 QPS per VM). |
+| **4. Holding Scarce Downstream GPU Hosts Too Long** | <Status tone="ok">Fixed:</Status> `StopOnBreach` halts stepping the moment a bound machine hits its limit and immediately unfreezes + unlocks both the client and GPU hosts. |
+
+:::notes
+Place Step cards directly inside Flow without Lane wrappers to build a horizontal step-by-step pipeline with routed arrows above a detailed comparison or bottleneck table.
+:::
+
 ::slide{id="reveal" section="Presenting"}
 # A reveal and private notes
 

@@ -296,7 +296,10 @@ a { color: #1752ad; }
   background: color-mix(in srgb, var(--slide-muted) 4%, var(--slide-surface));
 }
 .stage .flow-lanes { display: grid; grid-template-columns: repeat(auto-fit, minmax(0, 1fr)); gap: .85em; height: 100%; align-items: stretch; }
-.stage .flow-lanes > :not(.flow-lane) { display: none !important; }
+.stage .flow-lanes:not(:has(> .flow-lane)) { gap: 1.15em; height: auto; }
+.stage .flow-lanes > :not(.flow-lane):not(.flow-step) { display: none !important; }
+.stage .flow-lanes > .flow-step { display: flex; flex-direction: column; padding: .36em .48em; font-size: .44em; }
+.stage .flow-lanes > .flow-step > .flow-step-title { color: var(--flow-arrow); text-align: center; margin-bottom: .2em; }
 .stage .flow-lane {
   display: flex;
   flex-direction: column;
@@ -417,6 +420,10 @@ a { color: #1752ad; }
 }
 .stage .slide-content > .slide-markdown:has(> .flow-board) > p a::after { content: " ↗"; }
 .stage .slide-content > .slide-markdown > .flow-board { flex: 1; min-height: 0; min-width: 0; }
+.stage .slide-content > .slide-markdown:has(> .flow-board):has(> table) > .flow-board { flex: 0 0 auto; padding: .42em .55em; }
+.stage .slide-content > .slide-markdown:has(> .flow-board) > table { margin-top: .38em; font-size: .45em; line-height: 1.26; }
+.stage .slide-content > .slide-markdown:has(> .flow-board) > table :is(td, th) { padding: .3em .5em; vertical-align: top; }
+.stage .slide-content > .slide-markdown:has(> .flow-board) > table td:first-child { width: 32%; }
 .stage .slide-content > .slide-markdown:has(> .flow-board) > .component-cards {
   grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
   gap: 0;

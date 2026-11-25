@@ -4,7 +4,7 @@ import { layouts } from '../src/source-edit';
 import { sampleImageReference } from '../src/sample-image-reference';
 
 test('master gallery covers supported layouts and composition families without modifying a deck', () => {
-  expect(masterSamples).toHaveLength(22);
+  expect(masterSamples).toHaveLength(23);
   expect(new Set(masterSamples.map(sample => sample.slide.layout))).toEqual(new Set(layouts));
   expect(masterSamples.map(sample => sample.slide.id)).toEqual(
     masterSamples.map((_, index) => `master-sample-${index + 1}`)
