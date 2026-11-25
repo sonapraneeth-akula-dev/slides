@@ -521,6 +521,122 @@ function fitViewBox(svg: SVGSVGElement | null): void {
   } catch { /* Not rendered yet; keep Mermaid's viewBox. */ }
 }
 
+const chartAnnotationPalette: Record<string, { fg: string; bg: string; stroke: string }> = {
+  red: { fg: '#991b1b', bg: '#fef2f2', stroke: '#dc2626' },
+  amber: { fg: '#92400e', bg: '#fffbeb', stroke: '#d97706' },
+  green: { fg: '#065f46', bg: '#ecfdf5', stroke: '#059669' },
+  blue: { fg: '#1e40af', bg: '#eff6ff', stroke: '#0284c7' },
+  teal: { fg: '#0f766e', bg: '#f0fdfa', stroke: '#0d9488' },
+};
+
+function drawChartAnnotations(
+  svg: SVGSVGElement,
+  canvas: HTMLElement,
+  instance: { convertToPixel: (finder: { gridIndex?: number; xAxisIndex?: number }, value: number | Array<number | string>) => number | number[] },
+  chart: ChartData,
+  overlayId: number,
+): void {
+  svg.replaceChildren();
+  if (!chart.annotations?.length) return;
+  const w = canvas.clientWidth || 960;
+  const h = canvas.clientHeight || 320;
+  if (w < 40 || h < 40) return;
+  svg.setAttribute('viewBox', `0 0 ${w} ${h}`);
+  const defs = document.createElementNS(svgNamespace, 'defs');
+  for (const [tone, pal] of Object.entries(chartAnnotationPalette)) {
+    const marker = document.createElementNS(svgNamespace, 'marker');
+    marker.setAttribute('id', `chart-head-${tone}-${overlayId}`);
+    marker.setAttribute('viewBox', '0 0 8 8');
+    marker.setAttribute('refX', '7');
+    marker.setAttribute('refY', '4');
+    marker.setAttribute('markerWidth', '6');
+    marker.setAttribute('markerHeight', '6');
+    marker.setAttribute('orient', 'auto');
+    const tip = document.createElementNS(svgNamespace, 'path');
+    tip.setAttribute('d', 'M 0 1 L 7 4 L 0 7 z');
+    tip.setAttribute('fill', pal.stroke);
+    marker.append(tip);
+    defs.append(marker);
+  }
+  svg.append(defs);
+
+  const catStep = chart.type !== 'scatter' && chart.labels.length > 1
+    ? Math.abs(Number(instance.convertToPixel({ xAxisIndex: 0 }, 1)) - Number(instance.convertToPixel({ xAxisIndex: 0 }, 0))) || 60
+    : 60;
+
+  for (const ann of chart.annotations) {
+    const tone = ann.tone && chartAnnotationPalette[ann.tone] ? ann.tone : 'blue';
+    const pal = chartAnnotationPalette[tone];
+    const xLookup = typeof ann.x === 'string' && chart.type !== 'scatter'
+      ? (() => { const idx = chart.labels.indexOf(ann.x); return idx >= 0 ? idx : ann.x; })()
+      : ann.x;
+    const rawPt = instance.convertToPixel({ gridIndex: 0 }, [xLookup, ann.y]);
+    if (!Array.isArray(rawPt) || !Number.isFinite(rawPt[0]) || !Number.isFinite(rawPt[1])) continue;
+    let barShift = 0;
+    if (chart.type === 'bar' && chart.series.length > 1 && ann.seriesIndex !== undefined) {
+      barShift = ((ann.seriesIndex - (chart.series.length - 1) / 2) / chart.series.length) * (catStep * 0.68);
+    }
+    const tx = rawPt[0] + barShift;
+    const ty = rawPt[1];
+    const lines = ann.text.split('\n').slice(0, 3);
+    const fs = Math.max(8.5, Math.min(11, w * 0.019));
+    const lh = fs * 1.24;
+    const maxChars = Math.max(...lines.map(l => l.length), 4);
+    const bw = Math.round(maxChars * fs * 0.56 + 12);
+    const bh = Math.round(lines.length * lh + 7);
+    const dxPx = (ann.dx ?? 0) * (w / 520);
+    const dyPx = (ann.dy ?? -38) * (h / 260);
+    const bx = Math.min(w - bw / 2 - 4, Math.max(bw / 2 + 4, tx + dxPx));
+    const by = Math.min(h - bh / 2 - 4, Math.max(bh / 2 + 4, ty + dyPx));
+    const vx = tx - bx;
+    const vy = ty - by;
+    const dist = Math.hypot(vx, vy);
+    if (dist > 6) {
+      const edgeScale = 1 / Math.max(Math.abs(vx) / (bw / 2), Math.abs(vy) / (bh / 2), 1e-6);
+      const sx = bx + vx * Math.min(1, edgeScale);
+      const sy = by + vy * Math.min(1, edgeScale);
+      const ux = vx / dist;
+      const uy = vy / dist;
+      const ex = tx - ux * 2;
+      const ey = ty - uy * 2;
+      if (Math.hypot(ex - sx, ey - sy) > 3) {
+        const line = document.createElementNS(svgNamespace, 'line');
+        line.setAttribute('x1', sx.toFixed(1));
+        line.setAttribute('y1', sy.toFixed(1));
+        line.setAttribute('x2', ex.toFixed(1));
+        line.setAttribute('y2', ey.toFixed(1));
+        line.setAttribute('stroke', pal.stroke);
+        line.setAttribute('stroke-width', '1.6');
+        line.setAttribute('marker-end', `url(#chart-head-${tone}-${overlayId})`);
+        svg.append(line);
+      }
+    }
+    const box = document.createElementNS(svgNamespace, 'rect');
+    box.setAttribute('x', (bx - bw / 2).toFixed(1));
+    box.setAttribute('y', (by - bh / 2).toFixed(1));
+    box.setAttribute('width', String(bw));
+    box.setAttribute('height', String(bh));
+    box.setAttribute('fill', pal.bg);
+    box.setAttribute('stroke', pal.stroke);
+    box.setAttribute('stroke-width', '1.3');
+    svg.append(box);
+    const label = document.createElementNS(svgNamespace, 'text');
+    label.setAttribute('text-anchor', 'middle');
+    label.setAttribute('fill', pal.fg);
+    label.setAttribute('font-size', fs.toFixed(1));
+    label.setAttribute('font-weight', '700');
+    const firstBaseline = by - ((lines.length - 1) * lh) / 2 + fs * 0.34;
+    lines.forEach((txt, idx) => {
+      const tspan = document.createElementNS(svgNamespace, 'tspan');
+      tspan.setAttribute('x', bx.toFixed(1));
+      tspan.setAttribute('y', (firstBaseline + idx * lh).toFixed(1));
+      tspan.textContent = txt;
+      label.append(tspan);
+    });
+    svg.append(label);
+  }
+}
+
 async function renderFences(root: HTMLElement): Promise<void> {
   const fences = [...root.querySelectorAll<HTMLElement>('.special-fence')];
   for (const fence of fences) {
@@ -579,16 +695,20 @@ async function renderFences(root: HTMLElement): Promise<void> {
         const canvas = document.createElement('div');
         canvas.className = 'chart-visual';
         canvas.setAttribute('aria-hidden', 'true');
-        fence.replaceChildren(canvas, accessibleData);
+        const annotationSvg = document.createElementNS(svgNamespace, 'svg');
+        annotationSvg.setAttribute('class', 'chart-annotations');
+        annotationSvg.setAttribute('aria-hidden', 'true');
+        fence.replaceChildren(canvas, annotationSvg, accessibleData);
         const staticExport = document.documentElement.dataset.exportStatic === 'true';
-        const [echarts, { BarChart, LineChart, PieChart, ScatterChart }, { GridComponent, LegendComponent, TooltipComponent }, { CanvasRenderer, SVGRenderer }] = await Promise.all([
+        const [echarts, { BarChart, LineChart, PieChart, ScatterChart }, { GridComponent, LegendComponent, MarkAreaComponent, MarkLineComponent, TooltipComponent }, { CanvasRenderer, SVGRenderer }] = await Promise.all([
           import('echarts/core'),
           import('echarts/charts'),
           import('echarts/components'),
           import('echarts/renderers'),
         ]);
-        echarts.use([BarChart, LineChart, PieChart, ScatterChart, GridComponent, LegendComponent, TooltipComponent, CanvasRenderer, SVGRenderer]);
+        echarts.use([BarChart, LineChart, PieChart, ScatterChart, GridComponent, LegendComponent, MarkAreaComponent, MarkLineComponent, TooltipComponent, CanvasRenderer, SVGRenderer]);
         if (!fence.isConnected) continue;
+        const overlayId = ++diagramCounter;
         const instance = echarts.init(
           canvas,
           undefined,
@@ -596,28 +716,83 @@ async function renderFences(root: HTMLElement): Promise<void> {
         );
         try {
           const round = chart.type === 'pie' || chart.type === 'donut';
+          const suffix = chart.valueSuffix ?? '';
+          const markLineData = !round && chart.lines?.length
+            ? chart.lines.map(ln => ({
+                ...(ln.y !== undefined ? { yAxis: ln.y } : { xAxis: ln.x }),
+                name: ln.label ?? '',
+                lineStyle: { color: ln.color || '#64748b', type: ln.style || 'dashed', width: 1.5 },
+                label: ln.label ? { show: true, formatter: ln.label, fontSize: 10, fontWeight: 700, color: ln.color || '#475569', position: ln.y !== undefined ? 'insideEndTop' : 'end' } : { show: false },
+              }))
+            : undefined;
+          const markAreaData = !round && chart.zones?.length
+            ? chart.zones.map(zn => [
+                {
+                  ...(zn.xMin !== undefined ? { xAxis: zn.xMin } : {}),
+                  ...(zn.yMin !== undefined ? { yAxis: zn.yMin } : {}),
+                  name: zn.label ?? '',
+                  itemStyle: { color: zn.color || '#64748b', opacity: 0.1 },
+                  label: zn.label ? { show: true, position: 'inside', fontSize: 10, fontWeight: 600, color: '#475569' } : { show: false },
+                },
+                {
+                  ...(zn.xMax !== undefined ? { xAxis: zn.xMax } : {}),
+                  ...(zn.yMax !== undefined ? { yAxis: zn.yMax } : {}),
+                },
+              ])
+            : undefined;
           instance.setOption({
             animation: !staticExport && !matchMedia('(prefers-reduced-motion: reduce)').matches,
             tooltip: { trigger: round ? 'item' : 'axis', renderMode: 'richText' },
-            legend: { top: 0 },
-            grid: { left: '6%', right: '5%', bottom: '8%', top: '20%', containLabel: true },
-            xAxis: round ? undefined : { type: chart.type === 'scatter' ? 'value' : 'category', data: chart.type === 'scatter' ? undefined : chart.labels, name: chart.x },
-            yAxis: round ? undefined : { type: 'value', name: chart.y },
-            series: chart.series.map(item => ({
+            legend: { top: 0, textStyle: { fontSize: 11 } },
+            grid: { left: '6%', right: '5%', bottom: chart.x ? '13%' : '8%', top: '20%', containLabel: true },
+            xAxis: round ? undefined : {
+              type: chart.type === 'scatter' ? 'value' : 'category',
+              data: chart.type === 'scatter' ? undefined : chart.labels,
+              name: chart.x,
+              nameLocation: chart.x ? 'middle' : undefined,
+              nameGap: chart.x ? 22 : undefined,
+              axisLabel: { fontSize: 10 },
+            },
+            yAxis: round ? undefined : {
+              type: 'value',
+              name: chart.y,
+              max: chart.yMax,
+              axisLabel: { fontSize: 10, formatter: suffix && !chart.y ? `{value}${suffix}` : undefined },
+            },
+            series: chart.series.map((item, sIdx) => ({
               name: item.name,
               type: round ? 'pie' : chart.type === 'bar' ? 'bar' : chart.type === 'scatter' ? 'scatter' : 'line',
-              areaStyle: chart.type === 'area' ? {} : undefined,
+              itemStyle: item.color ? { color: item.color } : undefined,
+              lineStyle: !round && chart.type !== 'bar' && chart.type !== 'scatter'
+                ? { type: item.style || 'solid', width: 2.2, ...(item.color ? { color: item.color } : {}) }
+                : undefined,
+              areaStyle: chart.type === 'area' || item.area ? { opacity: 0.16 } : undefined,
+              label: chart.showValues && chart.type === 'bar'
+                ? { show: true, position: 'top', fontSize: 9.5, fontWeight: 700, formatter: `{c}${suffix}` }
+                : undefined,
               center: round ? ['50%', '55%'] : undefined,
               radius: chart.type === 'donut' ? ['36%', '60%'] : chart.type === 'pie' ? '60%' : undefined,
-              data: round ? item.data.map((value, index) => ({ value, name: chart.labels[index] })) : item.data,
+              data: round
+                ? item.data.map((value, index) => ({ value, name: chart.labels[index] }))
+                : item.pointColors
+                  ? item.data.map((value, index) => item.pointColors?.[index]
+                    ? { value, itemStyle: { color: item.pointColors[index]! } }
+                    : value)
+                  : item.data,
+              ...(sIdx === 0 && markLineData ? { markLine: { silent: true, symbol: 'none', data: markLineData } } : {}),
+              ...(sIdx === 0 && markAreaData ? { markArea: { silent: true, data: markAreaData } } : {}),
             })),
           });
+          drawChartAnnotations(annotationSvg, canvas, instance, chart, overlayId);
         } catch (error) {
           instance.dispose();
           throw error;
         }
         const observer = new ResizeObserver(() => {
-          if (canvas.isConnected) instance.resize();
+          if (canvas.isConnected) {
+            instance.resize();
+            drawChartAnnotations(annotationSvg, canvas, instance, chart, overlayId);
+          }
         });
         observer.observe(canvas);
         mountedCharts.set(canvas, () => { observer.disconnect(); instance.dispose(); });

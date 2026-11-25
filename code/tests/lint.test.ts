@@ -81,6 +81,11 @@ flowchart TD
     expect(invalidFences.compilation.deck).toBeNull();
     expect(invalidFences.diagnostics.map(diag => diag.code)).toEqual(['CHART_INVALID', 'MERMAID_INVALID']);
 
+    const annotatedValid = await lintDeck(`::slide{id="annotated"}\n# Annotated\n\`\`\`chart\n{"type":"bar","labels":["A","B"],"showValues":true,"valueSuffix":"%","yMax":110,"series":[{"name":"Recall","data":[76,33],"color":"#0284c7","pointColors":[null,"#dc2626"]}],"lines":[{"y":50,"label":"Floor","style":"dashed","color":"#dc2626"}],"zones":[{"yMin":0,"yMax":50,"label":"Low"}],"annotations":[{"x":"B","y":33,"seriesIndex":0,"text":"TRAP #1","tone":"red","dy":-40}]}\n\`\`\`\n`);
+    expect(annotatedValid.diagnostics).toEqual([]);
+    const annotatedBad = await lintDeck(`::slide{id="bad-ann"}\n# Bad\n\`\`\`chart\n{"type":"bar","labels":["A"],"series":[{"name":"S","data":[10]}],"annotations":[{"x":"A","y":10,"seriesIndex":3,"text":"oob"}]}\n\`\`\`\n`);
+    expect(annotatedBad.diagnostics.map(d => d.code)).toEqual(['CHART_INVALID']);
+
     const workspace = await mkdtemp(join(tmpdir(), 'slides-lint-codes-'));
     try {
       const errorDeck = join(workspace, 'error.mdx');

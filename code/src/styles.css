@@ -534,7 +534,9 @@ a { color: #1752ad; }
 .stage[data-layout="title-image-left"] .slide-cover-image { order: -1; }
 .stage[data-layout^="title-image-"] .slide-image, .stage[data-layout="image-full"] .slide-image { width: 100%; height: 100%; max-width: none; max-height: none; border-radius: 0; object-fit: cover; }
 .stage[data-layout^="title-image-"] .slide-meta, .stage[data-layout="image-full"] .slide-meta { padding: .2em .5em; border-radius: 0; background: var(--slide-surface); }
+.special-fence { position: relative; }
 .special-fence svg { max-width: 100%; height: auto; }
+.special-fence svg.chart-annotations, .master-preview .special-fence svg.chart-annotations { position: absolute; inset: 0; width: 100%; height: 100%; max-width: none; max-height: none; pointer-events: none; overflow: visible; }
 .chart-visual { width: 100%; height: clamp(110px, 30cqw, 300px); }
 .stage .chart-data {
   position: absolute;
