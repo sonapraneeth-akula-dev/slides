@@ -250,6 +250,9 @@ a { color: #1752ad; }
 .stage .slide-markdown h1 { margin-block: 0 .32em; }
 .stage h2 { font-size: calc(1.8em * var(--headingSize-scale, 1)); }
 .stage h3 { font-size: calc(1.17em * var(--headingSize-scale, 1)); }
+.stage .slide-eyebrow { margin: 0 0 .22em; color: var(--slide-accent); font-family: var(--headingFont, var(--font-sans)); font-size: .56em; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; line-height: 1.25; }
+.stage[data-has-eyebrow="true"] :is(.slide-markdown, .slide-cover-text) > :is(h1, h2):first-of-type { color: var(--slide-text); margin-block: 0 .14em; }
+.stage .slide-subtitle { margin: 0 0 .48em; color: var(--slide-muted); font-size: .78em; line-height: 1.35; }
 .stage pre { max-width: 100%; overflow: auto; background: #e5e9f0; padding: .7em; border-radius: 0; color: #1c2733; }
 .stage pre code { font-family: var(--codeFont, var(--font-mono)); font-size: calc(1em * var(--codeSize-scale, 1)); }
 .stage .code-block, .stage .terminal { margin: .6em 0; border-radius: 0; overflow: hidden; }

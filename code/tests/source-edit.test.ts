@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 import { compileDeck } from '../src/deck';
-import { addSlide, clearTheme, editableLines, findSlideOffset, hasUniqueSlideIds, insertSlide, propagateSlideIdChange, replacePlainLine, setDeckTitle, setLayout, setMaster, setSlideHideTitle, setSlideMetadata, setSlideSection, setTheme } from '../src/source-edit';
+import { addSlide, clearTheme, editableLines, findSlideOffset, hasUniqueSlideIds, insertSlide, propagateSlideIdChange, replacePlainLine, setDeckTitle, setLayout, setMaster, setSlideHideTitle, setSlideMetadata, setSlideSection, setSlideTheme, setTheme } from '../src/source-edit';
 
 const source = `---
 slides:
@@ -280,5 +280,8 @@ intro and parent="intro" are prose
     const withBrokenNeighbor = `${deckWithFence}\n::slide{id="broken" badAttr=1}\n`;
     expect(findSlideOffset(withBrokenNeighbor, 'target')).toBe(expected);
     expect(findSlideOffset(deckWithFence, 'missing')).toBeNull();
+    const themed = setSlideTheme(deckWithFence, 'target', 'midnight');
+    expect(themed).toContain('::slide{layout="blank" id="target" theme="midnight"}');
+    expect(setSlideTheme(themed, 'target', undefined)).toBe(deckWithFence);
   });
 });

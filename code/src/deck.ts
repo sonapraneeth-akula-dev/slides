@@ -9,8 +9,8 @@ export interface Diagnostic { line: number; column: number; message: string }
 export interface SlideItem { text: string; line: number; step: number; slot: string }
 export interface Slide {
   id: string; parent: string | null; title: string; number: string; index: number;
-  layout: Layout; section?: string; hideTitle?: boolean; metadata: Record<string, string>;
-  items: SlideItem[]; notes: string[]; reveals: number;
+  layout: Layout; section?: string; hideTitle?: boolean; theme?: string; eyebrow?: string; subtitle?: string;
+  metadata: Record<string, string>; items: SlideItem[]; notes: string[]; reveals: number;
 }
 export interface Deck { title: string; master: Record<string, unknown>; slides: Slide[] }
 export interface Compilation { deck: Deck | null; diagnostics: Diagnostic[] }
@@ -141,8 +141,8 @@ export function compileDeck(source: string, filenameTitle?: string): Compilation
       const match = /^::slide\{(.*)\}$/.exec(trimmed);
       const attrs = match && attributes(match[1]);
       if (!attrs || !attrs.id || !slideId.test(attrs.id) ||
-          Object.keys(attrs).some(k => !['id', 'parent', 'layout', 'section', 'title', 'hideTitle'].includes(k) && !metadataKeys.has(k))) {
-        fail(line, 'Invalid slide directive (expected id, optional parent, layout, section, title, hideTitle and metadata positions)');
+          Object.keys(attrs).some(k => !['id', 'parent', 'layout', 'section', 'title', 'hideTitle', 'theme', 'eyebrow', 'subtitle'].includes(k) && !metadataKeys.has(k))) {
+        fail(line, 'Invalid slide directive (expected id, optional parent, layout, section, title, hideTitle, theme, eyebrow, subtitle and metadata positions)');
         current = undefined;
         container = undefined;
         continue;
@@ -156,6 +156,15 @@ export function compileDeck(source: string, filenameTitle?: string): Compilation
       if (attrs.hideTitle !== undefined && attrs.hideTitle !== 'true' && attrs.hideTitle !== 'false') {
         fail(line, 'hideTitle must be "true" or "false"');
       }
+      if (attrs.theme !== undefined && !themes.has(attrs.theme)) {
+        fail(line, `Unknown slide theme: ${attrs.theme}`);
+      }
+      if (attrs.eyebrow !== undefined && (!attrs.eyebrow.trim() || attrs.eyebrow.length > 100 || /[{}<>]/.test(attrs.eyebrow))) {
+        fail(line, 'Slide eyebrow must be 1–100 characters without markup');
+      }
+      if (attrs.subtitle !== undefined && (!attrs.subtitle.trim() || attrs.subtitle.length > 220 || /[{}<>]/.test(attrs.subtitle))) {
+        fail(line, 'Slide subtitle must be 1–220 characters without markup');
+      }
       for (const key of metadataKeys) if (attrs[key] !== undefined && !allowedMetadata.has(attrs[key] as typeof metadataValues[number])) {
         fail(line, `Invalid metadata for ${key}`);
       }
@@ -168,6 +177,9 @@ export function compileDeck(source: string, filenameTitle?: string): Compilation
         layout: layouts.includes(chosen as Layout) ? chosen as Layout : 'title-content',
         section: attrs.section?.trim(),
         ...(attrs.hideTitle === 'true' ? { hideTitle: true } : {}),
+        ...(attrs.theme ? { theme: attrs.theme } : {}),
+        ...(attrs.eyebrow?.trim() ? { eyebrow: attrs.eyebrow.trim() } : {}),
+        ...(attrs.subtitle?.trim() ? { subtitle: attrs.subtitle.trim() } : {}),
         metadata: Object.fromEntries(Object.entries(attrs).filter(([key]) => metadataKeys.has(key))),
         items: [], notes: [], reveals: 0
       };
@@ -268,6 +280,9 @@ export function audienceProjection(deck: Deck, slideId: string, step: number) {
       id: slide.id, title: slide.title, number: slide.number, index: slide.index,
       layout: slide.layout, reveals: slide.reveals, metadata: slide.metadata,
       ...(slide.hideTitle ? { hideTitle: true } : {}),
+      ...(slide.theme ? { theme: slide.theme } : {}),
+      ...(slide.eyebrow ? { eyebrow: slide.eyebrow } : {}),
+      ...(slide.subtitle ? { subtitle: slide.subtitle } : {}),
       items: slide.items.filter(item => item.step <= step).map(({ text, step, slot }) => ({ text, step, slot }))
     },
     total: deck.slides.length, step

@@ -104,7 +104,7 @@ slides:
     metadata:
       metadataBottomRight: slideNumber
 ---
-::slide{id="one" section="Findings" metadataBottomRight="none" metadataTopLeft="slideTitle" layout="title-image-left"}
+::slide{id="one" section="Findings" theme="midnight" eyebrow="TRACK 1 · ARCHITECTURE" subtitle="Decoupled five-stage pipeline" metadataBottomRight="none" metadataTopLeft="slideTitle" layout="title-image-left"}
 # First
 :::slot{name="image"}
 ![Example](assets/sample-landscape.svg)
@@ -112,14 +112,24 @@ slides:
     const compiled = compileDeck(input);
     expect(compiled.diagnostics).toEqual([]);
     expect(compiled.deck?.slides[0].section).toBe('Findings');
-    expect(compiled.deck?.slides[0].metadata).toEqual({ metadataBottomRight: 'none', metadataTopLeft: 'slideTitle' });
+    expect(compiled.deck?.slides[0].theme).toBe('midnight');
+    expect(compiled.deck?.slides[0].eyebrow).toBe('TRACK 1 · ARCHITECTURE');
+    expect(compiled.deck?.slides[0].subtitle).toBe('Decoupled five-stage pipeline');
     const projected = audienceProjection(compiled.deck!, 'one', 0);
+    expect(projected.slide.theme).toBe('midnight');
+    expect(projected.slide.eyebrow).toBe('TRACK 1 · ARCHITECTURE');
+    expect(projected.slide.subtitle).toBe('Decoupled five-stage pipeline');
+    expect(compileDeck(input.replace('theme="midnight"', 'theme="neon"')).deck).toBeNull();
+    expect(compiled.deck?.slides[0].metadata).toEqual({ metadataBottomRight: 'none', metadataTopLeft: 'slideTitle' });
     expect(projected.slide.metadata).toEqual(compiled.deck!.slides[0].metadata);
     const snapshot = publicSnapshot({
       schemaVersion: 1, sessionId: 'test', sequence: 1, slideId: 'one', step: 0,
       stage: { title: 'Demo', master: compiled.deck!.master, total: 1, slide: projected.slide },
       overlay: { marks: [], blackout: false, canvas: false },
     });
+    expect(snapshot.stage.slides[0].theme).toBe('midnight');
+    expect(snapshot.stage.slides[0].eyebrow).toBe('TRACK 1 · ARCHITECTURE');
+    expect(snapshot.stage.slides[0].subtitle).toBe('Decoupled five-stage pipeline');
     expect(snapshot.stage.slides[0].metadata).toEqual({ metadataBottomRight: 'none', metadataTopLeft: 'slideTitle' });
     for (const directive of [
       'section=""', 'section="<script>"', 'metadataBottomRight="invalid"',

@@ -1,4 +1,4 @@
-import { clearTheme, editableLines, findSlideOffset, hasUniqueSlideIds, insertSlide, layouts, propagateSlideIdChange, replacePlainLine, setDeckTitle, setLayout, setMaster, setSlideHideTitle, setSlideMetadata, setSlideSection, setTheme, themeNames } from './source-edit';
+import { clearTheme, editableLines, findSlideOffset, hasUniqueSlideIds, insertSlide, layouts, propagateSlideIdChange, replacePlainLine, setDeckTitle, setLayout, setMaster, setSlideHideTitle, setSlideMetadata, setSlideSection, setSlideTheme, setTheme, themeNames } from './source-edit';
 import { markdown, overlayMode, renderStage, themePresets, type Deck, type Slide, type Snapshot, type Stage, type Stroke } from './render';
 import { drawStage } from './stage-view';
 import { masterSamples } from './master-samples';
@@ -567,6 +567,20 @@ async function updatePreview(): Promise<void> {
       });
       hideTitleLabel.append(hideTitleInput, document.createTextNode('Hide slide title'));
       fields.append(hideTitleLabel);
+      const slideThemeLabel = document.createElement('label');
+      slideThemeLabel.textContent = 'Slide Theme';
+      const slideThemeSelect = document.createElement('select');
+      slideThemeSelect.setAttribute('aria-label', `Theme override for slide ${slide.index + 1}`);
+      slideThemeSelect.add(new Option('Inherit deck theme', ''));
+      for (const name of themeNames) slideThemeSelect.add(new Option(optionLabel(name), name));
+      slideThemeSelect.value = slide.theme || '';
+      slideThemeSelect.disabled = !canEditPreview();
+      slideThemeSelect.addEventListener('change', () => {
+        try { editSource(setSlideTheme(sourceInput.value, slide.id, slideThemeSelect.value || undefined)); }
+        catch (error) { errorNotice(error); }
+      });
+      slideThemeLabel.append(slideThemeSelect);
+      fields.append(slideThemeLabel);
       for (const position of metadataPositions) {
         const field = `metadata${position}` as MetadataKey;
         const fieldLabel = document.createElement('label');

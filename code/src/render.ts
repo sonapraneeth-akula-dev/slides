@@ -18,6 +18,9 @@ export interface Slide {
   layout: string;
   title?: string;
   hideTitle?: boolean;
+  theme?: string;
+  eyebrow?: string;
+  subtitle?: string;
   section?: string;
   metadata?: Record<string, string>;
   body: string;
@@ -576,12 +579,15 @@ export const themePresets: Record<string, Record<string, string>> = {
   forest: { surface: '#f1f6f0', text: '#1d2b1f', accent: '#2f7d4a', muted: '#5d6f60' },
 };
 
-function setAppearance(host: HTMLElement, stage: Stage): void {
-  const preset = themePresets[stage.theme] || themePresets.signal;
+function setAppearance(host: HTMLElement, stage: Stage, slide?: Slide): void {
+  const slidePreset = slide?.theme ? themePresets[slide.theme] : undefined;
+  const preset = slidePreset || themePresets[stage.theme] || themePresets.signal;
+  if (slidePreset && slide?.theme) host.dataset.slideTheme = slide.theme;
+  else delete host.dataset.slideTheme;
   host.style.backgroundColor = 'var(--slide-surface)';
   host.style.color = 'var(--slide-text)';
   for (const key of ['surface', 'text', 'accent', 'muted'] as const) {
-    const value = stage.master?.[key];
+    const value = slidePreset ? undefined : stage.master?.[key];
     host.style.setProperty(`--slide-${key}`, typeof value === 'string' && /^#[0-9a-f]{6}$/i.test(value) ? value : preset[key]);
   }
   for (const key of ['headingFont', 'bodyFont', 'codeFont'] as const) {
@@ -613,9 +619,31 @@ function setAppearance(host: HTMLElement, stage: Stage): void {
   }
 }
 
+function decorateSlideHeader(container: HTMLElement, slide: Slide): void {
+  let heading = container.querySelector<HTMLElement>(':scope > :is(h1, h2, h3):first-child');
+  if (slide.hideTitle && heading) {
+    heading.remove();
+    heading = null;
+  }
+  if (slide.eyebrow) {
+    const eyebrow = document.createElement('div');
+    eyebrow.className = 'slide-eyebrow';
+    eyebrow.textContent = slide.eyebrow;
+    container.prepend(eyebrow);
+  }
+  if (slide.subtitle) {
+    const subtitle = document.createElement('div');
+    subtitle.className = 'slide-subtitle';
+    subtitle.textContent = slide.subtitle;
+    const anchor = heading ?? container.querySelector(':scope > .slide-eyebrow');
+    if (anchor) anchor.after(subtitle);
+    else container.prepend(subtitle);
+  }
+}
+
 export async function renderStage(host: HTMLElement, stage: Stage, slide: Slide | undefined, step: number): Promise<void> {
   host.replaceChildren();
-  setAppearance(host, stage);
+  setAppearance(host, stage, slide);
   if (!slide) {
     host.textContent = 'Waiting for a slide…';
     return;
@@ -623,12 +651,14 @@ export async function renderStage(host: HTMLElement, stage: Stage, slide: Slide 
   host.dataset.layout = slide.layout;
   if (slide.hideTitle) host.dataset.hideTitle = 'true';
   else delete host.dataset.hideTitle;
+  if (slide.eyebrow) host.dataset.hasEyebrow = 'true';
+  else delete host.dataset.hasEyebrow;
   if (slide.layout !== 'blank') {
     const content = document.createElement('div');
     content.className = 'slide-content';
     if (slide.layout === 'title-image-left' || slide.layout === 'title-image-right') {
       const text = markdown(slide.body, stage.assetBase, stage.assetMap);
-      if (slide.hideTitle) text.querySelector(':scope > :is(h1, h2, h3):first-child')?.remove();
+      decorateSlideHeader(text, slide);
       text.classList.add('slide-cover-text');
       const image = markdown(slide.slots?.image || '', stage.assetBase, stage.assetMap);
       image.classList.add('slide-cover-image');
@@ -636,7 +666,7 @@ export async function renderStage(host: HTMLElement, stage: Stage, slide: Slide 
       content.append(text, image);
     } else {
       const body = markdown(slide.body, stage.assetBase, stage.assetMap);
-      if (slide.hideTitle) body.querySelector(':scope > :is(h1, h2, h3):first-child')?.remove();
+      decorateSlideHeader(body, slide);
       if (slide.layout === 'image-full') body.classList.add('slide-full-image');
       content.append(body);
     }
