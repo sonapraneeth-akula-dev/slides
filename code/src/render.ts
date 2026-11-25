@@ -225,12 +225,25 @@ md.renderer.rules.component_open = (tokens, index) => {
       : '';
     return `<section class="showcase-panel">${headerHtml}<div class="panel-body">`;
   }
-  if (name === 'Flow') return '<div class="flow-board"><div class="flow-lanes">';
-  if (name === 'Lane') return `<section class="flow-lane">${meta.title ? `<p class="flow-lane-title">${escapeHtml(meta.title)}</p>` : ''}<div class="flow-lane-steps">`;
+  if (name === 'Flow') {
+    const layoutAttr = meta.layout === 'rows' ? ' data-layout="rows"' : '';
+    const toneAttr = ['blue', 'teal'].includes(meta.tone) ? ` data-tone="${meta.tone}"` : '';
+    return `<div class="flow-board"${layoutAttr}${toneAttr}><div class="flow-lanes">`;
+  }
+  if (name === 'Lane') {
+    const toneAttr = cardTones.has(meta.tone) && meta.tone !== 'dark' ? ` data-tone="${meta.tone}"` : '';
+    const titleHtml = meta.title ? `<p class="flow-lane-title">${escapeHtml(meta.title)}</p>` : '';
+    const headHtml = meta.subtitle
+      ? `<div class="flow-lane-head">${titleHtml}<p class="flow-lane-subtitle">${escapeHtml(meta.subtitle)}</p></div>`
+      : titleHtml;
+    return `<section class="flow-lane"${toneAttr}>${headHtml}<div class="flow-lane-steps">`;
+  }
   if (name === 'Step') {
     const idAttr = meta.id && /^[A-Za-z][\w-]*$/.test(meta.id) ? ` data-step-id="${escapeHtml(meta.id)}"` : '';
-    const toneAttr = meta.tone === 'accent' ? ' data-tone="accent"' : '';
-    return `<article class="flow-step"${idAttr}${toneAttr}>${meta.title ? `<p class="flow-step-title">${escapeHtml(meta.title)}</p>` : ''}`;
+    const toneAttr = (meta.tone === 'accent' || (cardTones.has(meta.tone) && meta.tone !== 'dark'))
+      ? ` data-tone="${meta.tone}"` : '';
+    const badgeHtml = meta.badge ? `<span class="flow-step-badge">${escapeHtml(meta.badge)}</span>` : '';
+    return `<article class="flow-step"${idAttr}${toneAttr}>${meta.title ? `<p class="flow-step-title">${escapeHtml(meta.title)}</p>` : ''}${badgeHtml}`;
   }
   const type = calloutTypes[meta.type] ? meta.type : 'note';
   return `<aside class="callout" data-type="${type}"><p class="component-title">${escapeHtml(meta.title || calloutTypes[type])}</p>`;
