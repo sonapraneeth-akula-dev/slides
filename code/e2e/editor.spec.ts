@@ -1896,3 +1896,50 @@ test('framed <Panels> render side-by-side linked headers, fitted visuals/tables,
   expect(await iconRes.text()).toContain('<svg');
   await expect(page.locator('head link[rel="icon"]')).toHaveAttribute('href', '/favicon.svg');
 });
+
+test('clicking a slide in the sidebar outline scrolls the source editor to that slide directive', async ({ page }) => {
+  await page.goto(origin);
+  await page.locator('#open-demo').click();
+  const source = page.locator('#source');
+  await expect(source).toBeVisible();
+
+  await page.locator('#outline .outline-item[data-slide-id="portal-panels"]').click();
+  const afterDeepClick = await source.evaluate(el => {
+    const ta = el as HTMLTextAreaElement;
+    return {
+      scrollTop: ta.scrollTop,
+      selectionStart: ta.selectionStart,
+      expectedOffset: ta.value.indexOf('::slide{id="portal-panels"'),
+    };
+  });
+  expect(afterDeepClick.expectedOffset).toBeGreaterThan(0);
+  expect(afterDeepClick.selectionStart).toBe(afterDeepClick.expectedOffset);
+  expect(afterDeepClick.scrollTop).toBeGreaterThan(4000);
+
+  await page.locator('#outline .outline-item[data-slide-id="welcome"]').click();
+  const afterCoverClick = await source.evaluate(el => {
+    const ta = el as HTMLTextAreaElement;
+    return {
+      scrollTop: ta.scrollTop,
+      selectionStart: ta.selectionStart,
+      expectedOffset: ta.value.indexOf('::slide{id="welcome"'),
+    };
+  });
+  expect(afterCoverClick.selectionStart).toBe(afterCoverClick.expectedOffset);
+  expect(afterCoverClick.scrollTop).toBeGreaterThan(200);
+  expect(afterCoverClick.scrollTop).toBeLessThan(500);
+
+  await page.locator('#hide-preview').click();
+  await expect(page.locator('#editor-panes')).toHaveAttribute('data-view', 'source');
+  await page.locator('#outline .outline-item[data-slide-id="architecture-flow"]').click();
+  const inSourceOnly = await source.evaluate(el => {
+    const ta = el as HTMLTextAreaElement;
+    return {
+      scrollTop: ta.scrollTop,
+      selectionStart: ta.selectionStart,
+      expectedOffset: ta.value.indexOf('::slide{id="architecture-flow"'),
+    };
+  });
+  expect(inSourceOnly.selectionStart).toBe(inSourceOnly.expectedOffset);
+  expect(inSourceOnly.scrollTop).toBeGreaterThan(afterCoverClick.scrollTop);
+});

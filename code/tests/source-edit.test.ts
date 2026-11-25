@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 import { compileDeck } from '../src/deck';
-import { addSlide, clearTheme, editableLines, hasUniqueSlideIds, insertSlide, propagateSlideIdChange, replacePlainLine, setDeckTitle, setLayout, setMaster, setSlideHideTitle, setSlideMetadata, setSlideSection, setTheme } from '../src/source-edit';
+import { addSlide, clearTheme, editableLines, findSlideOffset, hasUniqueSlideIds, insertSlide, propagateSlideIdChange, replacePlainLine, setDeckTitle, setLayout, setMaster, setSlideHideTitle, setSlideMetadata, setSlideSection, setTheme } from '../src/source-edit';
 
 const source = `---
 slides:
@@ -271,5 +271,14 @@ intro and parent="intro" are prose
     expect(editableLines(source, 'intro', 'Different paragraph')).toEqual([]);
     expect(editableLines(source.replace('Plain paragraph', '[link](https://example.com)'), 'intro', '## Welcome\n\n[link](https://example.com)')).toEqual([]);
     expect(editableLines(source, 'absent', '## Welcome\n\nPlain paragraph')).toEqual([]);
+  });
+
+  test('locates slide directive offset while ignoring fenced directives and broken neighbors', () => {
+    const deckWithFence = `---\nslides:\n  formatVersion: 1\n---\n\n::slide{id="intro"}\n\n\`\`\`md\n::slide{id="target"}\n\`\`\`\n\n::slide{layout="blank" id="target"}\n## Real target\n`;
+    const expected = deckWithFence.indexOf('::slide{layout="blank" id="target"}');
+    expect(findSlideOffset(deckWithFence, 'target')).toBe(expected);
+    const withBrokenNeighbor = `${deckWithFence}\n::slide{id="broken" badAttr=1}\n`;
+    expect(findSlideOffset(withBrokenNeighbor, 'target')).toBe(expected);
+    expect(findSlideOffset(deckWithFence, 'missing')).toBeNull();
   });
 });

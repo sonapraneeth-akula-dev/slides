@@ -1,4 +1,4 @@
-import { clearTheme, editableLines, hasUniqueSlideIds, insertSlide, layouts, propagateSlideIdChange, replacePlainLine, setDeckTitle, setLayout, setMaster, setSlideHideTitle, setSlideMetadata, setSlideSection, setTheme, themeNames } from './source-edit';
+import { clearTheme, editableLines, findSlideOffset, hasUniqueSlideIds, insertSlide, layouts, propagateSlideIdChange, replacePlainLine, setDeckTitle, setLayout, setMaster, setSlideHideTitle, setSlideMetadata, setSlideSection, setTheme, themeNames } from './source-edit';
 import { markdown, overlayMode, renderStage, themePresets, type Deck, type Slide, type Snapshot, type Stage, type Stroke } from './render';
 import { drawStage } from './stage-view';
 import { masterSamples } from './master-samples';
@@ -259,12 +259,50 @@ async function openDeck(id: string): Promise<void> {
   } catch (error) { errorNotice(error); }
 }
 
+function scrollSourceToOffset(start: number, end = start): void {
+  const len = sourceInput.value.length;
+  const clampedStart = Math.max(0, Math.min(start, len));
+  const clampedEnd = Math.max(clampedStart, Math.min(end, len));
+  sourceInput.setSelectionRange(clampedStart, clampedEnd);
+  if (sourceInput.clientWidth <= 0) return;
+  const style = getComputedStyle(sourceInput);
+  const mirror = document.createElement('div');
+  mirror.setAttribute('aria-hidden', 'true');
+  Object.assign(mirror.style, {
+    position: 'fixed', visibility: 'hidden', pointerEvents: 'none', top: '0', left: '-9999px',
+    boxSizing: 'border-box', width: `${sourceInput.clientWidth}px`,
+    paddingTop: style.paddingTop, paddingRight: style.paddingRight,
+    paddingBottom: style.paddingBottom, paddingLeft: style.paddingLeft,
+    fontFamily: style.fontFamily, fontSize: style.fontSize, fontWeight: style.fontWeight,
+    fontStyle: style.fontStyle, lineHeight: style.lineHeight, letterSpacing: style.letterSpacing,
+    tabSize: style.tabSize, whiteSpace: 'pre-wrap',
+    overflowWrap: style.overflowWrap || 'anywhere', wordBreak: style.wordBreak,
+  });
+  mirror.append(document.createTextNode(sourceInput.value.slice(0, clampedStart)));
+  const marker = document.createElement('span');
+  marker.textContent = '\u200b';
+  mirror.append(marker);
+  document.body.append(mirror);
+  const paddingTop = parseFloat(style.paddingTop) || 0;
+  const targetTop = Math.max(0, marker.offsetTop - paddingTop);
+  mirror.remove();
+  const maxScroll = Math.max(0, sourceInput.scrollHeight - sourceInput.clientHeight);
+  sourceInput.scrollTop = Math.min(targetTop, maxScroll);
+}
+
+function scrollSourceToSlide(id: string): void {
+  const offset = findSlideOffset(sourceInput.value, id);
+  if (offset !== null) scrollSourceToOffset(offset);
+}
+
 function setView(next: View): void {
+  const fromPreviewOnly = view === 'preview';
   view = next;
   $('master-pane').hidden = true;
   $('editor-panes').hidden = false;
   $('editor-panes').dataset.view = next;
   syncEditorNavigation();
+  if (fromPreviewOnly && next !== 'preview' && selected) scrollSourceToSlide(selected);
 }
 function syncEditorNavigation(): void {
   const settingsActive = !$('master-pane').hidden;
@@ -290,7 +328,7 @@ function updateDiagnostics(diagnostics: Diagnostic[] = []): void {
       if (item.slideId && compiled?.slides.some(slide => slide.id === item.slideId)) selectSlide(item.slideId);
       if (item.sourceSpan?.start !== undefined) {
         sourceInput.focus();
-        sourceInput.setSelectionRange(item.sourceSpan.start, item.sourceSpan.end ?? item.sourceSpan.start);
+        scrollSourceToOffset(item.sourceSpan.start, item.sourceSpan.end ?? item.sourceSpan.start);
       }
     });
     area.append(row);
@@ -307,6 +345,7 @@ function selectSlide(id: string): void {
     previewCollapsed.delete(group.key);
   }
   updateEditor();
+  scrollSourceToSlide(id);
   const card = [...document.querySelectorAll<HTMLElement>('.preview-card')].find(item => item.dataset.slideId === id);
   card?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
 }
@@ -442,7 +481,7 @@ function updateOutline(): void {
         editSource(added.text);
         selected = added.id;
         sourceInput.focus();
-        sourceInput.setSelectionRange(added.start, added.start);
+        scrollSourceToOffset(added.start);
       }
       catch (error) { errorNotice(error); }
     });

@@ -348,6 +348,35 @@ export function hasUniqueSlideIds(source: string): boolean {
   return !!slides?.length && new Set(slides.map(slide => slide.id.value)).size === slides.length;
 }
 
+export function findSlideOffset(source: string, slideId: string): number | null {
+  if (!/^[A-Za-z][\w-]*$/.test(slideId)) return null;
+  const parsed = sourceSlides(source)?.find(slide => slide.id.value === slideId);
+  if (parsed) return parsed.start;
+  let fence = '';
+  let frontMatter = source.startsWith('---\n') || source.startsWith('---\r\n');
+  let firstLine = true;
+  const idPattern = new RegExp(`(?:^|\\{|\\s)id="${slideId.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}"(?:\\s|\\}|$)`);
+  for (const match of source.matchAll(/[^\r\n]*(?:\r?\n|$)/g)) {
+    const line = match[0].replace(/\r?\n$/, '');
+    const trimmed = line.trim();
+    if (frontMatter) {
+      if (firstLine) { firstLine = false; continue; }
+      if (trimmed === '---') frontMatter = false;
+      continue;
+    }
+    firstLine = false;
+    const marker = /^(`{3,}|~{3,})/.exec(trimmed)?.[1];
+    if (marker) {
+      if (!fence) fence = marker;
+      else if (marker[0] === fence[0] && marker.length >= fence.length) fence = '';
+    }
+    if (!fence && !marker && trimmed.startsWith('::slide{') && idPattern.test(trimmed)) {
+      return match.index! + line.indexOf('::slide{');
+    }
+  }
+  return null;
+}
+
 export function propagateSlideIdChange(previous: string, current: string):
   { text: string; oldId: string; newId: string; replacements: IdReplacement[] } | null {
   const oldSlides = sourceSlides(previous);
