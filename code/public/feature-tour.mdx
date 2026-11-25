@@ -230,6 +230,29 @@ The chart is driven by inline JSON. Its data table remains available to screen r
 The same chart data format supports other chart types, including donut, line, area, and scatter.
 :::
 
+::slide{id="perf-metrics" section="Charts" hideTitle="true" metadataTopRight="slideTitle"}
+# Performance metrics
+
+<Cards>
+<Card title="p50 Latency">
+**14 ms** <Mark note="-36%">target met</Mark>
+</Card>
+<Card title="p99 Latency">
+**42 ms** across 4 regions
+</Card>
+<Card title="Throughput">
+**18.4k** req/s sustained
+</Card>
+</Cards>
+
+```chart
+{"type":"line","labels":["W1","W2","W3","W4"],"series":[{"name":"Baseline (ms)","data":[68,64,61,59]},{"name":"Optimized (ms)","data":[58,49,44,42]}],"y":"p99 ms"}
+```
+
+:::notes
+Combine multiple components on one slide, such as KPI summary cards above a live ECharts trend. Setting hideTitle="true" hides the slide heading on stage while keeping it in the outline, jump list, and slideTitle metadata.
+:::
+
 ::slide{id="diagram" section="Diagrams"}
 # A visible Mermaid flow
 

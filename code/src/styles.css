@@ -276,6 +276,7 @@ a { color: #1752ad; }
 .stage .component-card { margin: .6em 0; padding: .7em 1em; border: 1px solid color-mix(in srgb, var(--slide-accent) 30%, var(--slide-surface)); border-top: .25em solid var(--slide-accent); border-radius: 0; background: color-mix(in srgb, var(--slide-accent) 5%, var(--slide-surface)); }
 .stage .component-cards > .component-card { margin: 0; }
 .stage .component-title { margin: 0 0 .3em; font-weight: 800; font-family: var(--headingFont, var(--font-sans)); }
+.stage :is(.component-card, .callout) > p:not(.component-title) { margin-block: .2em 0; }
 .stage :is(.component-card, .callout) > :last-child { margin-bottom: 0; }
 .stage .callout { --callout: #2563eb; margin: .6em 0; padding: .6em 1em; border-left: .3em solid var(--callout); border-radius: 0; background: color-mix(in srgb, var(--callout) 10%, var(--slide-surface)); }
 .stage .callout[data-type="tip"] { --callout: #15803d; }
@@ -364,6 +365,19 @@ a { color: #1752ad; }
 }
 .stage .slide-content > .slide-markdown:has(> .special-fence[data-kind="chart"]) > p {
   margin-block: .25em 0;
+}
+.stage .slide-content > .slide-markdown:has(> .special-fence[data-kind="chart"]):has(> .component-cards, > .callout) > :is(h1, h2, h3) {
+  font-size: calc(1.75em * var(--headingSize-scale, 1));
+  margin-block: 0 .2em;
+}
+.stage .slide-content > .slide-markdown:has(> .special-fence[data-kind="chart"]) > .component-cards {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 6.5em), 1fr));
+  gap: .5em;
+  margin: .1em 0 .35em;
+  font-size: .82em;
+}
+.stage .slide-content > .slide-markdown:has(> .special-fence[data-kind="chart"]) .component-card {
+  padding: .38em .65em;
 }
 .stage .slide-content > .slide-markdown > .special-fence[data-kind="mermaid"] {
   display: grid;

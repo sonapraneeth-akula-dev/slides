@@ -541,7 +541,7 @@ test('one feature tour action opens the latest edition without overwriting edits
   await expect(page.locator('#open-demo')).toHaveText('Explore latest feature tour');
   await page.locator('#open-demo').click();
   await expect(page.locator('#editor-page')).toBeVisible();
-  await expect(page.locator('.preview-card')).toHaveCount(18);
+  await expect(page.locator('.preview-card')).toHaveCount(19);
   await expect(page.locator('#source')).toHaveValue(/# Bundled feature tour: [a-f0-9]{64}/);
   await expect(page.locator('.preview-card[data-slide-id="welcome"] .slide-cover-image img')).toBeVisible();
   await expect(page.locator('.preview-card[data-slide-id="diagram"] .special-fence svg')).toBeVisible();
@@ -562,7 +562,7 @@ test('one feature tour action opens the latest edition without overwriting edits
   await page.locator('#open-demo').click();
   await expect(page.locator('#editor-page')).toBeVisible();
   await expect(page.locator('#source')).toHaveValue(/# My personalized tour/);
-  await expect(page.locator('.preview-card')).toHaveCount(18);
+  await expect(page.locator('.preview-card')).toHaveCount(19);
   await page.locator('#home').click();
   await expect(page.locator('#library-page')).toBeVisible();
   const olderText = (await readFile(original, 'utf8')).replace(
@@ -570,11 +570,11 @@ test('one feature tour action opens the latest edition without overwriting edits
   await writeFile(original, olderText);
   await page.locator('#open-demo').click();
   await expect(page.locator('#editor-page')).toBeVisible();
-  await expect(page.locator('.preview-card')).toHaveCount(18);
+  await expect(page.locator('.preview-card')).toHaveCount(19);
   await expect(page.locator('#source-file')).toContainText('Slides-Feature-Tour-2.mdx');
   await expect(page.locator('#source')).toHaveValue(/# A reveal and private notes/);
   await expect(page.locator('#source')).toHaveValue(/Mermaid renders this left-to-right flow from idea to presentation/);
-  expect((await page.locator('#source').inputValue()).match(/^:::notes$/gm)).toHaveLength(18);
+  expect((await page.locator('#source').inputValue()).match(/^:::notes$/gm)).toHaveLength(19);
   expect(await readFile(original, 'utf8')).toBe(olderText);
   await page.locator('#home').click();
   await expect(page.locator('#library-page')).toBeVisible();
@@ -752,7 +752,7 @@ test('presenter fits charts and Mermaid, shows private notes, and groups legible
   await page.setViewportSize({ width: 1920, height: 1080 });
   await page.goto(origin);
   await page.locator('#open-demo').click();
-  await expect(page.locator('.preview-card')).toHaveCount(18);
+  await expect(page.locator('.preview-card')).toHaveCount(19);
   await expect(page.locator('#present')).toBeEnabled();
   await page.locator('#present').click();
   await page.locator('#jump').selectOption('diagram');
@@ -1653,13 +1653,20 @@ test('chart slides fit without scrollbars and keep footers anchored at the botto
 
   for (const [width, height] of [[1920, 1080], [1366, 768], [1280, 720]] as const) {
     await page.setViewportSize({ width, height });
-    for (const slideId of ['bar-chart', 'donut-chart']) {
+    for (const slideId of ['bar-chart', 'donut-chart', 'perf-metrics']) {
       const stage = page.locator(`.preview-card[data-slide-id="${slideId}"] .preview-stage`);
       await stage.scrollIntoViewIfNeeded();
       await expect(stage.locator('.chart-visual canvas')).toBeVisible();
+      if (slideId === 'perf-metrics') {
+        await expect(stage.locator(':is(h1, h2, h3)')).toHaveCount(0);
+        await expect(stage.locator('.component-cards > .component-card')).toHaveCount(3);
+        await expect(stage.locator('.slide-meta[data-position="TopRight"]')).toHaveText('Performance metrics');
+      }
       const metrics = await stage.evaluate(el => {
         const stageRect = el.getBoundingClientRect();
         const chartRect = el.querySelector('.chart-visual')!.getBoundingClientRect();
+        const cardsEl = el.querySelector('.component-cards');
+        const cardsRect = cardsEl?.getBoundingClientRect() ?? null;
         const paragraphs = [...el.querySelectorAll('.slide-markdown > p')].map(p => p.getBoundingClientRect());
         const contentBottom = Math.max(chartRect.bottom, ...paragraphs.map(p => p.bottom));
         const bottomLeft = el.querySelector('.slide-meta[data-position="BottomLeft"]')!.getBoundingClientRect();
@@ -1667,6 +1674,7 @@ test('chart slides fit without scrollbars and keep footers anchored at the botto
         return {
           overflow: el.scrollHeight > el.clientHeight + 1,
           chartHeight: chartRect.height,
+          cardsAboveChart: !cardsRect || cardsRect.bottom <= chartRect.top + 2,
           contentBottom,
           footerTop: Math.min(bottomLeft.top, bottomRight.top),
           leftBottomGap: stageRect.bottom - bottomLeft.bottom,
@@ -1676,11 +1684,22 @@ test('chart slides fit without scrollbars and keep footers anchored at the botto
       });
       expect(metrics.overflow).toBe(false);
       expect(metrics.chartHeight).toBeGreaterThanOrEqual(80);
+      expect(metrics.cardsAboveChart).toBe(true);
       expect(metrics.footerTop).toBeGreaterThanOrEqual(metrics.contentBottom - 2);
       expect(metrics.leftBottomGap).toBeLessThan(metrics.stageHeight * 0.08);
       expect(metrics.rightBottomGap).toBeLessThan(metrics.stageHeight * 0.08);
     }
   }
+
+  const perfCard = page.locator('.preview-card[data-slide-id="perf-metrics"]');
+  await perfCard.locator('.slide-options summary').click();
+  await perfCard.getByLabel('Hide title on slide 16').uncheck();
+  await expect(perfCard.locator('.preview-stage h1')).toHaveText('Performance metrics');
+  await expect(perfCard.locator('.preview-stage .chart-visual canvas')).toBeVisible();
+  const withVisibleHeadingOverflow = await perfCard.locator('.preview-stage').evaluate(
+    el => el.scrollHeight > el.clientHeight + 1,
+  );
+  expect(withVisibleHeadingOverflow).toBe(false);
 });
 
 test('slide title can be hidden via slide settings or omitted entirely while keeping outline and metadata titles', async ({ page, context }) => {
