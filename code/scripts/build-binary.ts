@@ -36,9 +36,10 @@ async function collectDist(dir: string): Promise<void> {
 }
 await collectDist(distDir);
 
-const [audienceAssetsRaw, featureTourMdx, sampleSvg, exportCss, exportPlayerJs] = await Promise.all([
+const [audienceAssetsRaw, featureTourMdx, leakmonShowcaseMdx, sampleSvg, exportCss, exportPlayerJs] = await Promise.all([
   readFile(join(buildDir, 'audience-assets.json'), 'utf8'),
   readFile(join(root, 'public', 'feature-tour.mdx'), 'utf8'),
+  readFile(join(root, 'public', 'leakmon-showcase.mdx'), 'utf8'),
   readFile(join(root, 'public', 'sample-landscape.svg')),
   readFile(join(buildDir, 'export.css'), 'utf8'),
   readFile(join(buildDir, 'export-player.js'), 'utf8'),
@@ -49,6 +50,7 @@ const bundlePayload = {
   distFiles,
   audienceAssets: JSON.parse(audienceAssetsRaw) as string[],
   featureTourMdx,
+  leakmonShowcaseMdx,
   sampleLandscapeSvgBase64: sampleSvg.toString('base64'),
   exportCss,
   exportPlayerJs,

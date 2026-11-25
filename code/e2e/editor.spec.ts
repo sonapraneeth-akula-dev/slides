@@ -542,7 +542,7 @@ test('end recovers from an expired owner token and an already-stopped presentati
 
 test('one feature tour action opens the latest edition without overwriting edits', async ({ page }) => {
   await page.goto(origin);
-  await expect(page.locator('.library-demo button')).toHaveCount(1);
+  await expect(page.locator('.library-demo button')).toHaveText(['Explore latest feature tour', 'Open LeakMon showcase']);
   await expect(page.locator('#open-demo')).toHaveText('Explore latest feature tour');
   await page.locator('#open-demo').click();
   await expect(page.locator('#editor-page')).toBeVisible();
@@ -1944,4 +1944,64 @@ test('clicking a slide in the sidebar outline scrolls the source editor to that 
   });
   expect(inSourceOnly.selectionStart).toBe(inSourceOnly.expectedOffset);
   expect(inSourceOnly.scrollTop).toBeGreaterThan(afterCoverClick.scrollTop);
+});
+
+test('LeakMon showcase demo renders dark/light themes, multi-track flows, annotated charts, pillars, badges, and child panels without overflow', async ({ page, context }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto(origin);
+  await expect(page.locator('#open-leakmon-demo')).toBeVisible();
+  await page.locator('#open-leakmon-demo').click();
+  await expect(page.locator('#editor-page')).toBeVisible();
+  await expect(page.locator('#diagnostics')).toHaveText('No diagnostics');
+  await expect(page.locator('#outline .outline-item')).toHaveCount(12);
+
+  const heroStage = page.locator('.preview-card[data-slide-id="hero"] .preview-stage');
+  await expect(heroStage).toHaveAttribute('data-slide-theme', 'midnight');
+  await expect(heroStage).toHaveCSS('background-color', 'rgb(15, 23, 42)');
+  await expect(heroStage.locator('.slide-eyebrow')).toContainText('KARDIA SINGLEBOX');
+  await expect(heroStage.locator('.card-stat')).toHaveCount(3);
+
+  const trackFlow = page.locator('.preview-card[data-slide-id="big-picture"] .preview-stage');
+  await trackFlow.scrollIntoViewIfNeeded();
+  await expect.poll(() => trackFlow.locator('svg.flow-arrows > path').count()).toBe(6);
+
+  const ablationStage = page.locator('.preview-card[data-slide-id="ablation-validation"] .preview-stage');
+  await ablationStage.scrollIntoViewIfNeeded();
+  await expect.poll(() => ablationStage.locator('svg.chart-annotations rect').count()).toBe(3);
+  await expect.poll(() => ablationStage.locator('svg.chart-annotations line').count()).toBe(3);
+  await expect(ablationStage.locator('svg.chart-annotations')).toContainText('TRAP #1: Reg Recall 32.6%');
+
+  const deepDiveStage = page.locator('.preview-card[data-slide-id="kardia-portal-deep-dive"] .preview-stage');
+  await deepDiveStage.scrollIntoViewIfNeeded();
+  await expect.poll(() =>
+    deepDiveStage.locator('.panel-body img.slide-image').first().evaluate(img => (img as HTMLImageElement).naturalWidth),
+  ).toBeGreaterThan(0);
+
+  await page.locator('#present').click();
+  const slideIds = [
+    'hero', 'big-picture', 'pipeline-stages', 'fleet-scale', 'gen1-limits', 'gen2-rewrite',
+    'ablation-validation', 'gen3-breakthroughs', 'measured-impact', 'ux-governance',
+    'kardia-portal-deep-dive', 'summary-horizon',
+  ];
+  for (const id of slideIds) {
+    await page.locator('#jump').selectOption(id);
+    await expect.poll(() => page.locator('#stage').evaluate(el => el.dataset.layout)).toBe('title-content');
+    const metrics = await page.locator('#stage').evaluate(el => ({
+      overflow: el.scrollHeight - el.clientHeight,
+      slideTheme: el.dataset.slideTheme ?? '',
+    }));
+    expect(metrics.overflow, `slide ${id} overflow`).toBeLessThanOrEqual(2);
+  }
+  await expect(page.locator('#stage')).toHaveAttribute('data-slide-theme', 'midnight');
+
+  const [audience] = await Promise.all([context.waitForEvent('page'), page.locator('#local-audience').click()]);
+  await page.locator('#jump').selectOption('ablation-validation');
+  await expect.poll(() => audience.locator('#audience-stage svg.chart-annotations rect').count()).toBe(3);
+  await page.locator('#jump').selectOption('kardia-portal-deep-dive');
+  await expect.poll(() =>
+    audience.locator('#audience-stage .panel-body img.slide-image').first().evaluate(img => (img as HTMLImageElement).naturalWidth),
+  ).toBeGreaterThan(0);
+  await audience.close();
+  await page.locator('#end').click();
+  await page.locator('#confirm-end').click();
 });

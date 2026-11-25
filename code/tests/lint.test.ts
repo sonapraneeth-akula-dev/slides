@@ -8,13 +8,17 @@ describe('deck lint engine and CLI', () => {
   test('passes bundled feature tour with zero diagnostics', async () => {
     const out: string[] = [];
     const err: string[] = [];
-    const exit = await runLintCli([join(process.cwd(), 'public', 'feature-tour.mdx')], {
+    const exit = await runLintCli([
+      join(process.cwd(), 'public', 'feature-tour.mdx'),
+      join(process.cwd(), 'public', 'leakmon-showcase.mdx'),
+    ], {
       stdout: line => out.push(line),
       stderr: line => err.push(line),
     });
     expect(exit).toBe(0);
     expect(err).toEqual([]);
-    expect(out[0]).toContain('OK');
+    expect(out).toHaveLength(2);
+    expect(out.every(line => line.includes('OK'))).toBe(true);
   });
 
   test('reports empty slide, missing alt text, missing asset, and density warnings while exiting 0', async () => {

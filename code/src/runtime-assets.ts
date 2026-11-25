@@ -6,6 +6,7 @@ export interface EmbeddedBundle {
   distFiles: Record<string, { base64: string; mime: string }>;
   audienceAssets: string[];
   featureTourMdx: string;
+  leakmonShowcaseMdx?: string;
   sampleLandscapeSvgBase64: string;
   exportCss: string;
   exportPlayerJs: string;
@@ -43,6 +44,26 @@ export async function readFeatureTourBundle(): Promise<string | null> {
     if (await file.exists()) return file.text();
   }
   return embeddedBundle?.featureTourMdx ?? null;
+}
+
+export async function readLeakMonShowcaseBundle(): Promise<string | null> {
+  for (const candidate of [join(process.cwd(), 'public', 'leakmon-showcase.mdx'), join(process.cwd(), 'dist', 'leakmon-showcase.mdx')]) {
+    const file = Bun.file(candidate);
+    if (await file.exists()) return file.text();
+  }
+  return embeddedBundle?.leakmonShowcaseMdx ?? null;
+}
+
+export async function readBundledTourAsset(relAsset: string): Promise<Buffer | null> {
+  for (const dir of ['public', 'dist']) {
+    const path = join(process.cwd(), dir, 'assets', ...relAsset.split('/'));
+    try { return await readFile(path); }
+    catch (error) {
+      if (!(error instanceof Error) || !('code' in error) || error.code !== 'ENOENT') throw error;
+    }
+  }
+  const embedded = embeddedBundle?.distFiles[`assets/${relAsset}`];
+  return embedded ? Buffer.from(embedded.base64, 'base64') : null;
 }
 
 export async function readBundledSampleSvg(): Promise<Buffer | null> {

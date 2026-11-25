@@ -7,8 +7,8 @@ import { checkAssetAtDirectory, lintDeck } from './lint';
 import { createTalk, endTalk, event, getTalk, localAudienceStream, presenterStream, privateState, publicState, publicViewers, setPointer, shareOptions, startShare, stopShare, talkAssetResponse, type Talk } from './session';
 import { exportDeckArtifact, exportTalkArtifact, type ExportFormat, type RevealExportMode } from './export';
 import { presenterSession, publicSnapshot, renderDeck } from './presentation-model';
-import { hasUiAssets, readFeatureTourBundle, readPublicDistAsset } from './runtime-assets';
-import { assetResponse, ensureSampleImage, readDeckAsset, sampleImageResponse } from './sample-image';
+import { hasUiAssets, readFeatureTourBundle, readLeakMonShowcaseBundle, readPublicDistAsset } from './runtime-assets';
+import { assetResponse, ensureBundledTourAsset, ensureSampleImage, readDeckAsset, sampleImageResponse } from './sample-image';
 import { sampleImageUrl } from './sample-image-reference';
 
 export interface RouterOptions {
@@ -61,10 +61,15 @@ async function body(request: Request): Promise<Record<string, unknown>> {
   return data as Record<string, unknown>;
 }
 
-async function featureTour(): Promise<{ id: string }> {
-  const filename = 'Slides-Feature-Tour.mdx';
-  const text = await readFeatureTourBundle();
-  if (!text) throw new LibraryError(500, 'Feature tour is missing from the application');
+async function installBundledTour(options: {
+  baseName: string;
+  readText: () => Promise<string | null>;
+  legacyHash?: string;
+  prepareAssets?: () => Promise<void>;
+}): Promise<{ id: string }> {
+  const filename = `${options.baseName}.mdx`;
+  const text = await options.readText();
+  if (!text) throw new LibraryError(500, `${options.baseName} is missing from the application`);
   const normalize = (value: string) => value.replace(/\r\n/g, '\n');
   const hash = (value: string) => createHash('sha256').update(value).digest('hex');
   const current = normalize(text);
@@ -72,20 +77,20 @@ async function featureTour(): Promise<{ id: string }> {
   const marker = `  # Bundled feature tour: ${bundleHash}`;
   const installText = text.replace(/^(slides:\r?\n)/m, `$1${marker}${text.includes('\r\n') ? '\r\n' : '\n'}`);
   if (installText === text || !compileDeck(installText).deck) {
-    throw new LibraryError(500, 'Bundled feature tour is invalid');
+    throw new LibraryError(500, `Bundled ${options.baseName} is invalid`);
   }
   const markerLine = /^(---\nslides:\n)  # Bundled feature tour: ([a-f0-9]{64})\n/;
-  // The pre-marker tour shipped in the first bundled edition.
-  const legacyBundleHash = '2ff5e8455502b2ab1611339d59f442f51888ba74fa687e25543ffb9d8bdd5a4b';
   const edition = (value: string) => markerLine.exec(value)?.[2];
   const unchanged = (value: string) => {
     const originalHash = edition(value);
     return originalHash ? hash(value.replace(markerLine, '$1')) === originalHash
-      : value === current || hash(value) === legacyBundleHash;
+      : value === current || (options.legacyHash !== undefined && hash(value) === options.legacyHash);
   };
+  const escapedBase = options.baseName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const namePattern = new RegExp(`^${escapedBase}(?:-\\d+)?\\.mdx?$`);
   const tours = (await listDecks())
     .filter(entry => entry.kind === 'tour' && !entry.missing &&
-      /^Slides-Feature-Tour(?:-\d+)?\.mdx?$/.test(entry.name) &&
+      namePattern.test(entry.name) &&
       entry.path === join(featureToursRoot, entry.name))
     .sort((a, b) => Number(/-(\d+)\.mdx?$/.exec(b.name)?.[1] ?? 1) -
       Number(/-(\d+)\.mdx?$/.exec(a.name)?.[1] ?? 1));
@@ -99,6 +104,7 @@ async function featureTour(): Promise<{ id: string }> {
     ?? currentTour
     ?? installed.find(tour => unchanged(tour.text));
   await ensureSampleImage();
+  await options.prepareAssets?.();
   if (reusable) {
     let id = reusable.id;
     let revision = reusable.revision;
@@ -118,10 +124,26 @@ async function featureTour(): Promise<{ id: string }> {
   }
   let candidate = filename;
   for (let number = 2; await Bun.file(join(featureToursRoot, candidate)).exists(); number++) {
-    candidate = `Slides-Feature-Tour-${number}.mdx`;
+    candidate = `${options.baseName}-${number}.mdx`;
   }
   const created = await createDeck(candidate, installText, 'tour');
   return { id: created.id };
+}
+
+async function featureTour(): Promise<{ id: string }> {
+  return installBundledTour({
+    baseName: 'Slides-Feature-Tour',
+    readText: readFeatureTourBundle,
+    legacyHash: '2ff5e8455502b2ab1611339d59f442f51888ba74fa687e25543ffb9d8bdd5a4b',
+  });
+}
+
+async function leakMonShowcase(): Promise<{ id: string }> {
+  return installBundledTour({
+    baseName: 'LeakMon-Evolution-Journey',
+    readText: readLeakMonShowcaseBundle,
+    prepareAssets: () => ensureBundledTourAsset('leakmon-kardia-ui.svg'),
+  });
 }
 
 function requireString(data: Record<string, unknown>, key: string): string {
@@ -265,7 +287,10 @@ export function privateRouter(port: number, options?: RouterOptions) {
             return response({ library: await listDecks(), id: created.id }, 201);
           }
           if (data.action === 'demo') {
-            const created = await featureTour();
+            if (data.demo !== undefined && data.demo !== 'feature-tour' && data.demo !== 'leakmon') {
+              throw new LibraryError(400, 'Unknown demo deck');
+            }
+            const created = data.demo === 'leakmon' ? await leakMonShowcase() : await featureTour();
             return response({ library: await listDecks(), id: created.id }, 201);
           }
           if (data.action === 'open' || data.action === 'relink') {

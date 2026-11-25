@@ -1,0 +1,62 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 880 500" font-family="Segoe UI, -apple-system, sans-serif">
+  <rect width="880" height="500" fill="#f8fafc"/>
+  <rect x="12" y="12" width="856" height="476" fill="#ffffff" stroke="#cbd5e1" stroke-width="1.5"/>
+  <rect x="12" y="12" width="856" height="40" fill="#0f172a"/>
+  <text x="28" y="37" fill="#f8fafc" font-size="14" font-weight="700">Kardia Singlebox · LeakMon Report — Run #925727 (Baseline vs. Treatment)</text>
+  <rect x="742" y="21" width="110" height="22" fill="#dc2626"/>
+  <text x="797" y="36" fill="#ffffff" font-size="11" font-weight="700" text-anchor="middle">#Alert# · 1 Red</text>
+
+  <rect x="12" y="52" width="856" height="34" fill="#f1f5f9" stroke="#e2e8f0"/>
+  <rect x="24" y="57" width="142" height="29" fill="#ffffff" stroke="#0d9488" stroke-width="2"/>
+  <text x="95" y="76" fill="#0f766e" font-size="11.5" font-weight="700" text-anchor="middle">1. Action Badges</text>
+  <rect x="174" y="57" width="154" height="25" fill="#e2e8f0"/>
+  <text x="251" y="74" fill="#334155" font-size="11" font-weight="600" text-anchor="middle">2. Caller-First Tree</text>
+  <rect x="336" y="57" width="166" height="25" fill="#e2e8f0"/>
+  <text x="419" y="74" fill="#334155" font-size="11" font-weight="600" text-anchor="middle">3. Alloc-First Tree</text>
+  <rect x="510" y="57" width="150" height="25" fill="#e2e8f0"/>
+  <text x="585" y="74" fill="#334155" font-size="11" font-weight="600" text-anchor="middle">4. Snapshot Curves</text>
+  <rect x="668" y="57" width="180" height="25" fill="#e2e8f0"/>
+  <text x="758" y="74" fill="#334155" font-size="11" font-weight="600" text-anchor="middle">5. Governance Rules</text>
+
+  <rect x="28" y="102" width="824" height="62" fill="#fef2f2" stroke="#f87171" stroke-width="1.4"/>
+  <rect x="42" y="116" width="154" height="30" fill="#fee2e2" stroke="#dc2626" stroke-width="1.4"/>
+  <text x="119" y="135" fill="#991b1b" font-size="11.5" font-weight="700" text-anchor="middle">New leak signal</text>
+  <text x="212" y="127" fill="#0f172a" font-size="13" font-weight="700">ListingAcsHost!MakePClickRequestData</text>
+  <text x="212" y="148" fill="#475569" font-size="11.5">Slope: +118 KB/min · Net: +4.8 MB (12,480 blocks) · 94% upward pairs · FDR = 0.0018</text>
+
+  <rect x="28" y="176" width="824" height="58" fill="#fffbeb" stroke="#fbbf24" stroke-width="1.4"/>
+  <rect x="42" y="188" width="154" height="30" fill="#fef3c7" stroke="#d97706" stroke-width="1.4"/>
+  <text x="119" y="207" fill="#92400e" font-size="11.5" font-weight="700" text-anchor="middle">Needs review</text>
+  <text x="212" y="200" fill="#0f172a" font-size="13" font-weight="700">HashStore.dll!ShardCache&lt;ListingKey&gt;::Grow</text>
+  <text x="212" y="220" fill="#475569" font-size="11.5">Bounded 4× cache plateau (8.0 MB → 31.8 MB) · Seg 3 slope ≈ 0 KB/min · No pager alert</text>
+
+  <rect x="28" y="250" width="490" height="220" fill="#f8fafc" stroke="#cbd5e1"/>
+  <rect x="28" y="250" width="490" height="28" fill="#e2e8f0"/>
+  <text x="42" y="269" fill="#0f172a" font-size="12" font-weight="700">Caller-First C++ Allocation Call Tree (IDF-Aligned)</text>
+  <g font-family="Cascadia Code, Consolas, monospace" font-size="11">
+    <text x="44" y="298" fill="#334155">▼ ListingServer::ProcessQueryBatch</text>
+    <text x="64" y="322" fill="#334155">└─ ▼ RankingPipeline::BuildCandidateContext</text>
+    <rect x="82" y="333" width="420" height="24" fill="#fee2e2"/>
+    <text x="88" y="349" fill="#991b1b" font-weight="700">└─ MakePClickRequestData  [+4.8 MB · +12,480 blks]</text>
+    <text x="112" y="375" fill="#64748b">└─ ArenaPool::AllocChunk (stripped STL wrapper)</text>
+    <text x="44" y="408" fill="#334155">▼ HashStore::LookupOrPopulate&lt;ListingKey&gt;</text>
+    <rect x="62" y="418" width="440" height="24" fill="#fef3c7"/>
+    <text x="68" y="434" fill="#92400e" font-weight="700">└─ ShardCache&lt;ListingKey&gt;::Grow  [31.8 MB cap · Watch]</text>
+    <text x="44" y="458" fill="#0f766e" font-weight="700">✓ FamilyKey preserved across build caller renames</text>
+  </g>
+
+  <rect x="534" y="250" width="318" height="220" fill="#0f172a" stroke="#334155"/>
+  <rect x="534" y="250" width="318" height="28" fill="#1e293b"/>
+  <text x="548" y="269" fill="#38bdf8" font-size="12" font-weight="700">IgnoreRules.v2.json (Auto-Expiring)</text>
+  <g font-family="Cascadia Code, Consolas, monospace" font-size="10.8" fill="#e2e8f0">
+    <text x="548" y="298">{</text>
+    <text x="560" y="318" fill="#7dd3fc">"ruleType": "ExpectedGrowth",</text>
+    <text x="560" y="338" fill="#a7f3d0">"owner": "listing-perf@team",</text>
+    <text x="560" y="358" fill="#fde68a">"expiresUtc": "2027-02-15T00:00Z",</text>
+    <text x="560" y="378">"family": "ShardCache&lt;ListingKey&gt;",</text>
+    <text x="560" y="398">"maxNetMB": 36.0,</text>
+    <text x="560" y="418">"maxSlopeKBPerMin": 12.0,</text>
+    <text x="560" y="438" fill="#cbd5e1">"reason": "4x shard LRU rollout"</text>
+    <text x="548" y="458">}</text>
+  </g>
+</svg>

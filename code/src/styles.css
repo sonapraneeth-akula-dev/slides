@@ -115,7 +115,10 @@ a { color: #1752ad; }
 .library-intro > p:not(.eyebrow) { color: #536275; line-height: 1.6; }
 .library-demo { display: grid; justify-items: start; gap: 10px; max-width: 560px; margin-top: 28px; padding: 20px; border: 1px solid #d6e1f5; border-radius: 0; background: #edf3ff; color: #536275; font-size: 14px; }
 .library-demo strong { color: #1b2534; }
+.library-demo-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .library-demo button { color: #194686; border-color: #a9c0e9; background: #edf3ff; font-weight: 600; }
+.library-demo #open-leakmon-demo { color: #fff; border-color: #0d9488; background: #0d9488; }
+.library-demo #open-leakmon-demo:hover:not(:disabled) { border-color: #0f766e; background: #0f766e; }
 .library-start { padding: 24px; border: 1px solid #dae2ed; border-radius: 0; background: #fff; }
 .library-open { margin-top: 24px; padding-top: 24px; border-top: 1px solid #dae2ed; }
 .library-create label, .library-open label, .share-dialog label { display: block; margin-bottom: 8px; font-weight: 600; }
@@ -322,6 +325,24 @@ a { color: #1752ad; }
 .stage .component-card:has(.special-fence[data-kind="chart"]) { display: flex; flex-direction: column; min-height: 0; }
 .stage .component-card .special-fence[data-kind="chart"] { flex: 1; min-height: 85px; display: flex; flex-direction: column; }
 .stage .component-card .chart-visual { flex: 1; height: auto; min-height: 85px; }
+.stage .slide-content > .slide-markdown > .component-cards:has(.special-fence[data-kind="chart"]) {
+  flex: 1;
+  min-height: 0;
+  margin-block: .2em;
+  grid-template-rows: minmax(0, 1fr);
+}
+.stage .slide-content > .slide-markdown > .component-cards[data-columns="2"]:has(> .component-card:nth-child(3)):has(.special-fence[data-kind="chart"]) {
+  grid-template-rows: minmax(0, 1fr) auto;
+}
+.stage[data-has-eyebrow="true"][data-slide-theme="midnight"] .slide-content > .slide-markdown > p + .component-cards:last-child {
+  margin-top: auto;
+  margin-bottom: .3em;
+}
+.stage[data-has-eyebrow="true"][data-slide-theme="midnight"] .slide-content > .slide-markdown > .component-cards:has(+ .component-cards) {
+  flex: 1;
+  align-items: stretch;
+  margin-block: .25em;
+}
 .stage .component-card ul { margin: .2em 0 0; padding-left: 1.15em; }
 .stage .component-card li { margin: .14em 0; }
 .stage .slide-split { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .65em; flex: 1; min-height: 0; min-width: 0; }

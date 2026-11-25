@@ -1238,6 +1238,7 @@ function wire(): void {
     void libraryAction({ action: 'create', name });
   });
   $('open-demo').addEventListener('click', () => void libraryAction({ action: 'demo' }));
+  $('open-leakmon-demo').addEventListener('click', () => void libraryAction({ action: 'demo', demo: 'leakmon' }));
   $('open').addEventListener('click', () => {
     const input = $<HTMLInputElement>('deck-path');
     const path = input.value.trim();
