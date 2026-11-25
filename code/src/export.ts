@@ -175,7 +175,7 @@ function buildFrames(sourceDeck: SourceDeck, assetMap: Record<string, string>, s
   return { stage, frames };
 }
 
-const inlineFaviconHref = `data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect width="32" height="32" fill="#152c54"/><rect x="0.5" y="0.5" width="31" height="31" fill="none" stroke="#3468d2"/><rect x="9" y="5" width="18" height="13" fill="#2b5fc2"/><rect x="4" y="10" width="19" height="14" fill="#ffffff"/><rect x="7" y="13" width="11" height="2.5" fill="#152c54"/><rect x="7" y="17.5" width="8" height="2" fill="#416ab8"/><circle cx="19" cy="19.5" r="2.3" fill="#e6695f"/></svg>')}`;
+const inlineFaviconHref = `data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect x="8" y="4" width="22" height="16" fill="#3468d2"/><rect x="2" y="11" width="22" height="16" fill="#ffffff" stroke="#1d4aa0" stroke-width="2"/><rect x="6" y="15" width="11" height="2.6" fill="#152c54"/><rect x="6" y="20" width="8" height="2.2" fill="#3468d2"/><circle cx="18.8" cy="20.8" r="2.5" fill="#e6695f"/></svg>')}`;
 
 function bootstrapRenderHtml(title: string, css: string, playerJs: string, data: ExportDocumentData, includeToolbar = false): string {
   const safeJson = JSON.stringify(data).replace(/</g, '\\u003c');

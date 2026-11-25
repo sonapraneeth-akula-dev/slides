@@ -1893,7 +1893,9 @@ test('framed <Panels> render side-by-side linked headers, fitted visuals/tables,
   const iconRes = await page.request.get(`${origin}/favicon.svg`);
   expect(iconRes.status()).toBe(200);
   expect(iconRes.headers()['content-type']).toContain('image/svg+xml');
-  expect(await iconRes.text()).toContain('<svg');
+  const iconSvg = await iconRes.text();
+  expect(iconSvg).toContain('<svg');
+  expect(iconSvg).not.toMatch(/width="32"\s+height="32"/);
   await expect(page.locator('head link[rel="icon"]')).toHaveAttribute('href', '/favicon.svg');
 });
 
