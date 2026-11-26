@@ -14,7 +14,7 @@ slides:
       metadataBottomRight: slideNumber
 ---
 
-::slide{id="hero" section="Overview" theme="midnight" eyebrow="KARDIA SINGLEBOX · JAN – NOV 2026" subtitle="From Manual Heap Dumps to Fleet-Wide C++ Memory Leak Detection"}
+::slide{id="hero" section="Overview" theme="midnight" accentBar="teal" eyebrow="KARDIA SINGLEBOX · JAN – NOV 2026" subtitle="From Manual Heap Dumps to Fleet-Wide C++ Memory Leak Detection" metadataBottomLeft="none" metadataBottomRight="none"}
 # The LeakMon Journey
 
 How two parallel tracks—global workflow automation and three generations of statistical detection—turned noisy C++ memory traces into fast, trusted pre-production guardrails.
@@ -22,17 +22,17 @@ How two parallel tracks—global workflow automation and three generations of st
 <Cards columns="3">
 <Card tone="blue" stat="73 + 65" title="Automated Recurring Runs">
 
-73 live Mon/Wed/Fri schedules + 65 weekly 65-min DELite sign-off runs across 10 E2E XMLs.
+73 live Mon/Wed/Fri schedules + 65 weekly 65-min DELite sign-off runs across 10 E2E XMLs
 
 </Card>
-<Card tone="teal" stat="92.9% / 83.6%" title="Leak / Regression Accuracy">
+<Card tone="green" stat="92.9% / 83.6%" title="Leak / Regression Accuracy">
 
-Up from 78.0% / 55.2% on 333 ground-truth runs; sawtooth batch leaks jumped 0% → 96.4%.
+Up from 78.0% / 55.2% on 333 ground-truth runs; sawtooth batch leaks jumped 0% → 96.4%
 
 </Card>
 <Card tone="amber" stat="30.5% → 4.4%" title="Historical Replay Alert Rate">
 
-85% drop in flagged Singlebox runs (Batch 18: 23.4% → 0.8%) & -50% background false alerts.
+85% drop in flagged Singlebox runs (Batch 18: 23.4% → 0.8%) & -50% background false alerts
 
 </Card>
 </Cards>
@@ -45,18 +45,14 @@ LeakMon began after January 2026 production memory leaks in Gene and PA services
 ## From Manual Firefighting to Two Parallel Engineering Tracks
 
 <Cards columns="2">
-<Card tone="red" title="Manual, Reactive Debugging">
-
-<Badge tone="red">JAN 2026 · BEFORE</Badge>
+<Card tone="red" badge="JAN 2026 · BEFORE" badgetone="red" badgerow="inline" title="Manual, Reactive Debugging">
 
 - Log onto Singlebox machines manually after prod incidents
 - Copy multi-megabyte raw ETW text dumps off the box
 - Eyeball C++ call stacks with no Baseline vs. Treatment diff
 
 </Card>
-<Card tone="teal" title="Automated Pre-Prod Guardrails">
-
-<Badge tone="teal">NOV 2026 · TODAY</Badge>
+<Card tone="teal" badge="NOV 2026 · TODAY" badgetone="teal" badgerow="inline" title="Automated Pre-Prod Guardrails">
 
 - Side-by-side Baseline vs. Treatment capture under live load
 - 40 snapshots (20m) MWF + 123 snapshots (65m) DELite sign-off
@@ -65,33 +61,37 @@ LeakMon began after January 2026 production memory leaks in Gene and PA services
 </Card>
 </Cards>
 
+<SectionLabel>
+HOW WE GOT THERE: TWO PARALLEL TRACKS
+</SectionLabel>
+
 <Flow layout="rows" tone="teal">
 <Lane title="Track 1 · Task Pipeline & Fleet Scale" subtitle="1 opt-in workflow → 10 E2E XMLs, 46 schedulers across US/EMEA/APAC & WaaS" tone="blue">
-<Step id="t1-w0" title="Mar–Apr" badge="Wave 0">
+<Step id="t1-w0" title="Mar–Apr">
 6-Task Pipeline & Linnet Wave 0
 </Step>
-<Step id="t1-w2" title="Jun–Jul" badge="Global MWF">
+<Step id="t1-w2" title="Jun–Jul">
 Gene, Listing, PA, PClick, Queene + MWF
 </Step>
-<Step id="t1-w4" title="Aug–Sep" badge="DELite 65m">
+<Step id="t1-w4" title="Aug–Sep">
 65-min DELite, Gating & 363-Context Isolation
 </Step>
-<Step id="t1-w5" title="Nov" tone="blue" badge="+WaaS">
+<Step id="t1-w5" title="Nov" tone="blue">
 WaaS CPU/GPU, QPS Tuning & Fast Unlock
 </Step>
 </Lane>
 <Lane title="Track 2 · Detection & Comparison Engine" subtitle="Three algorithm generations validated across 4,587 real & simulated pairs" tone="teal">
-<Step id="t2-g1" title="Gen 1 (Jan–Aug)" badge="30.5% Alerts">
-OLS Straight Line & Word-Bag
+<Step id="t2-g1" title="Gen 1 (Jan–Aug)">
+OLS Straight Line & Word-Bag (30.5% Alerts)
 </Step>
-<Step id="t2-g2" title="Gen 2 (Sept 15)" badge="17.7% Alerts">
-Median Slope, MSER-5 & Floor
+<Step id="t2-g2" title="Gen 2 (Sept 15)">
+Median Slope, MSER-5 & Floor (17.7% Alerts)
 </Step>
-<Step id="t2-sim" title="Sim + 5 Exps" badge="280 Runs">
+<Step id="t2-sim" title="Sim + 5 Exps">
 12 Leak Shapes & Ablation Tradeoffs
 </Step>
-<Step id="t2-g3" title="Gen 3 (Nov 17–18)" tone="teal" badge="4.4% Alerts">
-Sawtooth, Plateaus & Refactors
+<Step id="t2-g3" title="Gen 3 (Nov 17–18)" tone="teal">
+Sawtooth, Plateaus & Refactors (4.4% Alerts)
 </Step>
 </Lane>
 <Arrow from="t1-w0" to="t1-w2" />
@@ -109,20 +109,20 @@ Track 1 solved fleet orchestration and clean ETW trace capture; Track 2 iterated
 ::slide{id="pipeline-stages" section="Track 1 · Fleet Pipeline" eyebrow="TRACK 1 · TASK ARCHITECTURE" subtitle="Designed to isolate ETW capture, release scarce Singlebox machines early, and fail closed on bad data."}
 ## How a LeakMon Run Works: Five Decoupled Pipeline Stages
 
-<Flow tone="blue">
-<Step id="s1" title="1. Trigger Capture" badge="TriggerLeakMonTask">
+<Flow variant="plain" tone="blue">
+<Step id="s1" num="1" title="Trigger Capture" badge="TriggerLeakMonTask">
 Waits 100–120s for steady traffic, syncs PDBs & runs `LeakMon.exe` every 30s on both arms.
 </Step>
-<Step id="s2" title="2. Per-Side Upload" badge="CosmosUpload ×2">
+<Step id="s2" num="2" title="Per-Side Upload" badge="CosmosUpload ×2">
 Zips only the current test ID's trace files so stale logs on reused boxes are never included.
 </Step>
-<Step id="s3" title="3. Unlock + Parse" tone="teal" badge="LeakMonAnalysis ×2">
+<Step id="s3" num="3" title="Unlock + Parse" tone="teal" badge="LeakMonAnalysis ×2">
 Boxes unlock immediately! Offline workers repair text, parse 64-bit counts & fit trends.
 </Step>
-<Step id="s4" title="4. Compare & Gate" badge="LeakMonCompare">
+<Step id="s4" num="4" title="Compare & Gate" badge="LeakMonCompare">
 Aligns timestamps, pairs C++ stacks, checks service rules & emits red `#Alert#` on regressions.
 </Step>
-<Step id="s5" title="5. Visual Triage" tone="blue" badge="Kardia UI (5 Tabs)">
+<Step id="s5" num="5" title="Visual Triage" tone="blue" badge="Kardia UI (5 Tabs)">
 Plain-English badges for 2-minute triage, plus full stats & interactive C++ Call Trees.
 </Step>
 <Arrow from="s1" to="s2" />
@@ -131,20 +131,24 @@ Plain-English badges for 2-minute triage, plus full stats & interactive C++ Call
 <Arrow from="s4" to="s5" />
 </Flow>
 
+<SectionLabel>
+THREE KEY OPERATIONAL SAFEGUARDS BUILT INTO THE PIPELINE
+</SectionLabel>
+
 <Cards columns="3">
-<Card tone="blue" eyebrow="SAFEGUARD 1" title="8 Fail-Closed Per-Side Flags">
+<Card tone="blue" title="8 Fail-Closed Per-Side Flags">
 
-Comparison only runs when **both** Baseline & Treatment independently confirm capture, upload, valid JSON, and snapshot counts.
-
-</Card>
-<Card tone="teal" eyebrow="SAFEGUARD 2" title="Zero Benchmark Pollution">
-
-`PerfReportTask`, Azure CPU Profiler, and Response Parity stay disabled during LeakMon runs—no ETW buffer or latency interference.
+Comparison only runs when BOTH Baseline & Treatment independently confirm capture, upload, valid JSON, and snapshots.
 
 </Card>
-<Card tone="amber" eyebrow="SAFEGUARD 3" title="Faster Machine Pool Turnover">
+<Card tone="teal" title="Zero Benchmark Pollution">
 
-Heavy ZIP parsing, statistical fitting, and C++ stack matching run offline right after unlocking scarce Singlebox test hosts.
+`PerfReportTask`, Azure CPU Profiler, and Response Parity are disabled during LeakMon runs—no ETW buffer or latency interference.
+
+</Card>
+<Card tone="amber" title="Faster Machine Pool Turnover">
+
+Heavy ZIP parsing, statistical fitting, and stack matching run offline after (or alongside) unlocking the Singlebox test machines.
 
 </Card>
 </Cards>
@@ -162,15 +166,12 @@ Decoupling capture from analysis let Singlebox test machines return to the share
 ```chart
 {
   "type": "bar",
-  "labels": ["Mar (W0)", "May (W1)", "Jul (W3)", "Aug (W4)", "Nov (W5)"],
+  "labels": ["Mar (W0)\nLinnet", "May (W1)\nSat Trial", "Jul (W3)\nGlobal MWF", "Aug (W4)\n+DELite", "Nov (W5)\n+WaaS"],
   "yMax": 90,
   "showValues": true,
   "series": [
     { "name": "Live MWF Recurring Jobs", "data": [1, 15, 56, 71, 73], "color": "#0284c7" },
-    { "name": "Weekly 65-Min DELite Runs", "data": [0, 0, 0, 52, 65], "color": "#0d9488" }
-  ],
-  "annotations": [
-    { "x": "Nov (W5)", "y": 73, "seriesIndex": 0, "text": "138 total runs/wk (+WaaS)", "tone": "teal", "dx": -35, "dy": -26 }
+    { "name": "Weekly 65-Min DELite Runs", "data": [null, null, null, 52, 65], "color": "#0d9488" }
   ]
 }
 ```
@@ -210,15 +211,15 @@ Scaling to 138 recurring weekly runs exposed three critical infrastructure edge 
   "type": "line",
   "labels": ["2.5", "5.0", "7.5", "10.0", "12.5", "15.0", "17.5", "20.0"],
   "x": "Capture Time (minutes)",
-  "y": "MB",
+  "y": "MB Held",
   "yMax": 27,
   "series": [
-    { "name": "30s Snapshots", "data": [11.8, 12.0, 11.9, 12.1, 12.0, 12.1, 23.4, 12.1], "color": "#64748b" },
-    { "name": "Gen 1 OLS (False Leak)", "data": [10.8, 11.6, 12.4, 13.2, 14.0, 14.8, 15.6, 16.4], "color": "#dc2626", "style": "dashed" },
-    { "name": "Gen 2/3 Median (Clean)", "data": [11.9, 11.9, 12.0, 12.0, 12.0, 12.0, 12.1, 12.1], "color": "#059669" }
+    { "name": "30s Snapshots", "data": [11.8, 12.0, 11.9, 12.1, 12.0, 12.1, 23.4, 12.1], "color": "#64748b", "symbolSize": 5 },
+    { "name": "Gen 1 Average (OLS) → False Leak", "data": [10.8, 11.6, 12.4, 13.2, 14.0, 14.8, 15.6, 16.4], "color": "#dc2626", "style": "dashed", "symbolSize": 0 },
+    { "name": "Gen 2/3 Median → Flat (Clean)", "data": [11.9, 11.9, 12.0, 12.0, 12.0, 12.0, 12.1, 12.1], "color": "#059669", "symbolSize": 0 }
   ],
   "annotations": [
-    { "x": "17.5", "y": 23.4, "text": "1 late cache spike", "tone": "red", "dx": -72, "dy": -8 }
+    { "x": "17.5", "y": 23.4, "text": "1 late cache spike", "tone": "red", "dx": -78, "dy": -6 }
   ]
 }
 ```
@@ -230,12 +231,12 @@ Scaling to 138 recurring weekly runs exposed three critical infrastructure edge 
 {
   "type": "bar",
   "labels": ["Baseline Stack X", "Treatment Stack X"],
-  "y": "MB",
+  "y": "MB Held",
   "yMax": 22,
   "showValues": true,
   "valueSuffix": " MB",
   "series": [
-    { "name": "Observed in Top-25 Log", "data": [14.9, 15.1], "color": "#94a3b8", "pointColors": ["#94a3b8", "#dc2626"] }
+    { "name": "Observed in Top-25 Log", "data": [14.9, 15.1], "color": "#0284c7", "ghostPoints": [true, false], "pointColors": [null, "#0284c7"] }
   ],
   "lines": [
     { "y": 15.0, "label": "Top-25 Cutoff (15.0 MB)", "color": "#d97706", "style": "dashed" }
@@ -244,7 +245,7 @@ Scaling to 138 recurring weekly runs exposed three critical infrastructure edge 
     { "yMin": 0, "yMax": 15.0, "label": "Rank #26+ Zone (Unprinted in Log)", "color": "#94a3b8" }
   ],
   "annotations": [
-    { "x": "Baseline Stack X", "y": 14.9, "seriesIndex": 0, "text": "Gen 1 saw '0 MB' → False Leak!", "tone": "red", "dx": 28, "dy": -32 }
+    { "x": "Baseline Stack X", "y": 14.9, "seriesIndex": 0, "text": "Gen 1 saw '0 MB' → False Leak!", "tone": "red", "dx": 30, "dy": -34 }
   ]
 }
 ```
@@ -255,7 +256,7 @@ Scaling to 138 recurring weekly runs exposed three critical infrastructure edge 
 <Cards columns="3">
 <Card tone="blue" title="3. Blind to Piece Counts">
 
-Only checked bytes—so allocating **one** 8 MB hash table (1 block) looked identical to leaking 8,000 small chunks.
+Only checked bytes—so allocating ONE 8 MB hash table (1 block) looked identical to leaking 8,000 small chunks.
 
 </Card>
 <Card tone="amber" title="4. Fixed 30% Warmup Cut">
@@ -265,7 +266,7 @@ Blindly dropped 30% of snapshots—too short when pre-attach `'orphan frees'` ch
 </Card>
 <Card tone="red" title="5. Inverted .dll Filter & Coin Flips">
 
-Early bug stripped product `.dll` frames (fixing it cut 91-run flags 60 → 15, -75%). Testing 30 stacks unadjusted caused noise.
+Early bug stripped product `.dll` frames (fixing it cut 91-run flags 60 → 15, -75%). Testing 30 stacks unadjusted caused constant noise.
 
 </Card>
 </Cards>
@@ -307,9 +308,7 @@ Preserves C++ call order (IDF-weighted LCS) and only flags a Regression when tot
 - Added service `IgnoreRules` & interactive Call Trees
 
 </Card>
-<Card tone="amber">
-
-<Badge tone="amber">WHAT STILL SLIPPED THROUGH?</Badge>
+<Card tone="amber" badge="WHAT STILL SLIPPED THROUGH?" badgetone="amber">
 
 - **0%** of `'Sawtooth'` batch leaks caught (labeled `'Mixed'`)
 - Erasing C++ `<Templates>` merged unrelated pools (1,424 Regs)
@@ -333,9 +332,9 @@ Generation 2 deleted over 21K lines of ad-hoc heuristics in favor of Theil-Sen m
 ```chart
 {
   "type": "bar",
-  "labels": ["Gen 2 Ref", "Exp 1 (Tmpl)", "Exp 2 TRAP", "Exp 3 TRAP", "Gen 3 Final"],
-  "y": "Score (%)",
-  "yMax": 124,
+  "labels": ["Gen 2 Ref\n(Sept)", "Exp 1\n(Templates)", "Exp 2 TRAP\n(AR(1) nEff)", "Exp 3 TRAP\n(Raw Lambdas)", "Gen 3 Final\n(Nov)"],
+  "y": "Shape-Matched Score (%)",
+  "yMax": 128,
   "showValues": true,
   "valueSuffix": "%",
   "series": [
@@ -344,32 +343,26 @@ Generation 2 deleted over 21K lines of ad-hoc heuristics in favor of Theil-Sen m
     { "name": "Leak Precision (%)", "data": [59, 76, 97, 67, 86], "color": "#059669", "pointColors": [null, null, null, "#d97706", null] }
   ],
   "annotations": [
-    { "x": "Exp 2 TRAP", "y": 33, "seriesIndex": 1, "text": "TRAP #1: Reg Recall 32.6%", "tone": "red", "dx": -12, "dy": -92 },
-    { "x": "Exp 3 TRAP", "y": 67, "seriesIndex": 2, "text": "TRAP #2: +1,280 hist. leaks", "tone": "amber", "dx": -8, "dy": -52 },
-    { "x": "Gen 3 Final", "y": 93, "seriesIndex": 1, "text": "Winner: 4.4% alerts", "tone": "green", "dx": -6, "dy": -26 }
+    { "x": "Exp 2 TRAP\n(AR(1) nEff)", "y": 33, "seriesIndex": 1, "text": "TRAP #1:\nReg Recall 32.6%", "tone": "red", "dx": -14, "dy": -96 },
+    { "x": "Exp 3 TRAP\n(Raw Lambdas)", "y": 67, "seriesIndex": 2, "text": "TRAP #2:\n+1,280 hist. leaks", "tone": "amber", "dx": -10, "dy": -58 },
+    { "x": "Gen 3 Final\n(Nov)", "y": 86, "seriesIndex": 2, "text": "Winner:\n4.4% hist. alerts", "tone": "green", "dx": -8, "dy": -36 }
   ]
 }
 ```
 
 </Card>
 <Stack>
-<Card tone="blue" title="12-Shape C++ Simulator in Live Services">
-
-<Badge tone="blue">GROUND TRUTH</Badge>
+<Card tone="blue" badge="GROUND TRUTH" badgetone="blue" title="12-Shape C++ Simulator in Live Services">
 
 Injected Linear, Staircase, Sawtooth, Superlinear, Ratchet, Sporadic & Bounded Plateaus in Leak (168) & Regression (165) modes.
 
 </Card>
-<Card tone="red" title="Exp 2: AR(1) Penalty Crushed Recall to 32.6%">
-
-<Badge tone="red">TRAP #1 CAUGHT</Badge>
+<Card tone="red" badge="TRAP #1 CAUGHT" badgetone="red" title="Exp 2: AR(1) Penalty Crushed Recall to 32.6%">
 
 Adjusting sample size for `AR(1)` correlation mistook smooth curved/staircase leaks for `'correlated noise'` (`N → 4`). Dropped!
 
 </Card>
-<Card tone="amber" title="Exp 3: Raw Lambdas Added +1,280 False Leaks">
-
-<Badge tone="amber">TRAP #2 CAUGHT</Badge>
+<Card tone="amber" badge="TRAP #2 CAUGHT" badgetone="amber" title="Exp 3: Raw Lambdas Added +1,280 False Leaks">
 
 Keeping MSVC `??@hex@` lambda IDs rescued sawtooth leaks, but split async stacks across builds. Fixed by normalizing lambdas only!
 
@@ -385,21 +378,18 @@ Without controlled ablation on 280 synthetic + 4,235 historical runs, both AR(1)
 ## How Generation 3 Solves Real-World C++ Memory Blind Spots
 
 <Cards columns="2">
-<Card tone="teal" title="1. 'Connect the Valleys' Catches Sawtooth Leaks (0% → 96.4%)" subtitle="Finds the lowest point in ~6 consecutive sample buckets + checks rising block counts (27/28 Shape 4).">
+<Card tone="green" title="1. 'Connect the Valleys' Catches Sawtooth Leaks (0% → 96.4%)" subtitle="Finds the lowest point in ~6 consecutive sample buckets + checks rising block counts (27/28 Shape 4).">
 
 ```chart
 {
   "type": "line",
-  "labels": ["1", "3", "5", "7", "9", "11", "13", "15", "17", "19", "21", "23", "25"],
+  "labels": ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19", "20", "21", "22", "23", "24", "25"],
   "x": "Snapshots Across Batch Cycles",
-  "y": "MB",
-  "yMax": 22,
+  "y": "MB Held",
+  "yMax": 24,
   "series": [
-    { "name": "Raw Batch Cycles (Gen 2 Missed 100%)", "data": [3.8, 11.8, 5.0, 13.0, 6.2, 14.2, 7.4, 15.4, 8.6, 16.6, 9.8, 17.8, 11.0], "color": "#64748b" },
-    { "name": "Gen 3 Valley Trend (27/28 = 96.4%)", "data": [3.8, 4.4, 5.0, 5.6, 6.2, 6.8, 7.4, 8.0, 8.6, 9.2, 9.8, 10.4, 11.0], "color": "#059669", "area": true }
-  ],
-  "annotations": [
-    { "x": "21", "y": 9.8, "text": "Rising floor: +96.4% caught", "tone": "green", "dx": -55, "dy": 22 }
+    { "name": "Raw Batch Cycles (Gen 2 Missed 100%)", "data": [3.8, 8.0, 11.8, 6.4, 5.0, 9.2, 13.0, 7.6, 6.2, 10.4, 14.2, 8.8, 7.4, 11.6, 15.4, 10.0, 8.6, 12.8, 16.6, 11.2, 9.8, 14.0, 17.8, 12.4, 11.0], "color": "#64748b", "symbolSize": 4 },
+    { "name": "Gen 3 Valley Trend (27/28 = 96.4% Caught)", "data": [3.8, null, null, null, 5.0, null, null, null, 6.2, null, null, null, 7.4, null, null, null, 8.6, null, null, null, 9.8, null, null, null, 11.0], "color": "#059669", "connectNulls": true, "symbolSize": 8, "area": true }
   ]
 }
 ```
@@ -410,21 +400,28 @@ Without controlled ablation on 280 synthetic + 4,235 historical runs, both AR(1)
 ```chart
 {
   "type": "line",
-  "labels": ["2.5", "5.0", "7.5", "10.0", "12.5", "15.0", "17.5", "20.0"],
+  "labels": ["1.0", "2.5", "5.0", "7.5", "10.0", "12.5", "15.0", "17.5", "20.0"],
   "x": "Capture Time (minutes)",
-  "y": "MB",
+  "y": "MB Held",
   "yMax": 38,
   "series": [
-    { "name": "Treatment Cache (32 MB → Watch)", "data": [14.0, 22.8, 27.2, 29.6, 30.8, 31.4, 31.7, 31.8], "color": "#b45309" },
-    { "name": "Baseline Cache (8 MB Cap)", "data": [4.5, 6.4, 7.3, 7.7, 7.9, 8.0, 8.0, 8.0], "color": "#0284c7" }
+    { "name": "Treatment Cache (32 MB → Watch)", "data": [9.8, 15.5, 22.8, 27.2, 29.6, 30.8, 31.4, 31.7, 31.8], "color": "#b45309", "symbolSize": 0 },
+    { "name": "Baseline Pre-Floor", "data": [3.4, 4.9, 6.4, 7.3, null, null, null, null, null], "color": "#94a3b8", "style": "dashed", "symbolSize": 0 },
+    { "name": "Baseline Cache (8 MB Cap)", "data": [null, null, null, 7.3, 7.7, 7.9, 8.0, 8.0, 8.0], "color": "#0284c7", "symbolSize": 0 }
   ],
   "lines": [
-    { "x": "7.5", "label": "Seg 1 → Seg 2", "color": "#94a3b8", "style": "dashed" },
-    { "x": "15.0", "label": "Seg 3: Flat Cap", "color": "#b45309", "style": "dashed" },
-    { "y": 7.2, "label": "Top-25 Floor (7.2 MB)", "color": "#475569", "style": "dotted" }
+    { "x": "7.5", "color": "#cbd5e1", "style": "dashed" },
+    { "x": "12.5", "color": "#cbd5e1", "style": "dashed" },
+    { "y": 7.2, "label": "Top-25 Floor (7.2 MB)", "color": "#334155", "style": "dotted" }
+  ],
+  "zones": [
+    { "yMin": 0, "yMax": 7.2, "color": "#94a3b8" }
   ],
   "annotations": [
-    { "x": "17.5", "y": 31.7, "text": "4x Higher Cap (End slope ≈ 0)", "tone": "amber", "dx": -62, "dy": 30 }
+    { "x": "2.5", "y": 35.5, "text": "Seg 1: Fast", "tone": "muted", "arrow": false },
+    { "x": "10.0", "y": 35.5, "text": "Seg 2: Slowing", "tone": "muted", "arrow": false },
+    { "x": "17.5", "y": 35.5, "text": "Seg 3: Flat Cap", "tone": "amber", "arrow": false },
+    { "x": "17.5", "y": 31.7, "text": "4x Higher Cap\n(End slope ≈ 0)", "tone": "amber", "dx": -52, "dy": 32 }
   ]
 }
 ```
@@ -459,16 +456,13 @@ Connecting bucket minima turns oscillating batch sawtooth leaks into a clean mon
 ```chart
 {
   "type": "bar",
-  "labels": ["Gen 1 (Saved Base)", "Gen 2 (Sept Rewrite)", "Gen 3 (Nov Final)"],
-  "yMax": 38,
+  "labels": ["Gen 1\n(Saved Baseline)", "Gen 2\n(Sept Rewrite)", "Gen 3\n(Nov Final)"],
+  "yMax": 36,
   "showValues": true,
   "valueSuffix": "%",
   "series": [
     { "name": "Singlebox Fleet (3,288 runs)", "data": [30.5, 17.7, 4.4], "color": "#0284c7" },
     { "name": "Weekly DELite (947 runs)", "data": [28.1, 23.3, 6.1], "color": "#0d9488" }
-  ],
-  "annotations": [
-    { "x": "Gen 3 (Nov Final)", "y": 4.4, "seriesIndex": 0, "text": "-85% noisy runs", "tone": "teal", "dx": -18, "dy": -36 }
   ]
 }
 ```
@@ -479,16 +473,13 @@ Connecting bucket minima turns oscillating batch sawtooth leaks into a clean mon
 ```chart
 {
   "type": "bar",
-  "labels": ["New Leak (168)", "Regression (165)", "Sawtooth (S4)", "Plateaus (S8)"],
-  "yMax": 118,
+  "labels": ["New Leak\n(168 runs)", "Regression\n(165 runs)", "Sawtooth\n(Shape 4)", "Plateaus\n(Shape 8)"],
+  "yMax": 115,
   "showValues": true,
   "valueSuffix": "%",
   "series": [
     { "name": "Gen 2 (Sept Ref)", "data": [78.0, 55.2, 0.0, 7.1], "color": "#94a3b8" },
     { "name": "Gen 3 (Nov Final)", "data": [92.9, 83.6, 96.4, 100.0], "color": "#059669" }
-  ],
-  "annotations": [
-    { "x": "Sawtooth (S4)", "y": 96.4, "seriesIndex": 1, "text": "0% → 96.4%", "tone": "green", "dx": -16, "dy": -24 }
   ]
 }
 ```
@@ -497,24 +488,24 @@ Connecting bucket minima turns oscillating batch sawtooth leaks into a clean mon
 </Cards>
 
 <Cards columns="4">
-<Card tone="blue" stat="23.4% → 0.8%" title="Batch 18 Replay Alerts">
+<Card tone="blue" stat="23.4% → 0.8%">
 
-114 → 4 of 488 runs flagged
-
-</Card>
-<Card tone="teal" stat="1,351 → 170" title="DELite Actionable Stacks">
-
--87% weekly triage volume
+Batch 18 replay alerts (114 → 4 of 488 runs)
 
 </Card>
-<Card tone="green" stat="86 → 43 (-50%)" title="Background False Alerts">
+<Card tone="teal" stat="1,351 → 170">
 
-Across 313 / 333 clean runs
+DELite actionable stacks (-87% triage volume)
 
 </Card>
-<Card tone="amber" stat="3.9× Smaller" title="Amber 'Watch' Clutter">
+<Card tone="green" stat="86 → 43 (-50%)">
 
-2.1× smaller on Regressions
+Background false alerts (313 / 333 clean runs)
+
+</Card>
+<Card tone="amber" stat="3.9× Smaller">
+
+Amber `'Watch'` clutter (2.1× smaller on Regs)
 
 </Card>
 </Cards>
@@ -529,13 +520,23 @@ Across 3,288 Singlebox replays, flagged runs dropped from 30.5% in Gen 1 to 4.4%
 <Split ratio="48-52">
 <Card tone="blue" title="Kardia Report Badges (Basic Mode)" subtitle="Only high-confidence red badges page teams or fail bucket health">
 
-| Badge | Paging & Triage Semantics |
-| --- | --- |
-| <Badge tone="red">Faster memory growth</Badge> | **RED `#Alert#`** · Matched stack growing faster in Treatment — inspect diff. |
-| <Badge tone="red">New leak signal</Badge> | **RED `#Alert#`** · Rising or sawtooth stack clearing Baseline's Top-25 floor. |
-| <Badge tone="amber">Needs review</Badge> | **No Page** · Higher bounded cache plateau, fuzzy match, or growing refactor. |
-| <Badge tone="blue">One-time increase</Badge> | **Info Only** · Step/table load (high bytes, flat block count) — not a leak. |
-| <Badge tone="green">Less growth / Resolved</Badge> | **Positive** · Confirmed heap reduction or baseline leak no longer seen. |
+<BadgeList>
+<BadgeRow tone="red" label="Faster memory growth">
+RED `#Alert#` · Matched stack growing materially faster in Treatment — inspect diff.
+</BadgeRow>
+<BadgeRow tone="red" label="New leak signal">
+RED `#Alert#` · Rising or sawtooth stack clearing Baseline's Top-25 floor.
+</BadgeRow>
+<BadgeRow tone="amber" label="Needs review">
+No Page · Higher bounded cache plateau, fuzzy match, or growing refactor.
+</BadgeRow>
+<BadgeRow tone="blue" label="One-time increase">
+Info Only · Step/table load (high bytes, flat block count) — not a leak.
+</BadgeRow>
+<BadgeRow tone="green" label="Less growth / Resolved">
+Positive · Confirmed heap reduction or baseline leak no longer seen.
+</BadgeRow>
+</BadgeList>
 
 </Card>
 <Stack>
@@ -551,62 +552,35 @@ Paired `HashStore.dll` cache regression + isolated `MakePClickRequestData` leak;
 </Card>
 <Card tone="purple" eyebrow="GOVERNANCE SCHEMA V2" title="Auto-Expiring 'ExpectedGrowth' Ceilings">
 
-Teams check in intentional growth caps with mandatory `Owner`, `Reason`, `ExpiresUtc` & byte/slope ceilings—auto-alerts again if breached or expired!
+Teams can check in intentional growth caps with mandatory `Owner`, `Reason`, `ExpiresUtc` & byte/slope ceilings—auto-alerts again if breached or expired!
 
 </Card>
 </Stack>
 </Split>
 
 :::notes
-Press Down Arrow (or next) to inspect the child deep-dive slide showing Kardia's 5-tab Call Tree portal alongside the full Generation 1-to-3 architectural comparison matrix.
-:::
-
-::slide{id="kardia-portal-deep-dive" parent="ux-governance" section="Impact & Governance" eyebrow="DEEP DIVE · KARDIA 5-TAB PORTAL & GENERATION MATRIX" subtitle="Child drill-down slide pairing the live Kardia Call Tree UI with the Gen 1 → Gen 2 → Gen 3 evolution table."}
-## Inside Kardia's 5-Tab Triage View & Engine Evolution
-
-<Panels>
-<Panel title="Kardia 5-Tab Triage & Governance v2" href="https://example.com/kardia/leakmon/925727" link="Run #925727" footer="Tip: Basic Mode shows plain-English badges first; Caller-First & Alloc-First Call Trees pinpoint exact C++ owners.">
-
-![Kardia 5-tab LeakMon triage portal and C++ call tree](assets/leakmon-kardia-ui.svg)
-
-</Panel>
-<Panel title="Engine Evolution Matrix (Gen 1 → Gen 3)" footer="Evaluated across 3,288 Singlebox runs, 947 DELite runs & 333 synthetic ground-truth runs.">
-
-| Capability | Gen 1 (Jan–Aug) | Gen 2 (Sept 15) | Gen 3 (Nov Final) |
-| --- | --- | --- | --- |
-| **Trend estimator** | OLS `y = mx + b` | Theil-Sen + MK | <Status tone="ok">Valley-Connect + 3-Seg</Status> |
-| **Stack identity** | Unordered word-bag | IDF LCS (`<T>` erased) | <Status tone="ok">Template-aware + `FamilyKey`</Status> |
-| **Warmup handling** | Fixed 30% cut | Auto MSER-5 | <Status tone="ok">Orphan-free convergence cap</Status> |
-| **Sawtooth catch** | 0.0% | 0.0% (`Mixed`) | <Status tone="ok">96.4% (27 / 28)</Status> |
-| **Plateau accuracy** | False `#Alert#` | 7.1% (1 / 14) | <Status tone="ok">100.0% → Watch</Status> |
-| **Fleet alert rate** | 30.5% | 17.7% (-42%) | <Status tone="ok">4.4% (-85%)</Status> |
-
-</Panel>
-</Panels>
-
-:::notes
-This child slide demonstrates 2D hierarchical drill-down in Slides alongside framed side-by-side <Panels>, authorized SVG deck assets, and status-annotated comparison tables.
+Plain-English badges let any service engineer triage a Singlebox run in under two minutes, while Governance Schema v2 requires an expiration timestamp and explicit byte/slope ceilings so temporary overrides never turn into permanent blind spots.
 :::
 
 ::slide{id="summary-horizon" section="Summary" theme="midnight" eyebrow="SUMMARY & NEXT STEPS" subtitle="Simple workflows, rigorous statistics, and actionable answers before memory regressions reach production."}
 ## Ten Months From Manual Dumps to Trusted Fleet Guardrails
 
 <Cards columns="3">
-<Card tone="blue" eyebrow="01 · FLEET SCALE" stat="73 MWF + 65 DELite" title="Fleet-Wide, Zero-Friction Scale">
+<Card tone="blue" eyebrow="01" title="Fleet-Wide, Zero-Friction Scale" stat="73 MWF + 65 DELite" statpos="below">
 
 - 10 E2E workflow XMLs & 46 schedulers across US, EMEA, APAC & WaaS
 - 363 contexts isolated from CPU profiler & benchmark side-effects
 - Early machine unlock + 8 fail-closed flags keep Singlebox pools fast
 
 </Card>
-<Card tone="green" eyebrow="02 · STATISTICAL RIGOR" stat="92.9% Leak · 4.4% Alerts" title="High Catch Rate, Low Noise">
+<Card tone="green" eyebrow="02" title="High Catch Rate, Low Noise" stat="92.9% Leak · 4.4% Alerts" statpos="below">
 
 - Outlier-proof median slopes + Top-25 visibility floor + piece counts
 - Sawtooth batch leaks jumped 0% → 96.4%; bounded plateaus 7.1% → 100%
 - 85% drop in historical flagged runs & -50% background false stack alerts
 
 </Card>
-<Card tone="amber" eyebrow="03 · HUMAN TRIAGE" stat="5-Tab UI + Governance v2" title="Built for Fast Human Triage">
+<Card tone="amber" eyebrow="03" title="Built for Fast Human Triage" stat="5-Tab UI + Governance v2" statpos="below">
 
 - Plain-English badges separate urgent red leaks from amber cache reviews
 - Caller-first & Allocation-first Call Trees pinpoint the exact C++ owner
@@ -615,23 +589,17 @@ This child slide demonstrates 2D hierarchical drill-down in Slides alongside fra
 </Card>
 </Cards>
 
-<Cards columns="3">
-<Card tone="blue" eyebrow="NEXT HORIZON · PR 7381839" title="ETW Startup Hardening">
-
-Fail closed when pre-existing ETW sessions block attach on shared hosts.
-
+<Card tone="blue" eyebrow="NEXT HORIZON · ACTIVE IN-FLIGHT POLISH" columns="3">
+<Col title="ETW Startup Hardening (PR 7381839)">
+Fail closed when pre-existing ETW sessions block attach.
+</Col>
+<Col title="One-Time Load Banner (PR 7388970)">
+Surface step increases at priority #2 with top UI banner.
+</Col>
+<Col title="Ultra-High-QPS Capture">
+Mitigate residual ETW loss on high-rate Caique Linnet.
+</Col>
 </Card>
-<Card tone="teal" eyebrow="NEXT HORIZON · PR 7388970" title="One-Time Load Banner">
-
-Surface step increases at priority #2 with a dedicated top UI summary banner.
-
-</Card>
-<Card tone="purple" eyebrow="NEXT HORIZON · ULTRA-HIGH QPS" title="Ultra-High-QPS Capture">
-
-Mitigate residual ETW stack-walk loss on high-rate Caique Linnet workloads.
-
-</Card>
-</Cards>
 
 :::notes
 Ten months took LeakMon from manual post-incident heap dumps to 138 automated weekly runs with 92.9% leak recall and 4.4% historical alert rate.

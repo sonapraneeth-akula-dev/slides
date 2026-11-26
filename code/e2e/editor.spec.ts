@@ -1953,35 +1953,42 @@ test('LeakMon showcase demo renders dark/light themes, multi-track flows, annota
   await page.locator('#open-leakmon-demo').click();
   await expect(page.locator('#editor-page')).toBeVisible();
   await expect(page.locator('#diagnostics')).toHaveText('No diagnostics');
-  await expect(page.locator('#outline .outline-item')).toHaveCount(12);
+  const lines = await page.locator('#outline .outline-item').count();
+  expect(lines).toBe(11);
 
   const heroStage = page.locator('.preview-card[data-slide-id="hero"] .preview-stage');
   await expect(heroStage).toHaveAttribute('data-slide-theme', 'midnight');
+  await expect(heroStage).toHaveAttribute('data-accent-bar', 'teal');
   await expect(heroStage).toHaveCSS('background-color', 'rgb(15, 23, 42)');
   await expect(heroStage.locator('.slide-eyebrow')).toContainText('KARDIA SINGLEBOX');
   await expect(heroStage.locator('.card-stat')).toHaveCount(3);
 
   const trackFlow = page.locator('.preview-card[data-slide-id="big-picture"] .preview-stage');
   await trackFlow.scrollIntoViewIfNeeded();
+  await expect(trackFlow.locator('.card-head-inline')).toHaveCount(2);
+  await expect(trackFlow.locator('.section-divider')).toContainText('HOW WE GOT THERE');
   await expect.poll(() => trackFlow.locator('svg.flow-arrows > path').count()).toBe(6);
+
+  const pipelineStage = page.locator('.preview-card[data-slide-id="pipeline-stages"] .preview-stage');
+  await pipelineStage.scrollIntoViewIfNeeded();
+  await expect(pipelineStage.locator('.flow-step-num')).toHaveCount(5);
 
   const ablationStage = page.locator('.preview-card[data-slide-id="ablation-validation"] .preview-stage');
   await ablationStage.scrollIntoViewIfNeeded();
   await expect.poll(() => ablationStage.locator('svg.chart-annotations rect').count()).toBe(3);
   await expect.poll(() => ablationStage.locator('svg.chart-annotations line').count()).toBe(3);
-  await expect(ablationStage.locator('svg.chart-annotations')).toContainText('TRAP #1: Reg Recall 32.6%');
+  await expect(ablationStage.locator('svg.chart-annotations')).toContainText('Reg Recall 32.6%');
+  await expect(ablationStage.locator('.card-badge-top')).toHaveCount(3);
 
-  const deepDiveStage = page.locator('.preview-card[data-slide-id="kardia-portal-deep-dive"] .preview-stage');
-  await deepDiveStage.scrollIntoViewIfNeeded();
-  await expect.poll(() =>
-    deepDiveStage.locator('.panel-body img.slide-image').first().evaluate(img => (img as HTMLImageElement).naturalWidth),
-  ).toBeGreaterThan(0);
+  const uxStage = page.locator('.preview-card[data-slide-id="ux-governance"] .preview-stage');
+  await uxStage.scrollIntoViewIfNeeded();
+  await expect(uxStage.locator('.badge-row')).toHaveCount(5);
 
   await page.locator('#present').click();
   const slideIds = [
     'hero', 'big-picture', 'pipeline-stages', 'fleet-scale', 'gen1-limits', 'gen2-rewrite',
     'ablation-validation', 'gen3-breakthroughs', 'measured-impact', 'ux-governance',
-    'kardia-portal-deep-dive', 'summary-horizon',
+    'summary-horizon',
   ];
   for (const id of slideIds) {
     await page.locator('#jump').selectOption(id);
@@ -1993,14 +2000,14 @@ test('LeakMon showcase demo renders dark/light themes, multi-track flows, annota
     expect(metrics.overflow, `slide ${id} overflow`).toBeLessThanOrEqual(2);
   }
   await expect(page.locator('#stage')).toHaveAttribute('data-slide-theme', 'midnight');
+  await expect(page.locator('#stage .card-col')).toHaveCount(3);
+  await expect(page.locator('#stage .slide-meta[data-position="BottomRight"]')).toHaveText('11 / 11');
 
   const [audience] = await Promise.all([context.waitForEvent('page'), page.locator('#local-audience').click()]);
   await page.locator('#jump').selectOption('ablation-validation');
   await expect.poll(() => audience.locator('#audience-stage svg.chart-annotations rect').count()).toBe(3);
-  await page.locator('#jump').selectOption('kardia-portal-deep-dive');
-  await expect.poll(() =>
-    audience.locator('#audience-stage .panel-body img.slide-image').first().evaluate(img => (img as HTMLImageElement).naturalWidth),
-  ).toBeGreaterThan(0);
+  await page.locator('#jump').selectOption('ux-governance');
+  await expect.poll(() => audience.locator('#audience-stage .badge-row').count()).toBe(5);
   await audience.close();
   await page.locator('#end').click();
   await page.locator('#confirm-end').click();

@@ -54,18 +54,6 @@ export async function readLeakMonShowcaseBundle(): Promise<string | null> {
   return embeddedBundle?.leakmonShowcaseMdx ?? null;
 }
 
-export async function readBundledTourAsset(relAsset: string): Promise<Buffer | null> {
-  for (const dir of ['public', 'dist']) {
-    const path = join(process.cwd(), dir, 'assets', ...relAsset.split('/'));
-    try { return await readFile(path); }
-    catch (error) {
-      if (!(error instanceof Error) || !('code' in error) || error.code !== 'ENOENT') throw error;
-    }
-  }
-  const embedded = embeddedBundle?.distFiles[`assets/${relAsset}`];
-  return embedded ? Buffer.from(embedded.base64, 'base64') : null;
-}
-
 export async function readBundledSampleSvg(): Promise<Buffer | null> {
   for (const dir of ['public', 'dist']) {
     const path = join(process.cwd(), dir, 'sample-landscape.svg');

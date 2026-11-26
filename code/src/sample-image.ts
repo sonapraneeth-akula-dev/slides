@@ -1,8 +1,8 @@
 import { constants } from 'node:fs';
 import { copyFile, mkdir, readFile, stat, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { deckDirectory, featureToursRoot, hasSymlink, LibraryError, libraryRoot } from './library';
-import { readBundledSampleSvg, readBundledTourAsset } from './runtime-assets';
+import { deckDirectory, hasSymlink, LibraryError, libraryRoot } from './library';
+import { readBundledSampleSvg } from './runtime-assets';
 import { assetMimeType, parseAssetReference, sampleImageReference } from './sample-image-reference';
 
 async function bundledImage(): Promise<Buffer> {
@@ -29,22 +29,6 @@ export async function ensureSampleImage(root = libraryRoot): Promise<Buffer> {
   const installed = await readFile(destination);
   if (!installed.equals(bytes)) throw new LibraryError(409, 'Sample image differs from the bundled asset; move it aside and restart the app');
   return installed;
-}
-
-export async function ensureBundledTourAsset(relAsset: string, toursRoot = featureToursRoot): Promise<void> {
-  const bytes = await readBundledTourAsset(relAsset);
-  if (!bytes) throw new LibraryError(500, `Bundled tour asset "${relAsset}" is missing from the application`);
-  const destination = join(toursRoot, 'assets', ...relAsset.split('/'));
-  await mkdir(join(toursRoot, 'assets'), { recursive: true });
-  try {
-    await writeFile(destination, bytes, { flag: 'wx' });
-  } catch (error) {
-    if (!(error instanceof Error) || !('code' in error) || error.code !== 'EEXIST') throw error;
-    const existing = await readFile(destination);
-    if (!existing.equals(bytes) && !(await hasSymlink(destination))) {
-      await writeFile(destination, bytes);
-    }
-  }
 }
 
 export async function sampleImageResponse(method: 'GET' | 'HEAD'): Promise<Response> {

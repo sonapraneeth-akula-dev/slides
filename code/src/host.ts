@@ -8,7 +8,7 @@ import { createTalk, endTalk, event, getTalk, localAudienceStream, presenterStre
 import { exportDeckArtifact, exportTalkArtifact, type ExportFormat, type RevealExportMode } from './export';
 import { presenterSession, publicSnapshot, renderDeck } from './presentation-model';
 import { hasUiAssets, readFeatureTourBundle, readLeakMonShowcaseBundle, readPublicDistAsset } from './runtime-assets';
-import { assetResponse, ensureBundledTourAsset, ensureSampleImage, readDeckAsset, sampleImageResponse } from './sample-image';
+import { assetResponse, ensureSampleImage, readDeckAsset, sampleImageResponse } from './sample-image';
 import { sampleImageUrl } from './sample-image-reference';
 
 export interface RouterOptions {
@@ -142,7 +142,6 @@ async function leakMonShowcase(): Promise<{ id: string }> {
   return installBundledTour({
     baseName: 'LeakMon-Evolution-Journey',
     readText: readLeakMonShowcaseBundle,
-    prepareAssets: () => ensureBundledTourAsset('leakmon-kardia-ui.svg'),
   });
 }
 
