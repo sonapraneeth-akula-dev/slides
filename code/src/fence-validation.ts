@@ -20,18 +20,22 @@ export interface ChartAnnotation {
   y: number;
   seriesIndex?: number;
   text: string;
-  tone?: 'red' | 'amber' | 'green' | 'blue' | 'teal';
+  tone?: 'red' | 'amber' | 'green' | 'blue' | 'teal' | 'muted';
+  arrow?: boolean;
   dx?: number;
   dy?: number;
 }
 
 export interface ChartSeries {
   name: string;
-  data: Array<number | [number, number]>;
+  data: Array<number | null | [number, number]>;
   color?: string;
   style?: 'solid' | 'dashed' | 'dotted';
   area?: boolean;
+  connectNulls?: boolean;
+  symbolSize?: number;
   pointColors?: Array<string | null>;
+  ghostPoints?: boolean[];
 }
 
 export interface ChartData {
@@ -51,7 +55,7 @@ export interface ChartData {
 
 const hexColor = /^#[\da-fA-F]{6}$/;
 const lineStyles = new Set(['solid', 'dashed', 'dotted']);
-const annotationTones = new Set(['red', 'amber', 'green', 'blue', 'teal']);
+const annotationTones = new Set(['red', 'amber', 'green', 'blue', 'teal', 'muted']);
 const mermaidHeader = /^(?:flowchart\s+(?:TB|TD|BT|RL|LR)|sequenceDiagram|classDiagram|stateDiagram(?:-v2)?|erDiagram)\s*$/;
 
 export function safeMermaid(source: string): boolean {
@@ -84,7 +88,7 @@ export function parseChart(source: string): ChartData {
     throw new Error('Chart labels must be short text (up to 120).');
   }
   if (!Array.isArray(series) || !series.length || series.length > 4) throw new Error('Chart needs 1–4 series.');
-  const allowedSeriesKeys = new Set(['name', 'data', 'color', 'style', 'area', 'pointColors']);
+  const allowedSeriesKeys = new Set(['name', 'data', 'color', 'style', 'area', 'connectNulls', 'symbolSize', 'pointColors', 'ghostPoints']);
   if (!series.every(item => {
     if (!item || typeof item !== 'object' || Array.isArray(item)) return false;
     const s = item as Record<string, unknown>;
@@ -93,11 +97,15 @@ export function parseChart(source: string): ChartData {
     if (s.color !== undefined && (typeof s.color !== 'string' || !hexColor.test(s.color))) return false;
     if (s.style !== undefined && !lineStyles.has(String(s.style))) return false;
     if (s.area !== undefined && typeof s.area !== 'boolean') return false;
+    if (s.connectNulls !== undefined && typeof s.connectNulls !== 'boolean') return false;
+    if (s.symbolSize !== undefined && (!finiteNumber(s.symbolSize) || s.symbolSize < 0 || s.symbolSize > 24)) return false;
     if (s.pointColors !== undefined && (!Array.isArray(s.pointColors) || s.pointColors.length !== s.data.length ||
         !s.pointColors.every(c => c === null || (typeof c === 'string' && hexColor.test(c))))) return false;
+    if (s.ghostPoints !== undefined && (!Array.isArray(s.ghostPoints) || s.ghostPoints.length !== s.data.length ||
+        !s.ghostPoints.every(g => typeof g === 'boolean'))) return false;
     return type === 'scatter'
       ? s.data.every((point: unknown) => Array.isArray(point) && point.length === 2 && point.every(finiteNumber))
-      : s.data.every(finiteNumber);
+      : s.data.some(finiteNumber) && s.data.every((v: unknown) => v === null || finiteNumber(v));
   })) {
     throw new Error('Chart series must contain valid numbers and styling options.');
   }
@@ -150,11 +158,12 @@ export function parseChart(source: string): ChartData {
     if (!Array.isArray(chart.annotations) || chart.annotations.length > 12 || !chart.annotations.every(raw => {
       if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return false;
       const ann = raw as Record<string, unknown>;
-      if (Object.keys(ann).some(k => !['x', 'y', 'seriesIndex', 'text', 'tone', 'dx', 'dy'].includes(k))) return false;
+      if (Object.keys(ann).some(k => !['x', 'y', 'seriesIndex', 'text', 'tone', 'arrow', 'dx', 'dy'].includes(k))) return false;
       if (!(typeof ann.x === 'string' || finiteNumber(ann.x)) || !finiteNumber(ann.y)) return false;
       if (ann.seriesIndex !== undefined && (!Number.isInteger(ann.seriesIndex) || Number(ann.seriesIndex) < 0 || Number(ann.seriesIndex) >= series.length)) return false;
       if (typeof ann.text !== 'string' || !ann.text.trim() || ann.text.length > 100) return false;
       if (ann.tone !== undefined && !annotationTones.has(String(ann.tone))) return false;
+      if (ann.arrow !== undefined && typeof ann.arrow !== 'boolean') return false;
       if (ann.dx !== undefined && !finiteNumber(ann.dx)) return false;
       if (ann.dy !== undefined && !finiteNumber(ann.dy)) return false;
       return true;

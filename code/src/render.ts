@@ -555,6 +555,7 @@ const chartAnnotationPalette: Record<string, { fg: string; bg: string; stroke: s
   green: { fg: '#065f46', bg: '#ecfdf5', stroke: '#059669' },
   blue: { fg: '#1e40af', bg: '#eff6ff', stroke: '#0284c7' },
   teal: { fg: '#0f766e', bg: '#f0fdfa', stroke: '#0d9488' },
+  muted: { fg: '#334155', bg: '#f8fafc', stroke: '#94a3b8' },
 };
 
 function drawChartAnnotations(
@@ -613,41 +614,44 @@ function drawChartAnnotations(
     const bw = Math.round(maxChars * fs * 0.56 + 12);
     const bh = Math.round(lines.length * lh + 7);
     const dxPx = (ann.dx ?? 0) * (w / 520);
-    const dyPx = (ann.dy ?? -38) * (h / 260);
+    const dyPx = (ann.dy ?? (ann.arrow === false ? 0 : -38)) * (h / 260);
     const bx = Math.min(w - bw / 2 - 4, Math.max(bw / 2 + 4, tx + dxPx));
     const by = Math.min(h - bh / 2 - 4, Math.max(bh / 2 + 4, ty + dyPx));
-    const vx = tx - bx;
-    const vy = ty - by;
-    const dist = Math.hypot(vx, vy);
-    if (dist > 6) {
-      const edgeScale = 1 / Math.max(Math.abs(vx) / (bw / 2), Math.abs(vy) / (bh / 2), 1e-6);
-      const sx = bx + vx * Math.min(1, edgeScale);
-      const sy = by + vy * Math.min(1, edgeScale);
-      const ux = vx / dist;
-      const uy = vy / dist;
-      const ex = tx - ux * 2;
-      const ey = ty - uy * 2;
-      if (Math.hypot(ex - sx, ey - sy) > 3) {
-        const line = document.createElementNS(svgNamespace, 'line');
-        line.setAttribute('x1', sx.toFixed(1));
-        line.setAttribute('y1', sy.toFixed(1));
-        line.setAttribute('x2', ex.toFixed(1));
-        line.setAttribute('y2', ey.toFixed(1));
-        line.setAttribute('stroke', pal.stroke);
-        line.setAttribute('stroke-width', '1.6');
-        line.setAttribute('marker-end', `url(#chart-head-${tone}-${overlayId})`);
-        svg.append(line);
+    if (ann.arrow !== false) {
+      const vx = tx - bx;
+      const vy = ty - by;
+      const dist = Math.hypot(vx, vy);
+      if (dist > 6) {
+        const edgeScale = 1 / Math.max(Math.abs(vx) / (bw / 2), Math.abs(vy) / (bh / 2), 1e-6);
+        const sx = bx + vx * Math.min(1, edgeScale);
+        const sy = by + vy * Math.min(1, edgeScale);
+        const ux = vx / dist;
+        const uy = vy / dist;
+        const ex = tx - ux * 2;
+        const ey = ty - uy * 2;
+        if (Math.hypot(ex - sx, ey - sy) > 3) {
+          const line = document.createElementNS(svgNamespace, 'line');
+          line.setAttribute('x1', sx.toFixed(1));
+          line.setAttribute('y1', sy.toFixed(1));
+          line.setAttribute('x2', ex.toFixed(1));
+          line.setAttribute('y2', ey.toFixed(1));
+          line.setAttribute('stroke', pal.stroke);
+          line.setAttribute('stroke-width', '1.6');
+          line.setAttribute('marker-end', `url(#chart-head-${tone}-${overlayId})`);
+          svg.append(line);
+        }
       }
+      const box = document.createElementNS(svgNamespace, 'rect');
+      box.setAttribute('x', (bx - bw / 2).toFixed(1));
+      box.setAttribute('y', (by - bh / 2).toFixed(1));
+      box.setAttribute('width', String(bw));
+      box.setAttribute('height', String(bh));
+      box.setAttribute('rx', '3.5');
+      box.setAttribute('fill', pal.bg);
+      box.setAttribute('stroke', pal.stroke);
+      box.setAttribute('stroke-width', '1.3');
+      svg.append(box);
     }
-    const box = document.createElementNS(svgNamespace, 'rect');
-    box.setAttribute('x', (bx - bw / 2).toFixed(1));
-    box.setAttribute('y', (by - bh / 2).toFixed(1));
-    box.setAttribute('width', String(bw));
-    box.setAttribute('height', String(bh));
-    box.setAttribute('fill', pal.bg);
-    box.setAttribute('stroke', pal.stroke);
-    box.setAttribute('stroke-width', '1.3');
-    svg.append(box);
     const label = document.createElementNS(svgNamespace, 'text');
     label.setAttribute('text-anchor', 'middle');
     label.setAttribute('fill', pal.fg);
@@ -771,41 +775,59 @@ async function renderFences(root: HTMLElement): Promise<void> {
           instance.setOption({
             animation: !staticExport && !matchMedia('(prefers-reduced-motion: reduce)').matches,
             tooltip: { trigger: round ? 'item' : 'axis', renderMode: 'richText' },
-            legend: { top: 0, textStyle: { fontSize: 11 } },
-            grid: { left: '6%', right: '5%', bottom: chart.x ? '13%' : '8%', top: '20%', containLabel: true },
+            legend: { top: 0, itemWidth: 14, itemHeight: 8, textStyle: { fontSize: 10.5, fontWeight: 600, color: '#1e293b' } },
+            grid: { left: chart.y ? '8%' : '5%', right: '4%', bottom: chart.x ? '14%' : '8%', top: '19%', containLabel: true },
             xAxis: round ? undefined : {
               type: chart.type === 'scatter' ? 'value' : 'category',
               data: chart.type === 'scatter' ? undefined : chart.labels,
               name: chart.x,
               nameLocation: chart.x ? 'middle' : undefined,
               nameGap: chart.x ? 22 : undefined,
-              axisLabel: { fontSize: 10 },
+              nameTextStyle: { fontSize: 10.5, fontWeight: 700, color: '#0f172a' },
+              axisLine: { lineStyle: { color: '#94a3b8' } },
+              axisTick: { show: false },
+              axisLabel: { fontSize: 9.8, fontWeight: 600, color: '#1e293b', interval: chart.labels.length <= 10 ? 0 : 'auto', lineHeight: 12 },
             },
             yAxis: round ? undefined : {
               type: 'value',
               name: chart.y,
+              nameLocation: chart.y ? 'middle' : undefined,
+              nameGap: chart.y ? 34 : undefined,
+              nameTextStyle: { fontSize: 10.5, fontWeight: 700, color: '#0f172a' },
               max: chart.yMax,
-              axisLabel: { fontSize: 10, formatter: suffix && !chart.y ? `{value}${suffix}` : undefined },
+              axisLine: { show: true, lineStyle: { color: '#cbd5e1' } },
+              axisTick: { show: true, lineStyle: { color: '#cbd5e1' } },
+              splitLine: { show: true, lineStyle: { color: '#e2e8f0' } },
+              axisLabel: { fontSize: 9.8, color: '#475569', formatter: suffix && !chart.y ? `{value}${suffix}` : undefined },
             },
             series: chart.series.map((item, sIdx) => ({
               name: item.name,
               type: round ? 'pie' : chart.type === 'bar' ? 'bar' : chart.type === 'scatter' ? 'scatter' : 'line',
+              connectNulls: item.connectNulls === true,
+              symbol: !round && chart.type !== 'bar' ? 'circle' : undefined,
+              symbolSize: item.symbolSize ?? (!round && chart.type !== 'bar' ? 5 : undefined),
               itemStyle: item.color ? { color: item.color } : undefined,
               lineStyle: !round && chart.type !== 'bar' && chart.type !== 'scatter'
-                ? { type: item.style || 'solid', width: 2.2, ...(item.color ? { color: item.color } : {}) }
+                ? { type: item.style || 'solid', width: 2.3, ...(item.color ? { color: item.color } : {}) }
                 : undefined,
               areaStyle: chart.type === 'area' || item.area ? { opacity: 0.16 } : undefined,
               label: chart.showValues && chart.type === 'bar'
-                ? { show: true, position: 'top', fontSize: 9.5, fontWeight: 700, formatter: `{c}${suffix}` }
+                ? { show: true, position: 'top', fontSize: 9.5, fontWeight: 700, color: '#0f172a', formatter: `{c}${suffix}` }
                 : undefined,
               center: round ? ['50%', '55%'] : undefined,
               radius: chart.type === 'donut' ? ['36%', '60%'] : chart.type === 'pie' ? '60%' : undefined,
               data: round
-                ? item.data.map((value, index) => ({ value, name: chart.labels[index] }))
-                : item.pointColors
-                  ? item.data.map((value, index) => item.pointColors?.[index]
-                    ? { value, itemStyle: { color: item.pointColors[index]! } }
-                    : value)
+                ? item.data.map((value, index) => ({ value: value as number, name: chart.labels[index] }))
+                : (item.pointColors || item.ghostPoints)
+                  ? item.data.map((value, index) => {
+                      if (item.ghostPoints?.[index]) {
+                        return { value, itemStyle: { color: 'rgba(148, 163, 184, 0.34)', borderColor: '#64748b', borderWidth: 1.5, borderType: 'dashed' as const } };
+                      }
+                      if (item.pointColors?.[index]) {
+                        return { value, itemStyle: { color: item.pointColors[index]! } };
+                      }
+                      return value;
+                    })
                   : item.data,
               ...(sIdx === 0 && markLineData ? { markLine: { silent: true, symbol: 'none', data: markLineData } } : {}),
               ...(sIdx === 0 && markAreaData ? { markArea: { silent: true, data: markAreaData } } : {}),
