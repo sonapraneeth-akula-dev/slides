@@ -187,9 +187,9 @@ export async function lintDeck(
       }
       if (/^<Panels\b/.test(trimmed)) { panelsDepth++; continue; }
       if (trimmed === '</Panels>') { if (panelsDepth > 0) panelsDepth--; continue; }
-      if (/^<(?:Split|Cards|Steps)\b/.test(trimmed)) { structuredDepth++; continue; }
-      if (/^<\/(?:Split|Cards|Steps)>$/.test(trimmed)) { if (structuredDepth > 0) structuredDepth--; continue; }
-      const isComponentWrapper = /^<\/?(?:Cards|Card|Callout|Flow|Lane|Step|Panels|Panel|Split|Stack|Steps|StepItem)\b.*>$/.test(trimmed) || /^<Arrow\b.*\/>$/.test(trimmed);
+      if (/^<(?:Split|Cards|Steps|BadgeList)\b/.test(trimmed)) { structuredDepth++; continue; }
+      if (/^<\/(?:Split|Cards|Steps|BadgeList)>$/.test(trimmed)) { if (structuredDepth > 0) structuredDepth--; continue; }
+      const isComponentWrapper = /^<\/?(?:Cards|Card|Col|Callout|Flow|Lane|Step|Panels|Panel|Split|Stack|Steps|StepItem|SectionLabel|BadgeList|BadgeRow)\b.*>$/.test(trimmed) || /^<Arrow\b.*\/>$/.test(trimmed);
       if (trimmed && flowDepth === 0 && panelsDepth === 0 && structuredDepth === 0 && !isComponentWrapper) {
         proseLines++;
         proseChars += trimmed.length;

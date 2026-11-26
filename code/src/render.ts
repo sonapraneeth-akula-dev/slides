@@ -137,7 +137,7 @@ md.renderer.rules.fence = (tokens, index) => {
 };
 
 // Static MDX-style components: attributes are plain strings, never evaluated.
-const componentTag = /^<(Cards|Card|Callout|Flow|Lane|Steps|StepItem|Step|Panels|Panel|Split|Stack)((?:\s+[a-z]+="[^"<{}]*")*)\s*>$/;
+const componentTag = /^<(Cards|Card|Col|Callout|Flow|Lane|Steps|StepItem|Step|Panels|Panel|Split|Stack|SectionLabel|BadgeList|BadgeRow)((?:\s+[a-z]+="[^"<{}]*")*)\s*>$/;
 const arrowTag = /^<Arrow((?:\s+[a-z]+="[^"<{}]*")+)\s*\/>$/;
 const calloutTypes: Record<string, string> = { note: 'Note', tip: 'Tip', warning: 'Warning' };
 const cardTones = new Set(['blue', 'teal', 'green', 'amber', 'red', 'purple', 'dark']);
@@ -199,9 +199,31 @@ md.renderer.rules.component_open = (tokens, index) => {
     const toneAttr = cardTones.has(meta.tone) ? ` data-tone="${meta.tone}"` : '';
     const eyebrowHtml = meta.eyebrow ? `<div class="card-eyebrow">${escapeHtml(meta.eyebrow)}</div>` : '';
     const statHtml = meta.stat ? `<div class="card-stat">${escapeHtml(meta.stat)}</div>` : '';
-    const titleHtml = meta.title ? `<p class="component-title">${escapeHtml(meta.title)}</p>` : '';
+    const badgeTone = meta.badgetone && ['red', 'amber', 'blue', 'green', 'teal', 'purple', 'muted'].includes(meta.badgetone)
+      ? meta.badgetone
+      : (meta.tone && meta.tone !== 'dark' ? meta.tone : 'blue');
+    const badgePill = meta.badge ? `<span class="ui-badge" data-tone="${escapeHtml(badgeTone)}">${escapeHtml(meta.badge)}</span>` : '';
+    const titleEl = meta.title ? `<p class="component-title">${escapeHtml(meta.title)}</p>` : '';
+    const headerBlock = badgePill && meta.badgerow === 'inline'
+      ? `<div class="card-head-inline">${badgePill}${titleEl}</div>`
+      : `${badgePill ? `<div class="card-badge-top">${badgePill}</div>` : ''}${titleEl}`;
+    const orderedHead = meta.statpos === 'below'
+      ? `${eyebrowHtml}${headerBlock}${statHtml}`
+      : `${eyebrowHtml}${statHtml}${headerBlock}`;
     const subHtml = meta.subtitle ? `<div class="card-subtitle">${escapeHtml(meta.subtitle)}</div>` : '';
-    return `<section class="component-card"${toneAttr}>${eyebrowHtml}${statHtml}${titleHtml}${subHtml}`;
+    const colsOpen = ['2', '3', '4'].includes(meta.columns) ? `<div class="card-cols" data-columns="${meta.columns}">` : '';
+    return `<section class="component-card"${toneAttr}>${orderedHead}${subHtml}${colsOpen}`;
+  }
+  if (name === 'Col') {
+    const titleHtml = meta.title ? `<p class="card-col-title">${escapeHtml(meta.title)}</p>` : '';
+    return `<div class="card-col">${titleHtml}`;
+  }
+  if (name === 'SectionLabel') return '<div class="section-divider">';
+  if (name === 'BadgeList') return '<div class="badge-list">';
+  if (name === 'BadgeRow') {
+    const tone = ['red', 'amber', 'blue', 'green', 'teal', 'purple', 'muted'].includes(meta.tone) ? meta.tone : 'blue';
+    const pill = `<span class="ui-badge badge-row-pill" data-tone="${tone}">${escapeHtml(meta.label || '')}</span>`;
+    return `<div class="badge-row">${pill}<div class="badge-row-desc">`;
   }
   if (name === 'Split') {
     const ratio = splitRatios.has(meta.ratio) ? meta.ratio : '50-50';
@@ -228,8 +250,9 @@ md.renderer.rules.component_open = (tokens, index) => {
   }
   if (name === 'Flow') {
     const layoutAttr = meta.layout === 'rows' ? ' data-layout="rows"' : '';
+    const variantAttr = meta.variant === 'plain' ? ' data-variant="plain"' : '';
     const toneAttr = ['blue', 'teal'].includes(meta.tone) ? ` data-tone="${meta.tone}"` : '';
-    return `<div class="flow-board"${layoutAttr}${toneAttr}><div class="flow-lanes">`;
+    return `<div class="flow-board"${layoutAttr}${variantAttr}${toneAttr}><div class="flow-lanes">`;
   }
   if (name === 'Lane') {
     const toneAttr = cardTones.has(meta.tone) && meta.tone !== 'dark' ? ` data-tone="${meta.tone}"` : '';
@@ -243,20 +266,24 @@ md.renderer.rules.component_open = (tokens, index) => {
     const idAttr = meta.id && /^[A-Za-z][\w-]*$/.test(meta.id) ? ` data-step-id="${escapeHtml(meta.id)}"` : '';
     const toneAttr = (meta.tone === 'accent' || (cardTones.has(meta.tone) && meta.tone !== 'dark'))
       ? ` data-tone="${meta.tone}"` : '';
+    const numHtml = meta.num ? `<span class="flow-step-num">${escapeHtml(meta.num)}</span>` : '';
+    const titleHtml = meta.title ? `<p class="flow-step-title">${escapeHtml(meta.title)}</p>` : '';
+    const headHtml = numHtml ? `<div class="flow-step-head">${numHtml}${titleHtml}</div>` : titleHtml;
     const badgeHtml = meta.badge ? `<span class="flow-step-badge">${escapeHtml(meta.badge)}</span>` : '';
-    return `<article class="flow-step"${idAttr}${toneAttr}>${meta.title ? `<p class="flow-step-title">${escapeHtml(meta.title)}</p>` : ''}${badgeHtml}`;
+    return `<article class="flow-step"${idAttr}${toneAttr}>${headHtml}${badgeHtml}`;
   }
   const type = calloutTypes[meta.type] ? meta.type : 'note';
   return `<aside class="callout" data-type="${type}"><p class="component-title">${escapeHtml(meta.title || calloutTypes[type])}</p>`;
 };
 md.renderer.rules.component_close = (tokens, index) => {
   const name = tokens[index].info;
-  if (name === 'Cards' || name === 'Panels' || name === 'Split' || name === 'Stack' || name === 'Steps') return '</div>';
-  if (name === 'Flow' || name === 'StepItem') return '</div></div>';
+  if (name === 'Cards' || name === 'Panels' || name === 'Split' || name === 'Stack' || name === 'Steps' || name === 'Col' || name === 'SectionLabel' || name === 'BadgeList') return '</div>';
+  if (name === 'Flow' || name === 'StepItem' || name === 'BadgeRow') return '</div></div>';
   if (name === 'Card') {
     const meta = (tokens[index].meta ?? {}) as Record<string, string>;
+    const colsClose = ['2', '3', '4'].includes(meta.columns) ? '</div>' : '';
     const footerHtml = meta.footer ? `<footer class="card-footer">${escapeHtml(meta.footer)}</footer>` : '';
-    return `${footerHtml}</section>`;
+    return `${colsClose}${footerHtml}</section>`;
   }
   if (name === 'Panel') {
     const meta = (tokens[index].meta ?? {}) as Record<string, string>;
