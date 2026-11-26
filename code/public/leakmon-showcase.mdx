@@ -212,14 +212,14 @@ Scaling to 138 recurring weekly runs exposed three critical infrastructure edge 
   "labels": ["2.5", "5.0", "7.5", "10.0", "12.5", "15.0", "17.5", "20.0"],
   "x": "Capture Time (minutes)",
   "y": "MB Held",
-  "yMax": 27,
+  "yMax": 25,
   "series": [
     { "name": "30s Snapshots", "data": [11.8, 12.0, 11.9, 12.1, 12.0, 12.1, 23.4, 12.1], "color": "#64748b", "symbolSize": 5 },
-    { "name": "Gen 1 Average (OLS) → False Leak", "data": [10.8, 11.6, 12.4, 13.2, 14.0, 14.8, 15.6, 16.4], "color": "#dc2626", "style": "dashed", "symbolSize": 0 },
-    { "name": "Gen 2/3 Median → Flat (Clean)", "data": [11.9, 11.9, 12.0, 12.0, 12.0, 12.0, 12.1, 12.1], "color": "#059669", "symbolSize": 0 }
+    { "name": "Gen 1 OLS (False Leak)", "data": [10.8, 11.6, 12.4, 13.2, 14.0, 14.8, 15.6, 16.4], "color": "#dc2626", "style": "dashed", "symbolSize": 0 },
+    { "name": "Gen 2/3 Median (Clean)", "data": [11.9, 11.9, 12.0, 12.0, 12.0, 12.0, 12.1, 12.1], "color": "#059669", "symbolSize": 0 }
   ],
   "annotations": [
-    { "x": "17.5", "y": 23.4, "text": "1 late cache spike", "tone": "red", "dx": -78, "dy": -6 }
+    { "x": "17.5", "y": 23.4, "text": "1 late cache spike", "tone": "red", "dx": -88, "dy": -2 }
   ]
 }
 ```
@@ -230,22 +230,23 @@ Scaling to 138 recurring weekly runs exposed three critical infrastructure edge 
 ```chart
 {
   "type": "bar",
-  "labels": ["Baseline Stack X", "Treatment Stack X"],
+  "labels": ["", "Baseline Stack X", "Treatment Stack X"],
   "y": "MB Held",
-  "yMax": 22,
+  "yMax": 20,
   "showValues": true,
   "valueSuffix": " MB",
   "series": [
-    { "name": "Observed in Top-25 Log", "data": [14.9, 15.1], "color": "#0284c7", "ghostPoints": [true, false], "pointColors": [null, "#0284c7"] }
+    { "name": "Observed in Top-25 Log", "data": [null, 14.9, 15.1], "color": "#0284c7", "ghostPoints": [false, true, false], "pointColors": [null, null, "#0284c7"] }
   ],
   "lines": [
-    { "y": 15.0, "label": "Top-25 Cutoff (15.0 MB)", "color": "#d97706", "style": "dashed" }
+    { "y": 15.0, "label": "Top-25 Cutoff (15.0 MB)", "labelPos": "start", "color": "#b45309", "style": "dashed" }
   ],
   "zones": [
-    { "yMin": 0, "yMax": 15.0, "label": "Rank #26+ Zone (Unprinted in Log)", "color": "#94a3b8" }
+    { "yMin": 0, "yMax": 15.0, "color": "#94a3b8" }
   ],
   "annotations": [
-    { "x": "Baseline Stack X", "y": 14.9, "seriesIndex": 0, "text": "Gen 1 saw '0 MB' → False Leak!", "tone": "red", "dx": 30, "dy": -34 }
+    { "x": "", "y": 8.0, "text": "Rank #26+ Zone\n(Unprinted in Log)", "tone": "muted", "arrow": false, "dx": 14 },
+    { "x": "Baseline Stack X", "y": 14.9, "seriesIndex": 0, "text": "Gen 1 saw '0 MB' → False Leak!", "tone": "red", "dx": -12, "dy": -36 }
   ]
 }
 ```
@@ -334,7 +335,7 @@ Generation 2 deleted over 21K lines of ad-hoc heuristics in favor of Theil-Sen m
   "type": "bar",
   "labels": ["Gen 2 Ref\n(Sept)", "Exp 1\n(Templates)", "Exp 2 TRAP\n(AR(1) nEff)", "Exp 3 TRAP\n(Raw Lambdas)", "Gen 3 Final\n(Nov)"],
   "y": "Shape-Matched Score (%)",
-  "yMax": 128,
+  "yMax": 140,
   "showValues": true,
   "valueSuffix": "%",
   "series": [
@@ -343,9 +344,9 @@ Generation 2 deleted over 21K lines of ad-hoc heuristics in favor of Theil-Sen m
     { "name": "Leak Precision (%)", "data": [59, 76, 97, 67, 86], "color": "#059669", "pointColors": [null, null, null, "#d97706", null] }
   ],
   "annotations": [
-    { "x": "Exp 2 TRAP\n(AR(1) nEff)", "y": 33, "seriesIndex": 1, "text": "TRAP #1:\nReg Recall 32.6%", "tone": "red", "dx": -14, "dy": -96 },
-    { "x": "Exp 3 TRAP\n(Raw Lambdas)", "y": 67, "seriesIndex": 2, "text": "TRAP #2:\n+1,280 hist. leaks", "tone": "amber", "dx": -10, "dy": -58 },
-    { "x": "Gen 3 Final\n(Nov)", "y": 86, "seriesIndex": 2, "text": "Winner:\n4.4% hist. alerts", "tone": "green", "dx": -8, "dy": -36 }
+    { "x": "Exp 2 TRAP\n(AR(1) nEff)", "y": 33, "seriesIndex": 1, "text": "TRAP #1:\nReg Recall 32.6%", "tone": "red", "dx": -34, "dy": -108 },
+    { "x": "Exp 3 TRAP\n(Raw Lambdas)", "y": 67, "seriesIndex": 2, "text": "TRAP #2:\n+1,280 hist. leaks", "tone": "amber", "dx": -14, "dy": -70 },
+    { "x": "Gen 3 Final\n(Nov)", "y": 86, "seriesIndex": 2, "text": "Winner:\n4.4% hist. alerts", "tone": "green", "dx": 4, "dy": -46 }
   ]
 }
 ```
@@ -386,10 +387,10 @@ Without controlled ablation on 280 synthetic + 4,235 historical runs, both AR(1)
   "labels": ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19", "20", "21", "22", "23", "24", "25"],
   "x": "Snapshots Across Batch Cycles",
   "y": "MB Held",
-  "yMax": 24,
+  "yMax": 25,
   "series": [
-    { "name": "Raw Batch Cycles (Gen 2 Missed 100%)", "data": [3.8, 8.0, 11.8, 6.4, 5.0, 9.2, 13.0, 7.6, 6.2, 10.4, 14.2, 8.8, 7.4, 11.6, 15.4, 10.0, 8.6, 12.8, 16.6, 11.2, 9.8, 14.0, 17.8, 12.4, 11.0], "color": "#64748b", "symbolSize": 4 },
-    { "name": "Gen 3 Valley Trend (27/28 = 96.4% Caught)", "data": [3.8, null, null, null, 5.0, null, null, null, 6.2, null, null, null, 7.4, null, null, null, 8.6, null, null, null, 9.8, null, null, null, 11.0], "color": "#059669", "connectNulls": true, "symbolSize": 8, "area": true }
+    { "name": "Raw Batch Cycles (Gen 2 Missed)", "data": [3.8, 8.0, 11.8, 6.4, 5.0, 9.2, 13.0, 7.6, 6.2, 10.4, 14.2, 8.8, 7.4, 11.6, 15.4, 10.0, 8.6, 12.8, 16.6, 11.2, 9.8, 14.0, 17.8, 12.4, 11.0], "color": "#64748b", "symbolSize": 4 },
+    { "name": "Gen 3 Valley Trend (96.4% Caught)", "data": [3.8, null, null, null, 5.0, null, null, null, 6.2, null, null, null, 7.4, null, null, null, 8.6, null, null, null, 9.8, null, null, null, 11.0], "color": "#059669", "connectNulls": true, "symbolSize": 7, "area": true }
   ]
 }
 ```
@@ -403,7 +404,7 @@ Without controlled ablation on 280 synthetic + 4,235 historical runs, both AR(1)
   "labels": ["1.0", "2.5", "5.0", "7.5", "10.0", "12.5", "15.0", "17.5", "20.0"],
   "x": "Capture Time (minutes)",
   "y": "MB Held",
-  "yMax": 38,
+  "yMax": 40,
   "series": [
     { "name": "Treatment Cache (32 MB → Watch)", "data": [9.8, 15.5, 22.8, 27.2, 29.6, 30.8, 31.4, 31.7, 31.8], "color": "#b45309", "symbolSize": 0 },
     { "name": "Baseline Pre-Floor", "data": [3.4, 4.9, 6.4, 7.3, null, null, null, null, null], "color": "#94a3b8", "style": "dashed", "symbolSize": 0 },
@@ -412,16 +413,16 @@ Without controlled ablation on 280 synthetic + 4,235 historical runs, both AR(1)
   "lines": [
     { "x": "7.5", "color": "#cbd5e1", "style": "dashed" },
     { "x": "12.5", "color": "#cbd5e1", "style": "dashed" },
-    { "y": 7.2, "label": "Top-25 Floor (7.2 MB)", "color": "#334155", "style": "dotted" }
+    { "y": 7.2, "label": "Top-25 Floor (7.2 MB)", "labelPos": "start", "color": "#334155", "style": "dotted" }
   ],
   "zones": [
     { "yMin": 0, "yMax": 7.2, "color": "#94a3b8" }
   ],
   "annotations": [
-    { "x": "2.5", "y": 35.5, "text": "Seg 1: Fast", "tone": "muted", "arrow": false },
-    { "x": "10.0", "y": 35.5, "text": "Seg 2: Slowing", "tone": "muted", "arrow": false },
-    { "x": "17.5", "y": 35.5, "text": "Seg 3: Flat Cap", "tone": "amber", "arrow": false },
-    { "x": "17.5", "y": 31.7, "text": "4x Higher Cap\n(End slope ≈ 0)", "tone": "amber", "dx": -52, "dy": 32 }
+    { "x": "2.5", "y": 37.5, "text": "Seg 1: Fast", "tone": "muted", "arrow": false },
+    { "x": "10.0", "y": 37.5, "text": "Seg 2: Slowing", "tone": "muted", "arrow": false },
+    { "x": "17.5", "y": 37.5, "text": "Seg 3: Flat Cap", "tone": "amber", "arrow": false },
+    { "x": "17.5", "y": 31.7, "text": "4x Higher Cap\n(End slope ≈ 0)", "tone": "amber", "dx": -42, "dy": 34 }
   ]
 }
 ```
@@ -457,7 +458,7 @@ Connecting bucket minima turns oscillating batch sawtooth leaks into a clean mon
 {
   "type": "bar",
   "labels": ["Gen 1\n(Saved Baseline)", "Gen 2\n(Sept Rewrite)", "Gen 3\n(Nov Final)"],
-  "yMax": 36,
+  "yMax": 40,
   "showValues": true,
   "valueSuffix": "%",
   "series": [
@@ -474,7 +475,7 @@ Connecting bucket minima turns oscillating batch sawtooth leaks into a clean mon
 {
   "type": "bar",
   "labels": ["New Leak\n(168 runs)", "Regression\n(165 runs)", "Sawtooth\n(Shape 4)", "Plateaus\n(Shape 8)"],
-  "yMax": 115,
+  "yMax": 120,
   "showValues": true,
   "valueSuffix": "%",
   "series": [

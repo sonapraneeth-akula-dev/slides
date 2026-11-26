@@ -2,6 +2,7 @@ export interface ChartLine {
   x?: string | number;
   y?: number;
   label?: string;
+  labelPos?: 'start' | 'middle' | 'end';
   color?: string;
   style?: 'solid' | 'dashed' | 'dotted';
 }
@@ -130,11 +131,12 @@ export function parseChart(source: string): ChartData {
     if (!Array.isArray(chart.lines) || chart.lines.length > 12 || !chart.lines.every(raw => {
       if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return false;
       const line = raw as Record<string, unknown>;
-      if (Object.keys(line).some(k => !['x', 'y', 'label', 'color', 'style'].includes(k))) return false;
+      if (Object.keys(line).some(k => !['x', 'y', 'label', 'labelPos', 'color', 'style'].includes(k))) return false;
       const hasX = typeof line.x === 'string' || finiteNumber(line.x);
       const hasY = finiteNumber(line.y);
       if (hasX === hasY) return false;
       if (line.label !== undefined && (typeof line.label !== 'string' || line.label.length > 80)) return false;
+      if (line.labelPos !== undefined && !['start', 'middle', 'end'].includes(String(line.labelPos))) return false;
       if (line.color !== undefined && (typeof line.color !== 'string' || !hexColor.test(line.color))) return false;
       if (line.style !== undefined && !lineStyles.has(String(line.style))) return false;
       return true;

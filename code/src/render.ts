@@ -593,6 +593,24 @@ function drawChartAnnotations(
     ? Math.abs(Number(instance.convertToPixel({ xAxisIndex: 0 }, 1)) - Number(instance.convertToPixel({ xAxisIndex: 0 }, 0))) || 60
     : 60;
 
+  type PlacedAnnotation = {
+    tone: string;
+    pal: { fg: string; bg: string; stroke: string };
+    arrow: boolean;
+    lines: string[];
+    fs: number;
+    lh: number;
+    bw: number;
+    bh: number;
+    bx: number;
+    by: number;
+    tx: number;
+    ty: number;
+  };
+  const placed: PlacedAnnotation[] = [];
+  const fs = Math.max(5.5, Math.min(10.5, w * 0.0185));
+  const lh = fs * 1.24;
+
   for (const ann of chart.annotations) {
     const tone = ann.tone && chartAnnotationPalette[ann.tone] ? ann.tone : 'blue';
     const pal = chartAnnotationPalette[tone];
@@ -608,18 +626,49 @@ function drawChartAnnotations(
     const tx = rawPt[0] + barShift;
     const ty = rawPt[1];
     const lines = ann.text.split('\n').slice(0, 3);
-    const fs = Math.max(8.5, Math.min(11, w * 0.019));
-    const lh = fs * 1.24;
     const maxChars = Math.max(...lines.map(l => l.length), 4);
-    const bw = Math.round(maxChars * fs * 0.56 + 12);
-    const bh = Math.round(lines.length * lh + 7);
+    const padX = ann.arrow === false ? 4 : 10;
+    const bw = Math.round(maxChars * fs * 0.55 + padX);
+    const bh = Math.round(lines.length * lh + (ann.arrow === false ? 2 : 6));
     const dxPx = (ann.dx ?? 0) * (w / 520);
     const dyPx = (ann.dy ?? (ann.arrow === false ? 0 : -38)) * (h / 260);
     const bx = Math.min(w - bw / 2 - 4, Math.max(bw / 2 + 4, tx + dxPx));
     const by = Math.min(h - bh / 2 - 4, Math.max(bh / 2 + 4, ty + dyPx));
-    if (ann.arrow !== false) {
+    placed.push({ tone, pal, arrow: ann.arrow !== false, lines, fs, lh, bw, bh, bx, by, tx, ty });
+  }
+
+  // Pairwise horizontal/vertical anti-overlap pass so callout boxes never collide at any width.
+  const boxed = placed.filter(item => item.arrow).sort((a, b) => a.bx - b.bx);
+  for (let pass = 0; pass < 4; pass++) {
+    for (let i = 0; i < boxed.length - 1; i++) {
+      const a = boxed[i];
+      const b = boxed[i + 1];
+      const vOverlap = (a.bh + b.bh) / 2 + 3 - Math.abs(a.by - b.by);
+      const hOverlap = (a.bw + b.bw) / 2 + 6 - (b.bx - a.bx);
+      if (vOverlap > 0 && hOverlap > 0) {
+        const shift = hOverlap / 2;
+        a.bx = Math.max(a.bw / 2 + 4, a.bx - shift);
+        b.bx = Math.min(w - b.bw / 2 - 4, a.bx + (a.bw + b.bw) / 2 + 6);
+        if ((b.bx - a.bx) < (a.bw + b.bw) / 2 + 4) {
+          a.bx = Math.max(a.bw / 2 + 4, b.bx - ((a.bw + b.bw) / 2 + 6));
+        }
+        if ((b.bx - a.bx) < (a.bw + b.bw) / 2 + 4) {
+          b.by = Math.min(h - b.bh / 2 - 4, a.by + (a.bh + b.bh) / 2 + 5);
+        }
+      }
+    }
+  }
+
+  const barValuePad = chart.showValues && chart.type === 'bar' ? Math.max(10, fs * 1.35) : 0;
+
+  for (const item of placed) {
+    const { tone, pal, arrow, lines, bw, bh, bx, by, tx } = item;
+    const tipY = arrow && barValuePad > 0 && by + bh / 2 < item.ty - barValuePad
+      ? item.ty - barValuePad
+      : item.ty;
+    if (arrow) {
       const vx = tx - bx;
-      const vy = ty - by;
+      const vy = tipY - by;
       const dist = Math.hypot(vx, vy);
       if (dist > 6) {
         const edgeScale = 1 / Math.max(Math.abs(vx) / (bw / 2), Math.abs(vy) / (bh / 2), 1e-6);
@@ -628,7 +677,7 @@ function drawChartAnnotations(
         const ux = vx / dist;
         const uy = vy / dist;
         const ex = tx - ux * 2;
-        const ey = ty - uy * 2;
+        const ey = tipY - uy * 2;
         if (Math.hypot(ex - sx, ey - sy) > 3) {
           const line = document.createElementNS(svgNamespace, 'line');
           line.setAttribute('x1', sx.toFixed(1));
@@ -636,7 +685,7 @@ function drawChartAnnotations(
           line.setAttribute('x2', ex.toFixed(1));
           line.setAttribute('y2', ey.toFixed(1));
           line.setAttribute('stroke', pal.stroke);
-          line.setAttribute('stroke-width', '1.6');
+          line.setAttribute('stroke-width', '1.5');
           line.setAttribute('marker-end', `url(#chart-head-${tone}-${overlayId})`);
           svg.append(line);
         }
@@ -649,19 +698,19 @@ function drawChartAnnotations(
       box.setAttribute('rx', '3.5');
       box.setAttribute('fill', pal.bg);
       box.setAttribute('stroke', pal.stroke);
-      box.setAttribute('stroke-width', '1.3');
+      box.setAttribute('stroke-width', '1.25');
       svg.append(box);
     }
     const label = document.createElementNS(svgNamespace, 'text');
     label.setAttribute('text-anchor', 'middle');
     label.setAttribute('fill', pal.fg);
-    label.setAttribute('font-size', fs.toFixed(1));
+    label.setAttribute('font-size', item.fs.toFixed(1));
     label.setAttribute('font-weight', '700');
-    const firstBaseline = by - ((lines.length - 1) * lh) / 2 + fs * 0.34;
+    const firstBaseline = by - ((lines.length - 1) * item.lh) / 2 + item.fs * 0.34;
     lines.forEach((txt, idx) => {
       const tspan = document.createElementNS(svgNamespace, 'tspan');
       tspan.setAttribute('x', bx.toFixed(1));
-      tspan.setAttribute('y', (firstBaseline + idx * lh).toFixed(1));
+      tspan.setAttribute('y', (firstBaseline + idx * item.lh).toFixed(1));
       tspan.textContent = txt;
       label.append(tspan);
     });
@@ -749,13 +798,20 @@ async function renderFences(root: HTMLElement): Promise<void> {
         try {
           const round = chart.type === 'pie' || chart.type === 'donut';
           const suffix = chart.valueSuffix ?? '';
+          const cw = canvas.clientWidth || 520;
+          const baseFs = Math.max(7.4, Math.min(10.2, cw * 0.02));
           const markLineData = !round && chart.lines?.length
-            ? chart.lines.map(ln => ({
-                ...(ln.y !== undefined ? { yAxis: ln.y } : { xAxis: ln.x }),
-                name: ln.label ?? '',
-                lineStyle: { color: ln.color || '#64748b', type: ln.style || 'dashed', width: 1.5 },
-                label: ln.label ? { show: true, formatter: ln.label, fontSize: 10, fontWeight: 700, color: ln.color || '#475569', position: ln.y !== undefined ? 'insideEndTop' : 'end' } : { show: false },
-              }))
+            ? chart.lines.map(ln => {
+                const hPos = ln.labelPos === 'start' ? 'insideStartTop'
+                  : ln.labelPos === 'middle' ? 'insideMiddleTop'
+                  : 'insideEndTop';
+                return {
+                  ...(ln.y !== undefined ? { yAxis: ln.y } : { xAxis: ln.x }),
+                  name: ln.label ?? '',
+                  lineStyle: { color: ln.color || '#64748b', type: ln.style || 'dashed', width: 1.5 },
+                  label: ln.label ? { show: true, formatter: ln.label, fontSize: baseFs, fontWeight: 700, color: ln.color || '#475569', position: ln.y !== undefined ? hPos : 'end' } : { show: false },
+                };
+              })
             : undefined;
           const markAreaData = !round && chart.zones?.length
             ? chart.zones.map(zn => [
@@ -764,7 +820,7 @@ async function renderFences(root: HTMLElement): Promise<void> {
                   ...(zn.yMin !== undefined ? { yAxis: zn.yMin } : {}),
                   name: zn.label ?? '',
                   itemStyle: { color: zn.color || '#64748b', opacity: 0.1 },
-                  label: zn.label ? { show: true, position: 'inside', fontSize: 10, fontWeight: 600, color: '#475569' } : { show: false },
+                  label: zn.label ? { show: true, position: 'inside', fontSize: baseFs, fontWeight: 600, color: '#475569' } : { show: false },
                 },
                 {
                   ...(zn.xMax !== undefined ? { xAxis: zn.xMax } : {}),
@@ -772,37 +828,40 @@ async function renderFences(root: HTMLElement): Promise<void> {
                 },
               ])
             : undefined;
+          const showLegend = round || chart.series.length > 1;
           instance.setOption({
             animation: !staticExport && !matchMedia('(prefers-reduced-motion: reduce)').matches,
             tooltip: { trigger: round ? 'item' : 'axis', renderMode: 'richText' },
-            legend: { top: 0, itemWidth: 14, itemHeight: 8, textStyle: { fontSize: 10.5, fontWeight: 600, color: '#1e293b' } },
-            grid: { left: chart.y ? '8%' : '5%', right: '4%', bottom: chart.x ? '14%' : '8%', top: '19%', containLabel: true },
+            legend: { show: showLegend, top: 0, itemWidth: 12, itemHeight: 7, itemGap: 8, textStyle: { fontSize: baseFs, fontWeight: 600, color: '#1e293b' } },
+            grid: { left: chart.y ? '8%' : '5%', right: '4%', bottom: chart.x ? '14%' : '8%', top: showLegend ? '20%' : '10%', containLabel: true },
             xAxis: round ? undefined : {
               type: chart.type === 'scatter' ? 'value' : 'category',
               data: chart.type === 'scatter' ? undefined : chart.labels,
               name: chart.x,
               nameLocation: chart.x ? 'middle' : undefined,
-              nameGap: chart.x ? 22 : undefined,
-              nameTextStyle: { fontSize: 10.5, fontWeight: 700, color: '#0f172a' },
+              nameGap: chart.x ? Math.round(baseFs * 2.1) : undefined,
+              nameTextStyle: { fontSize: baseFs, fontWeight: 700, color: '#0f172a' },
               axisLine: { lineStyle: { color: '#94a3b8' } },
               axisTick: { show: false },
-              axisLabel: { fontSize: 9.8, fontWeight: 600, color: '#1e293b', interval: chart.labels.length <= 10 ? 0 : 'auto', lineHeight: 12 },
+              axisLabel: { fontSize: baseFs * 0.96, fontWeight: 600, color: '#1e293b', interval: chart.labels.length <= 10 ? 0 : 'auto', lineHeight: Math.round(baseFs * 1.2) },
             },
             yAxis: round ? undefined : {
               type: 'value',
               name: chart.y,
               nameLocation: chart.y ? 'middle' : undefined,
-              nameGap: chart.y ? 34 : undefined,
-              nameTextStyle: { fontSize: 10.5, fontWeight: 700, color: '#0f172a' },
+              nameGap: chart.y ? Math.round(baseFs * 3.2) : undefined,
+              nameTextStyle: { fontSize: baseFs, fontWeight: 700, color: '#0f172a' },
               max: chart.yMax,
+              splitNumber: 4,
               axisLine: { show: true, lineStyle: { color: '#cbd5e1' } },
               axisTick: { show: true, lineStyle: { color: '#cbd5e1' } },
               splitLine: { show: true, lineStyle: { color: '#e2e8f0' } },
-              axisLabel: { fontSize: 9.8, color: '#475569', formatter: suffix && !chart.y ? `{value}${suffix}` : undefined },
+              axisLabel: { fontSize: baseFs * 0.96, color: '#475569', formatter: suffix && !chart.y ? `{value}${suffix}` : undefined },
             },
             series: chart.series.map((item, sIdx) => ({
               name: item.name,
               type: round ? 'pie' : chart.type === 'bar' ? 'bar' : chart.type === 'scatter' ? 'scatter' : 'line',
+              barMaxWidth: chart.type === 'bar' ? (chart.series.length === 1 ? 58 : 34) : undefined,
               connectNulls: item.connectNulls === true,
               symbol: !round && chart.type !== 'bar' ? 'circle' : undefined,
               symbolSize: item.symbolSize ?? (!round && chart.type !== 'bar' ? 5 : undefined),
@@ -812,7 +871,7 @@ async function renderFences(root: HTMLElement): Promise<void> {
                 : undefined,
               areaStyle: chart.type === 'area' || item.area ? { opacity: 0.16 } : undefined,
               label: chart.showValues && chart.type === 'bar'
-                ? { show: true, position: 'top', fontSize: 9.5, fontWeight: 700, color: '#0f172a', formatter: `{c}${suffix}` }
+                ? { show: true, position: 'top', fontSize: baseFs * 0.94, fontWeight: 700, color: '#0f172a', formatter: `{c}${suffix}` }
                 : undefined,
               center: round ? ['50%', '55%'] : undefined,
               radius: chart.type === 'donut' ? ['36%', '60%'] : chart.type === 'pie' ? '60%' : undefined,
