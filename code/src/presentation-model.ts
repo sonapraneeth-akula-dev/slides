@@ -5,7 +5,7 @@ function content(items: SlideItem[], step: number, slot = ''): string {
   return items.filter(item => item.step === step && item.slot === slot).map(item => item.text).join('\n').trim();
 }
 
-function slide(source: Pick<SourceSlide, 'id' | 'parent' | 'index' | 'layout' | 'items' | 'reveals' | 'metadata'> & { section?: string; title?: string; hideTitle?: boolean; theme?: string; eyebrow?: string; subtitle?: string }): Slide {
+function slide(source: Pick<SourceSlide, 'id' | 'parent' | 'index' | 'layout' | 'items' | 'reveals' | 'metadata'> & { section?: string; title?: string; hideTitle?: boolean; theme?: string; eyebrow?: string; subtitle?: string; accentBar?: string }): Slide {
   const slots: Record<string, string> = {};
   for (const item of source.items) if (item.slot) slots[item.slot] = content(source.items, 0, item.slot);
   return {
@@ -16,6 +16,7 @@ function slide(source: Pick<SourceSlide, 'id' | 'parent' | 'index' | 'layout' | 
     ...(source.theme ? { theme: source.theme } : {}),
     ...(source.eyebrow ? { eyebrow: source.eyebrow } : {}),
     ...(source.subtitle ? { subtitle: source.subtitle } : {}),
+    ...(source.accentBar ? { accentBar: source.accentBar } : {}),
     body: content(source.items, 0),
     slots,
     reveals: Array.from({ length: source.reveals }, (_, index) => content(source.items, index + 1)),
@@ -68,6 +69,7 @@ export interface PublicState {
       theme?: string;
       eyebrow?: string;
       subtitle?: string;
+      accentBar?: string;
       items: Array<Pick<SlideItem, 'text' | 'step' | 'slot'>>;
     };
   };

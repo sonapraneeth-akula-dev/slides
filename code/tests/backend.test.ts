@@ -104,7 +104,7 @@ slides:
     metadata:
       metadataBottomRight: slideNumber
 ---
-::slide{id="one" section="Findings" theme="midnight" eyebrow="TRACK 1 · ARCHITECTURE" subtitle="Decoupled five-stage pipeline" metadataBottomRight="none" metadataTopLeft="slideTitle" layout="title-image-left"}
+::slide{id="one" section="Findings" theme="midnight" accentBar="teal" eyebrow="TRACK 1 · ARCHITECTURE" subtitle="Decoupled five-stage pipeline" metadataBottomRight="none" metadataTopLeft="slideTitle" layout="title-image-left"}
 # First
 :::slot{name="image"}
 ![Example](assets/sample-landscape.svg)
@@ -130,6 +130,7 @@ slides:
     expect(snapshot.stage.slides[0].theme).toBe('midnight');
     expect(snapshot.stage.slides[0].eyebrow).toBe('TRACK 1 · ARCHITECTURE');
     expect(snapshot.stage.slides[0].subtitle).toBe('Decoupled five-stage pipeline');
+    expect(snapshot.stage.slides[0].accentBar).toBe('teal');
     expect(snapshot.stage.slides[0].metadata).toEqual({ metadataBottomRight: 'none', metadataTopLeft: 'slideTitle' });
     for (const directive of [
       'section=""', 'section="<script>"', 'metadataBottomRight="invalid"',

@@ -21,6 +21,7 @@ export interface Slide {
   theme?: string;
   eyebrow?: string;
   subtitle?: string;
+  accentBar?: string;
   section?: string;
   metadata?: Record<string, string>;
   body: string;
@@ -886,6 +887,8 @@ export async function renderStage(host: HTMLElement, stage: Stage, slide: Slide 
   else delete host.dataset.hideTitle;
   if (slide.eyebrow) host.dataset.hasEyebrow = 'true';
   else delete host.dataset.hasEyebrow;
+  if (slide.accentBar) host.dataset.accentBar = slide.accentBar;
+  else delete host.dataset.accentBar;
   if (slide.layout !== 'blank') {
     const content = document.createElement('div');
     content.className = 'slide-content';
