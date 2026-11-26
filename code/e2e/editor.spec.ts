@@ -1984,6 +1984,42 @@ test('LeakMon showcase demo renders dark/light themes, multi-track flows, annota
   await uxStage.scrollIntoViewIfNeeded();
   await expect(uxStage.locator('.badge-row')).toHaveCount(5);
 
+  const gen2Stage = page.locator('.preview-card[data-slide-id="gen2-rewrite"] .preview-stage');
+  await gen2Stage.scrollIntoViewIfNeeded();
+  const fivePillarFill = await gen2Stage.evaluate(el => {
+    const card = el.querySelector('.component-card:has(.pillar-steps)')!.getBoundingClientRect();
+    const lastStep = el.querySelector('.pillar-step:last-child')!.getBoundingClientRect();
+    return {
+      bottomSlack: card.bottom - lastStep.bottom,
+      cardHeight: card.height,
+      stepHeight: lastStep.height,
+      overflow: el.scrollHeight - el.clientHeight,
+    };
+  });
+  expect(fivePillarFill.overflow).toBeLessThanOrEqual(2);
+  expect(fivePillarFill.bottomSlack).toBeLessThan(fivePillarFill.cardHeight * 0.08);
+
+  const originalSource = await page.locator('#source').inputValue();
+  const extraPillars = `<StepItem num="6" tone="teal" title="Sixth Adaptive Pillar">\nCompresses row height automatically as entries grow.\n</StepItem>\n<StepItem num="7" tone="blue" title="Seventh Adaptive Pillar">\nKeeps full-height occupation with zero stage overflow.\n</StepItem>\n</Steps>`;
+  await page.locator('#source').fill(originalSource.replace('</Steps>', extraPillars));
+  await expect(gen2Stage.locator('.pillar-step')).toHaveCount(7);
+  const sevenPillarFill = await gen2Stage.evaluate(el => {
+    const card = el.querySelector('.component-card:has(.pillar-steps)')!.getBoundingClientRect();
+    const lastStep = el.querySelector('.pillar-step:last-child')!.getBoundingClientRect();
+    return {
+      bottomSlack: card.bottom - lastStep.bottom,
+      cardHeight: card.height,
+      stepHeight: lastStep.height,
+      overflow: el.scrollHeight - el.clientHeight,
+    };
+  });
+  expect(sevenPillarFill.overflow).toBeLessThanOrEqual(2);
+  expect(sevenPillarFill.bottomSlack).toBeLessThan(sevenPillarFill.cardHeight * 0.08);
+  expect(sevenPillarFill.stepHeight).toBeLessThan(fivePillarFill.stepHeight);
+  await page.locator('#source').fill(originalSource);
+  await expect(gen2Stage.locator('.pillar-step')).toHaveCount(5);
+  await expect(page.locator('#save')).toBeDisabled();
+
   await page.locator('#present').click();
   const slideIds = [
     'hero', 'big-picture', 'pipeline-stages', 'fleet-scale', 'gen1-limits', 'gen2-rewrite',
